@@ -1,0 +1,405 @@
+// Pluggable AI Provider Architecture
+// Supports any AI provider: OpenAI, Anthropic, Gemini, Ollama, etc.
+
+export interface AIProvider {
+  name: string;
+  analyzeImage(imageBase64: string, prompt: string): Promise<AIResponse>;
+  chat(messages: AIMessage[], prompt: string): Promise<AIResponse>;
+}
+
+export interface AIMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface AIResponse {
+  text: string;
+  error?: string;
+  provider?: string;  // Which provider processed the request
+  retryable?: boolean; // If true, fallback to next provider
+}
+
+// Provider implementations
+import { chatWithOpenAI, analyzeImageWithOpenAI } from './ai-providers/openai';
+import { chatWithOllama, analyzeImageWithOllama } from './ai-providers/ollama';
+import { chatWithMinimax, analyzeImageWithMinimax } from './ai-providers/minimax';
+import { chatWithGemini, analyzeImageWithGemini } from './ai-providers/gemini';
+
+// Fallback chain order - tried in sequence until one succeeds
+const FALLBACK_CHAIN = ['gemini', 'openai', 'minimax', 'ollama'];
+
+export interface AIProviderConfig {
+  provider: string;
+  priority: number;
+}
+
+// Provider registry - add new providers here
+const providers: Record<string, AIProvider> = {
+  openai: {
+    name: 'OpenAI GPT-4o',
+    analyzeImage: analyzeImageWithOpenAI,
+    chat: chatWithOpenAI,
+  },
+  ollama: {
+    name: 'Ollama (Local)',
+    analyzeImage: analyzeImageWithOllama,
+    chat: chatWithOllama,
+  },
+  minimax: {
+    name: 'MiniMax',
+    analyzeImage: analyzeImageWithMinimax,
+    chat: chatWithMinimax,
+  },
+  gemini: {
+    name: 'Google Gemini Vision',
+    analyzeImage: analyzeImageWithGemini,
+    chat: chatWithGemini,
+  },
+};
+
+// Get configured provider or fallback chain
+function getProviderChain(): string[] {
+  const configured = process.env.AI_PROVIDER;
+  
+  if (configured) {
+    // Single provider specified
+    return [configured];
+  }
+  
+  // Use fallback chain - check which providers have API keys configured
+  const chain: string[] = [];
+  
+  for (const provider of FALLBACK_CHAIN) {
+    const hasKey = checkProviderHasKey(provider);
+    if (hasKey) {
+      chain.push(provider);
+    }
+  }
+  
+  return chain.length > 0 ? chain : ['ollama']; // Default to ollama as last resort
+}
+
+// Check if a provider has its API key configured
+function checkProviderHasKey(provider: string): boolean {
+  switch (provider) {
+    case 'gemini':
+      return !!process.env.GEMINI_API_KEY;
+    case 'openai':
+      return !!process.env.OPENAI_API_KEY;
+    case 'minimax':
+      return !!process.env.MINIMAX_API_KEY;
+    case 'ollama':
+      // Ollama is local, always "available" if server is running
+      return true;
+    default:
+      return false;
+  }
+}
+
+export function getAIProvider(name?: string): AIProvider {
+  // If explicitly specified, use that provider
+  if (name) {
+    const provider = providers[name];
+    if (provider) {
+      return provider;
+    }
+    console.warn(`AI provider ${name} not found, using fallback chain`);
+  }
+  
+  // Try providers in fallback chain until one works
+  const chain = getProviderChain();
+  if (chain.length === 0) {
+    console.warn('No AI providers configured, falling back to ollama');
+    return providers.ollama;
+  }
+  
+  // Return first available provider (or wrap with fallback logic)
+  const primaryProvider = providers[chain[0]];
+  if (!primaryProvider) {
+    return providers.ollama;
+  }
+  
+  return primaryProvider;
+}
+
+/**
+ * Analyze image with automatic fallback between providers
+ * Tries each provider in the fallback chain until one succeeds
+ */
+export async function analyzeImageWithFallback(
+  imageBase64: string,
+  prompt: string,
+  preferredProvider?: string
+): Promise<AIResponse> {
+  // Build provider chain: preferred first, then fallback chain
+  const chain = getProviderChain();
+  
+  // Move preferred to front if specified
+  if (preferredProvider && chain.includes(preferredProvider)) {
+    const idx = chain.indexOf(preferredProvider);
+    chain.splice(idx, 1);
+    chain.unshift(preferredProvider);
+  }
+  
+  const errors: string[] = [];
+  
+  for (const providerName of chain) {
+    const provider = providers[providerName];
+    if (!provider) continue;
+    
+    try {
+      const result = await provider.analyzeImage(imageBase64, prompt);
+      
+      // Check if result indicates a retryable error
+      if (result.error && (result.retryable || result.error.includes('429') || result.error.includes('rate_limit') || result.error.includes('quota'))) {
+        console.warn(`Provider ${providerName} failed with retryable error: ${result.error}`);
+        errors.push(`${providerName}: ${result.error}`);
+        continue; // Try next provider
+      }
+      
+      if (result.error) {
+        // Non-retryable error - return it
+        return { ...result, provider: providerName };
+      }
+      
+      // Success!
+      return { ...result, provider: providerName };
+    } catch (err: any) {
+      console.error(`Provider ${providerName} threw error:`, err);
+      errors.push(`${providerName}: ${err.message || err}`);
+      continue; // Try next provider
+    }
+  }
+  
+  // All providers failed
+  return {
+    text: '',
+    error: `All AI providers failed. Errors: ${errors.join('; ')}`,
+    provider: 'none',
+  };
+}
+
+/**
+ * Chat with automatic fallback between providers
+ */
+export async function chatWithFallback(
+  messages: AIMessage[],
+  prompt: string,
+  preferredProvider?: string
+): Promise<AIResponse> {
+  const chain = getProviderChain();
+  
+  // Move preferred to front if specified
+  if (preferredProvider && chain.includes(preferredProvider)) {
+    const idx = chain.indexOf(preferredProvider);
+    chain.splice(idx, 1);
+    chain.unshift(preferredProvider);
+  }
+  
+  const errors: string[] = [];
+  
+  for (const providerName of chain) {
+    const provider = providers[providerName];
+    if (!provider) continue;
+    
+    try {
+      const result = await provider.chat(messages, prompt);
+      
+      if (result.error) {
+        errors.push(`${providerName}: ${result.error}`);
+        continue;
+      }
+      
+      return { ...result, provider: providerName };
+    } catch (err: any) {
+      errors.push(`${providerName}: ${err.message || err}`);
+      continue;
+    }
+  }
+  
+  return {
+    text: '',
+    error: `All AI providers failed. Errors: ${errors.join('; ')}`,
+    provider: 'none',
+  };
+}
+
+// Coach prompts and response logic
+export interface CoachContext {
+  clientName: string;
+  gender: 'male' | 'female';
+  currentPhase: number;
+  goalWeight: number;
+  currentWeight: number;
+  startingWeight: number;
+  programType: string;
+  eventDate?: string;
+  weekNumber: number;
+  trainerNotes?: string;
+  recentMessedUp?: number; // count of messed up meals this week
+}
+
+const PORTION_SIZES = {
+  male: {
+    protein: '6 ounces',
+    veg: '2 cups',
+    fat: '1-2 tablespoons',
+  },
+  female: {
+    protein: '4 ounces',
+    veg: '1-2 cups',
+    fat: '1 tablespoon',
+  },
+};
+
+export function getCoachPrompt(context: CoachContext, message: string): string {
+  const portions = PORTION_SIZES[context.gender];
+  const weeksUntilEvent = context.eventDate 
+    ? Math.ceil((new Date(context.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000))
+    : null;
+
+  return `You are an AI nutrition coach speaking as a punchy, supportive, direct fitness coach. You speak like a friend who cares deeply about their client's success. NEVER use the client's name. Use "we" language when appropriate.
+
+COACH VOICE RULES:
+- Short, punchy sentences - NEVER paragraphs
+- Use ALL CAPS for emphasis when celebrating or pushing hard
+- Supportive and hype when client does good
+- Direct and firm when client needs to get back on track
+- NO lecturing, NO corporate speak
+- Use phrases like: "LEEEETS GOOOO!", "Ya killing me smalls!", "Log your foods!", "Don't worry about the past, plan those foods!"
+- One emoji max when it adds personality (😁 👊 🔥)
+
+CLIENT CONTEXT:
+- Gender: ${context.gender}
+- Current Phase: ${context.currentPhase}
+- Goal Weight: ${context.goalWeight} lbs
+- Current Weight: ${context.currentWeight} lbs
+- Starting Weight: ${context.startingWeight} lbs
+- Weight Lost: ${context.startingWeight - context.currentWeight} lbs
+- Program: ${context.programType}
+- Week: ${context.weekNumber}
+${context.eventDate ? `- Weeks Until Event: ${weeksUntilEvent}` : ''}
+${context.trainerNotes ? `- Trainer Notes: ${context.trainerNotes}` : ''}
+
+PHASE GUIDELINES:
+${context.gender === 'male' ? `
+Phase 1 Male portions per meal:
+- ${portions.protein} lean protein
+- ${portions.veg} fibrous vegetables
+- ${portions.fat} healthy fat
+- 128oz water daily
+- No starch in Phase 1
+` : `
+Phase 1 Female portions per meal:
+- ${portions.protein} lean protein
+- ${portions.veg} fibrous vegetables  
+- ${portions.fat} healthy fat
+- 80oz water daily
+- No starch in Phase 1
+`}
+
+IMPORTANT RULES:
+1. If you don't know something - say "I'm not sure, I'll check with your trainer"
+2. NEVER make up calorie counts or nutrition facts
+3. When uncertain about a food - default to recommending smaller portions
+4. Keep responses SHORT (1-3 sentences typically)
+
+Respond to the client's message:`;
+}
+
+export function analyzeMealPortion(
+  foodDescription: string,
+  context: CoachContext
+): { advice: string; onPhase: boolean; corrections: string[] } {
+  const portions = PORTION_SIZES[context.gender];
+  const corrections: string[] = [];
+  let onPhase = true;
+  
+  // Simple keyword-based analysis (MVP - will be replaced by AI)
+  const foodLower = foodDescription.toLowerCase();
+  
+  // Phase 1 - no starch allowed
+  if (context.currentPhase === 1) {
+    const starchKeywords = ['pasta', 'bread', 'rice', 'potato', 'noodles', 'spaghetti', 'lasagna', 'tortilla', 'cereal', 'oatmeal', 'beans', 'corn', 'peas'];
+    for (const starch of starchKeywords) {
+      if (foodLower.includes(starch)) {
+        corrections.push(`⚠️ Phase 1 - no starch! Consider skipping the ${starch} or just eating 1/4 of it.`);
+        onPhase = false;
+      }
+    }
+  }
+  
+  // Check for protein mentions
+  const proteinKeywords = ['chicken', 'beef', 'pork', 'fish', 'salmon', 'turkey', 'egg', 'yogurt', 'protein'];
+  const hasProtein = proteinKeywords.some(p => foodLower.includes(p));
+  
+  // Check for vegetable mentions  
+  const vegKeywords = ['broccoli', 'spinach', 'salad', 'lettuce', 'pepper', 'onion', 'mushroom', 'asparagus', 'green beans', 'cauliflower'];
+  const hasVeg = vegKeywords.some(v => foodLower.includes(v));
+  
+  if (!hasProtein) {
+    corrections.push(`💡 Add some lean protein! ${portions.protein} per meal.`);
+  }
+  
+  if (!hasVeg) {
+    corrections.push(`💡 Add some fibrous vegetables! ${portions.veg}.`);
+  }
+  
+  if (corrections.length === 0) {
+    return {
+      advice: `Looks good! Keep those portions in check. ${portions.protein} protein, ${portions.veg} veg, ${portions.fat} fat per meal. You've got this! 👊`,
+      onPhase: true,
+      corrections: [],
+    };
+  }
+  
+  return {
+    advice: corrections.length > 0 
+      ? corrections.join('\n')
+      : 'Log your foods and get back on track next meal!',
+    onPhase,
+    corrections,
+  };
+}
+
+export function getWeightResponse(
+  currentWeight: number,
+  previousWeight: number,
+  goalWeight: number,
+  gender: 'male' | 'female'
+): string {
+  const change = previousWeight - currentWeight; // positive = lost weight
+  const totalLost = Math.round((currentWeight - goalWeight) * 10) / 10;
+  
+  if (change > 0) {
+    // Weight went down
+    if (change >= 3) {
+      return `LEEEETS GOOOO! 🎉 ${change.toFixed(1)} lbs down! That's incredible work! We're crushing this!`;
+    } else if (change >= 2) {
+      return `Way to go! 👊 ${change.toFixed(1)} lbs lost this week! You're doing great!`;
+    } else {
+      return `Good job! ${change.toFixed(1)} lbs down. Keep it up!`;
+    }
+  } else if (change < 0) {
+    // Weight went up
+    return `No worries - let's get back on track this week. Plan those foods! You've got this! 💪`;
+  } else {
+    // Same weight
+    return `Same weight - that's totally fine! Plan those foods and eat perfect this week. Don't let your brain prevent your body from reaching your goal!`;
+  }
+}
+
+export function getPhaseAdvice(clientPhase: number): string {
+  switch (clientPhase) {
+    case 1:
+      return 'Phase 1: No starch! Focus on lean protein, fibrous veg, and healthy fats.';
+    case 2:
+      return 'Phase 2: Add starch on Wed/Sat/Sun to first 2 meals only.';
+    case 3:
+      return 'Phase 3: Evaluation checkpoint - are you at goal?';
+    case 4:
+      return 'Phase 4: Maintenance mode - add starch to every meal, weigh Fridays only.';
+    default:
+      return 'Keep following your plan!';
+  }
+}

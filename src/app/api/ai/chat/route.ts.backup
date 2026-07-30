@@ -1,0 +1,121 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db_get } from '@/lib/db';
+import { chatWithFallback, CoachContext, AIMessage, getCoachPrompt, analyzeMealPortion, getWeightResponse } from '@/lib/ai-coach';
+
+export async function POST(request: NextRequest) {
+  try {
+    const clientId = request.headers.get('x-client-id');
+    if (!clientId) {
+      return NextResponse.json({ error: 'Client ID required' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { message, preferredProvider } = body;
+
+    if (!message || message.trim().length === 0) {
+      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+    }
+
+    // Get client context using SQL.js
+    const client = await db_get('SELECT * FROM clients WHERE id = ?', clientId) as any;
+    
+    if (!client) {
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    }
+
+    const context: CoachContext = {
+      clientName: client.name,
+      gender: client.gender || 'male',
+      currentPhase: client.current_phase || 1,
+      goalWeight: client.goal_weight || 0,
+      currentWeight: client.current_weight || client.starting_weight || 0,
+      startingWeight: client.starting_weight || client.current_weight || 0,
+      programType: client.program_type || 'general_health',
+      eventDate: client.event_date,
+      weekNumber: client.current_week || 1,
+      trainerNotes: client.notes,
+    };
+
+    // Check for specific intents
+    const lowerMessage = message.toLowerCase().trim();
+    
+    // Handle weight logging intent
+    if (lowerMessage.match(/^(log |i weigh |my weight is |weighed|i'm |im |i am )/)) {
+      const weightMatch = message.match(/(\d+\.?\d*)/);
+      if (weightMatch) {
+        const weight = parseFloat(weightMatch[1]);
+        const prevWeight = client.current_weight || client.starting_weight;
+        if (prevWeight) {
+          const response = getWeightResponse(weight, prevWeight, client.goal_weight || 0, context.gender);
+          return NextResponse.json({
+            response,
+            type: 'weight_update',
+          });
+        }
+      }
+    }
+
+    // Handle phase inquiry
+    if (lowerMessage.includes('what phase') || lowerMessage.includes('which phase')) {
+      const phaseAdvice = getPhaseAdvice(context.currentPhase);
+      return NextResponse.json({
+        response: `You're currently in Phase ${context.currentPhase}! ${phaseAdvice}`,
+        type: 'phase_info',
+      });
+    }
+
+    // Handle portion inquiry
+    if (lowerMessage.includes('portion') || lowerMessage.includes('how much') || lowerMessage.includes('serving size')) {
+      const portions = context.gender === 'male'
+        ? '6oz protein, 2 cups veg, 1-2 tbsp fat per meal'
+        : '4oz protein, 1-2 cups veg, 1 tbsp fat per meal';
+      return NextResponse.json({
+        response: `For Phase ${context.currentPhase}, your portions per meal: ${portions}. No starch in Phase 1!`,
+        type: 'portion_info',
+      });
+    }
+
+    // Handle general chat with AI coach - use fallback chain for reliability
+    const coachPrompt = getCoachPrompt(context, message);
+    
+    // FIX: Send coach prompt as SYSTEM message, and user's actual message as prompt
+    const systemMessage: AIMessage = { role: 'system', content: coachPrompt };
+    const result = await chatWithFallback([systemMessage], message, preferredProvider);
+    
+    if (result.error || !result.text) {
+      // Fallback to rule-based response
+      const fallback = analyzeMealPortion(message, context);
+      return NextResponse.json({
+        response: fallback.advice,
+        type: 'fallback',
+        error: result.error,
+        provider: result.provider,
+      });
+    }
+
+    return NextResponse.json({
+      response: result.text,
+      type: 'coach',
+      provider: result.provider,
+    });
+
+  } catch (error) {
+    console.error('AI chat error:', error);
+    return NextResponse.json({ error: 'Chat failed' }, { status: 500 });
+  }
+}
+
+function getPhaseAdvice(phase: number): string {
+  switch (phase) {
+    case 1:
+      return 'No starch! Focus on lean protein, fibrous veg, and healthy fats.';
+    case 2:
+      return 'Add starch on Wed/Sat/Sun to first 2 meals only.';
+    case 3:
+      return 'Evaluation checkpoint — are you at goal?';
+    case 4:
+      return 'Maintenance mode — add starch to every meal, weigh Fridays only.';
+    default:
+      return 'Keep following your plan!';
+  }
+}
