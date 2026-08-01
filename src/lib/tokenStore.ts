@@ -31,6 +31,7 @@ export async function generateSignupToken(data: { email: string; name: string; p
     console.log('[tokenStore] db_hset completed for:', fullToken);
   } catch (e) {
     console.error('[tokenStore] db_hset ERROR:', e);
+    throw new Error('Failed to store signup token');
   }
   
   return token; // Return without prefix

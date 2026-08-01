@@ -298,7 +298,11 @@ export async function redis_get<T = any>(key: string): Promise<T | null> {
 
 export async function redis_set(key: string, value: any): Promise<void> {
   const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-  await supabase.from('kv_store').upsert({ key, value: stringValue }, { onConflict: 'key' });
+  const { error } = await supabase.from('kv_store').upsert({ key, value: stringValue }, { onConflict: 'key' });
+  if (error) {
+    console.error('[redis_set] Supabase upsert error:', error);
+    throw new Error(`Failed to store in kv_store: ${error.message}`);
+  }
 }
 
 export async function redis_del(key: string): Promise<void> {
