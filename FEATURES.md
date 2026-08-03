@@ -280,3 +280,31 @@ Update `getMealAnalysisPrompt` for Phase 4 to:
 5. Track daily processed meal count in client session
 6. Reset processed meal counter daily
 7. Test: log 2 processed meals in one day → should warn
+
+---
+
+# Future Feature: Update Program Choices (Signup)
+
+## Overview
+Update the program choices shown to clients during onboarding.
+
+## Current State
+- UI shows: event_ready, muscle_gain, general_health, first_responder
+- Database accepts: lose_body_fat, muscle_gain, event_ready, general_health
+- MISMATCH: first_responder in UI but lose_body_fat in DB
+
+## Changes Required
+1. Remove "First Responder" from UI program choices
+2. Change "Lose Body Fat" to "Get Shredded" (display text only)
+3. Update VALID_PROGRAMS in update-program route if needed
+
+## New Program Choices
+1. 🎯 Event Ready
+2. 🔥 Get Shredded (was Lose Body Fat)
+3. 💪 Muscle Gain
+4. 🏥 General Health
+
+## Files to Update
+1. `/src/app/onboarding/page.tsx` - update select options
+2. `/src/app/api/client/update-program/route.ts` - update VALID_PROGRAMS if needed
+3. Test signup flow with new program choices
