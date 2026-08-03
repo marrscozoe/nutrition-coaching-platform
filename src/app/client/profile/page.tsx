@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Toast from '@/components/Toast';
+import { logout } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -53,10 +54,8 @@ export default function ProfilePage() {
     setLoading(false);
   }, [router]);
 
-  function handleLogout() {
-    localStorage.removeItem('user');
-    localStorage.removeItem('userType');
-    window.location.href = '/';
+  async function handleLogout() {
+    await logout();
   }
 
   const PROGRAMS = [

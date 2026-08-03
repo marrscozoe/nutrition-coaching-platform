@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
+import { logout } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -205,10 +206,8 @@ export default function ClientDashboard() {
     return Math.max(1, diffDays + 1);
   }
 
-  function handleLogout() {
-    localStorage.removeItem('user');
-    localStorage.removeItem('userType');
-    window.location.href = '/';
+  async function handleLogout() {
+    await logout();
   }
 
   if (loading || !client) {

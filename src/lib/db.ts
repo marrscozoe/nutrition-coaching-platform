@@ -8,39 +8,44 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-let supabase: SupabaseClient;
+let supabase: SupabaseClient | null = null;
 let supabaseAdmin: SupabaseClient | null = null;
 
-console.log('[Supabase] Init - URL:', supabaseUrl, 'KEY length:', supabaseAnonKey.length);
-try {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
-  console.log('[Supabase] Client initialized, URL:', supabaseUrl ? '✓' : '✗');
-  console.log('[Supabase] ANON_KEY set:', !!supabaseAnonKey);
-  
-  // Admin client (service role) for server-side operations - bypasses RLS
-  if (supabaseServiceKey) {
+// Lazy initialization to avoid build-time errors
+function getSupabaseClient(): SupabaseClient {
+  if (!supabase) {
+    console.log('[Supabase] Lazy init - URL:', supabaseUrl ? '✓' : '✗');
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.warn('[Supabase] Missing env vars - using placeholder client');
+      supabase = createClient('https://placeholder.supabase.co', 'placeholder');
+    } else {
+      supabase = createClient(supabaseUrl, supabaseAnonKey);
+    }
+  }
+  return supabase;
+}
+
+// For backwards compatibility
+export { getSupabaseClient as getSupabase };
+
+// Admin client getter
+function getAdminClient(): SupabaseClient {
+  if (!supabaseAdmin) {
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
+    }
     supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { persistSession: false, autoRefreshToken: false }
     });
     console.log('[Supabase] Admin (service role) client initialized ✓');
-  } else {
-    console.log('[Supabase] SUPABASE_SERVICE_ROLE_KEY not set - using anon key only');
-  }
-} catch (e) {
-  console.error('[Supabase] Failed to initialize:', e);
-  supabase = createClient('http://placeholder', 'placeholder');
-}
-
-// Export admin client getter for use in API routes
-function getAdminClient() {
-  if (!supabaseAdmin) {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
   }
   return supabaseAdmin;
 }
 
 // Re-export for convenience
 export { getAdminClient };
+
+
 
 // ============================================
 // Prepared Statement Wrapper (for SQL.js compatibility)
@@ -121,7 +126,7 @@ export async function db_all<T = any>(sql: string | PreparedStatement, ...params
     
     if (!table) return [];
     
-    let query = supabase.from(table).select('*');
+    let query = getSupabaseClient().from(table).select('*');
     
     for (const [key, value] of Object.entries(conditions)) {
       query = query.eq(key, value);
@@ -209,7 +214,7 @@ export async function db_run(sql: string | PreparedStatement, ...params: any[]):
       console.log('[db_run] INSERT into table:', table);
       console.log('[db_run] INSERT obj:', JSON.stringify(obj));
       
-      const { error } = await supabase.from(table).insert(obj);
+      const { error } = await getSupabaseClient().from(table).insert(obj);
       if (error) {
         console.error('[db_run] INSERT error:', error);
         console.error('[db_run] INSERT error details:', JSON.stringify(error));
@@ -247,7 +252,7 @@ export async function db_run(sql: string | PreparedStatement, ...params: any[]):
       }
       
       // Use admin client for updates to bypass RLS
-      const updateClient = supabaseAdmin || supabase;
+      const updateClient = supabaseAdmin ?? getSupabaseClient();
       let query = updateClient.from(table).update(obj);
       for (const [key, value] of Object.entries(whereConditions)) {
         query = query.eq(key, value);
@@ -275,7 +280,7 @@ export async function db_run(sql: string | PreparedStatement, ...params: any[]):
       }
       
       // Use admin client for deletes to bypass RLS
-      const deleteClient = supabaseAdmin || supabase;
+      const deleteClient = supabaseAdmin ?? getSupabaseClient();
       let query = deleteClient.from(table).delete();
       for (const [key, value] of Object.entries(whereConditions)) {
         query = query.eq(key, value);
@@ -309,7 +314,7 @@ export async function forceSyncDb(): Promise<void> {
 // ============================================
 
 export async function redis_get<T = any>(key: string): Promise<T | null> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseClient()
     .from('kv_store')
     .select('value')
     .eq('key', key)
@@ -325,7 +330,7 @@ export async function redis_get<T = any>(key: string): Promise<T | null> {
 
 export async function redis_set(key: string, value: any): Promise<void> {
   const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-  const { error } = await supabase.from('kv_store').upsert({ key, value: stringValue }, { onConflict: 'key' });
+  const { error } = await getSupabaseClient().from('kv_store').upsert({ key, value: stringValue }, { onConflict: 'key' });
   if (error) {
     console.error('[redis_set] Supabase upsert error:', error);
     throw new Error(`Failed to store in kv_store: ${error.message}`);
@@ -333,7 +338,7 @@ export async function redis_set(key: string, value: any): Promise<void> {
 }
 
 export async function redis_del(key: string): Promise<void> {
-  await supabase.from('kv_store').delete().eq('key', key);
+  await getSupabaseClient().from('kv_store').delete().eq('key', key);
 }
 
 export async function db_hget<T = any>(key: string, field?: string): Promise<T | null> {
@@ -442,5 +447,3 @@ export interface Feedback {
 }
 
 export type { MealLog as MealLogRow };
-
-export { supabase };

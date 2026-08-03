@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { logout } from '@/lib/auth';
 
 interface TrainerData {
   id: string;
@@ -60,10 +61,8 @@ export default function TrainerDashboard() {
     }
   }
 
-  function handleLogout() {
-    localStorage.removeItem('user');
-    localStorage.removeItem('userType');
-    window.location.href = '/';
+  async function handleLogout() {
+    await logout();
   }
 
   function getStatusColor(status: string): string {
