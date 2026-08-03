@@ -120,3 +120,57 @@ INSERT INTO settings (key, value) VALUES ('correction_feature_enabled', 'false')
 - Trainer/gym clients don't see this feature
 - Speed must remain same as current (in-memory cache)
 - Separate from "I messed up" flow - keeps chat clean
+
+---
+
+# Future Feature: Bacon Conditional Approval
+
+## Overview
+Bacon is only allowed if it is **low sodium AND nitrate-free**. Only then is it allowed twice per week as a protein + fat source.
+
+## Problem
+Current keyword detection just looks for "bacon" and can't automatically know if the bacon is low sodium nitrate-free or not.
+
+## Solution: Option 1 - AI Coach Asks
+- Remove bacon from automatic "allowed" list
+- When client logs bacon, AI asks: "Was it low sodium nitrate-free?"
+- If yes → allowed (counts toward twice per week)
+- If no → flagged as violation
+
+## Implementation
+
+### Change to Bacon Status
+- Remove bacon from LEAN_PROTEINS list
+- Keep bacon off the automatic "allowed" lists
+
+### AI Prompt Addition
+Add to the coach prompt:
+```
+CRITICAL: Bacon is only allowed if LOW SODIUM AND NITRATE-FREE.
+When client mentions bacon, ask: "Was it low sodium nitrate-free?"
+- If YES: Count as allowed protein, note it toward twice-per-week limit
+- If NO or unclear: Flag as violation
+```
+
+### Tracking (Optional Enhancement)
+Track bacon intake per client per week:
+- Store bacon meal entries with date
+- Query count of bacon meals in current week
+- If count >= 2, warn client they've reached their twice-per-week limit
+- If count > 2, flag as violation
+
+### Database Changes (if tracking)
+```sql
+CREATE TABLE bacon_tracking (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  logged_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  was_nitrate_free BOOLEAN DEFAULT FALSE,
+  was_low_sodium BOOLEAN DEFAULT FALSE
+);
+```
+
+## Implementation Tasks
+1. Remove "Bacon (nitrate-free, twice per week)" from LEAN_PROTEINS
+2. Update AI prompt to ask about bacon quality when mentioned
+3. Add tracking logic if desired (Phase 2)
