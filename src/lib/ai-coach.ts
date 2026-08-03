@@ -464,6 +464,8 @@ export function getMealAnalysisPrompt(context: CoachContext, mealData: {
     'pie crust', 'cake', 'cookies', 'brownies', 'pastries', 'donuts', 'scones', 'cobbler', 'dumplings',
     // Other
     'breadcrumbs', 'tempura', 'egg roll wrapper', 'wonton wrapper', 'flour', 'cornmeal', 'pancake mix',
+    // Processed meats
+    'sausage', 'pepperoni', 'hot dog', 'bacon', 'ham', 'spam', 'vienna sausages',
   ];
   const dairyKeywords = [
     // Original
