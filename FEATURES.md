@@ -214,3 +214,69 @@ Update the violation logic so Phase 2:
 2. Change Phase 2 to only skip starch checks
 3. Keep dairy and sugar checks active for Phase 2+
 4. Test with sample meals to verify correct behavior
+
+---
+
+# Future Feature: Phase 4 Portion and Processed Food Tracking
+
+## Overview
+Phase 4 (Maintenance) has different rules than Phase 1-3:
+- Dairy and sugar are ALLOWED but in controlled portions
+- Processed food is allowed but limited to ~1 meal per day
+- Portion sizes must still be followed
+- 5+ lbs above goal weight triggers reset to Phase 1
+
+## Phase 4 Rules (from Allen)
+
+### Portion Guidelines
+| Category | Men | Women |
+|----------|-----|-------|
+| Dairy | 2 servings | 1 serving |
+| Sugar | 2 servings | 1 serving |
+| Starch | 1-2 cups cooked (same as Phase 2) | 1 cup cooked (same as Phase 2) |
+| Protein | 6oz per meal | 4oz per meal |
+| Fibrous Veg | 2 cups per meal | 1-2 cups per meal |
+| Fat | 2 tbsp per meal | 1 tbsp per meal |
+
+### Serving Size Examples
+- **Sugar:** 2 tsp = fine, 5+ tsp = problem
+- **Dairy:** per container serving size (e.g., 1 cup milk, 1 oz cheese)
+
+### Processed Food Rule
+- ✅ About 1 processed meal per day = OK (if portions are good)
+- ❌ If processed meals exceed 1 per day → AI warns client to get back to natural food
+
+### Weight Trigger
+- 5+ lbs above goal → automatic reset to Phase 1
+
+## Problem
+Current code disables ALL violation checks for Phase 2+:
+```javascript
+const starchFound = context.currentPhase === 1 ? starchKeywords.filter(...) : [];
+const dairyFound = context.currentPhase === 1 ? dairyKeywords.filter(...) : [];
+const sugarFound = context.currentPhase === 1 ? sugarKeywords.filter(...) : [];
+```
+
+This means Phase 4 allows unlimited dairy, sugar, and processed food - no portion tracking or warnings.
+
+## Solution: Phase 4 Portion Tracking
+
+### AI Prompt Changes
+Update `getMealAnalysisPrompt` for Phase 4 to:
+1. Acknowledge dairy/sugar is allowed in Phase 4
+2. Track portions against serving sizes
+3. Warn if portions exceed guidelines (men >2 servings, women >1 serving dairy/sugar)
+4. Track processed food intake
+5. Warn if processed meals exceed 1 per day
+
+### Implementation Tasks
+1. Add Phase 4 portion check logic to `analyzeMealPortion` in ai-coach.ts
+2. Update AI prompt to explain Phase 4 rules:
+   - "Dairy and sugar are allowed but portions apply"
+   - "Men: up to 2 servings dairy/sugar per meal"
+   - "Women: up to 1 serving dairy/sugar per meal"
+3. Add processed food detection and daily tracking
+4. Add warning message when processed meals exceed 1 per day
+5. Track daily processed meal count in client session
+6. Reset processed meal counter daily
+7. Test: log 2 processed meals in one day → should warn
