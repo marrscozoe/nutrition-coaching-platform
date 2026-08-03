@@ -308,3 +308,88 @@ Update the program choices shown to clients during onboarding.
 1. `/src/app/onboarding/page.tsx` - update select options
 2. `/src/app/api/client/update-program/route.ts` - update VALID_PROGRAMS if needed
 3. Test signup flow with new program choices
+
+---
+
+# Future Feature: Program Definitions & Rules
+
+## Overview
+Each program (Event Ready, Get Shredded, Muscle Gain, General Health) has different rules and phase progressions. Currently only Event Ready is implemented with the Phase 1-4 loop.
+
+## Program Types
+
+### 1. Event Ready
+**Phase Progression:** Full Phase 1-4 loop
+- Phase 1: No starch, dairy, sugar (14 days + 10 streak → Phase 2)
+- Phase 2: Add starch Wed/Sat/Sun (7 days + weight improving → Phase 3)
+- Phase 3: Evaluation checkpoint (at goal → Phase 4, 14 days not at goal → Phase 1)
+- Phase 4: Maintenance (starch every meal, dairy/sugar portions, ~1 processed meal/day, 5+ lbs trigger → Phase 1)
+- Loops back to Phase 1 if not at goal
+
+### 2. Get Shredded
+**Status:** TBD - rules not yet defined
+
+### 3. Muscle Gain
+**Base:** Phase 4 (maintenance) with modifications
+
+**Daily Supplements:**
+- Whey protein shot at START and END of day
+- Creatine taken as directed on container
+
+**Daily Portions (vs standard Phase 4):**
+
+| | Men | Women | Phase 4 (for reference) |
+|---|---|---|---|
+| Whey Protein | 40g start + 40g end | 20g start + 20g end | N/A |
+| Natural Starch | 3 cups per meal | 2 cups per meal | 1-2 cups men, 1 cup women |
+| Fat | 3 tbsp per meal | 2 tbsp per meal | 2 tbsp men, 1 tbsp women |
+| Protein | Same as Phase 1 | Same as Phase 1 | 6oz men, 4oz women |
+| Fibrous Veg | Same as Phase 1 | Same as Phase 1 | 2 cups men, 1-2 cups women |
+
+**Weight Expectations:**
+- Expect 1-2 lbs weight GAIN per week until goal met
+
+**Meal Timing:**
+- Biggest meal = RIGHT AFTER weight training
+- Starch (banana/fruit) 30 minutes BEFORE weight training
+
+### 4. General Health
+**Base:** Phase 4 (maintenance)
+
+**Goals:**
+- No real weight change expected (maybe a few pounds loss)
+- Focus: teach client to eat natural health food and correct portions
+
+**Processed Food Rules:**
+- AI should be MORE RESTRICTIVE on processed foods than standard Phase 4 maintenance
+- Emphasis on natural, whole foods
+
+**Portions:**
+- Same as standard Phase 4 portions
+
+**Weight Expectations:**
+- No weight gain expected (slight loss OK)
+
+## Shared Rules (All Programs)
+
+### Water Intake
+- Water intake is the SAME in all phases and programs
+
+### Phase 4 Portion Reference (Standard)
+- Starch: Men 1-2 cups cooked, Women 1 cup cooked
+- Protein: Men 6oz, Women 4oz
+- Fibrous Veg: Men 2 cups, Women 1-2 cups
+- Fat: Men 2 tbsp, Women 1 tbsp
+- Dairy: Men 2 servings, Women 1 serving
+- Sugar: Men 2 servings, Women 1 serving
+- Processed Food: ~1 meal per day max
+
+## Implementation Tasks
+1. Define rules for Get Shredded program
+2. Add program-specific AI prompts/configs
+3. Update `getPhaseAdvice` to return different advice per program
+4. Add Muscle Gain specific meal timing recommendations
+5. Add General Health more restrictive processed food detection
+6. Update AI coach to check program type when giving advice
+7. Add program-specific weight expectation tracking
+8. Test each program flow with sample client
