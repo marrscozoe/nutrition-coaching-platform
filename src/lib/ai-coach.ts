@@ -272,6 +272,7 @@ export const PORTION_SIZES = {
 
 // Allen's approved natural starchy carbohydrates (fresh or frozen, NO CANS)
 export const STARCHY_CARBOHYDRATES = [
+  // Original
   'Red potatoes',
   'New potatoes',
   'Sweet potatoes',
@@ -286,6 +287,32 @@ export const STARCHY_CARBOHYDRATES = [
   'Cantaloupe',
   'Black Eyed Peas',
   'Grapefruit',
+  // Added whole grains
+  'Bulgur',
+  'Steel cut oats',
+  'Wild rice',
+  'Buckwheat',
+  'Millet',
+  'Spelt',
+  // Added potatoes
+  'Yukon Gold potatoes',
+  'Russet potatoes',
+  'Fingerling potatoes',
+  'Purple potatoes',
+  // Added legumes
+  'Lentils',
+  'Cannellini beans',
+  'Navy beans',
+  'Lima beans',
+  'Butter beans',
+  // Added starchy vegetables
+  'Plantain',
+  'Parsnips',
+  'Acorn squash',
+  'Delicata squash',
+  // Added rice
+  'Jasmine rice',
+  'Basmati rice',
 ];
 
 // Allen's approved lean proteins (fresh or frozen, NO CANS)
