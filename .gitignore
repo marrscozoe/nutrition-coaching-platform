@@ -2,3 +2,8 @@ node_modules
 .vercel
 .next
 node_modules/@next
+
+# Environment files (NEVER commit these)
+.env
+.env.*
+!.env.example
