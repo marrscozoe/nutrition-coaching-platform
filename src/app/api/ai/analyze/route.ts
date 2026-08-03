@@ -175,11 +175,21 @@ export async function POST(request: NextRequest) {
 
       // Convert photo analysis to portion advice
       const analysis = analyzeMealPortion(result.text, context);
+      
+      // Check if AI response contains food/nutrition content
+      // If not, the AI likely gave an irrelevant response (like a story)
+      const foodKeywords = ['protein', 'starch', 'phase', 'oz', 'cup', 'fat', 'vegetable', 'chicken', 'beef', 'fish', 'salad', 'rice', 'pasta', 'bread', 'nut', 'almond', 'walnut', 'broccoli', 'spinach', 'potato', 'egg', 'yogurt', 'cheese', 'milk', 'cream', 'avocado', 'oil', 'calorie', 'gram', 'fiber', 'sodium', 'sugar', 'frozen', 'canned', 'fresh', 'portion', 'handful', 'tablespoon', 'ounce'];
+      const lowerResponse = (result.text || '').toLowerCase();
+      const hasFoodContent = foodKeywords.some(kw => lowerResponse.includes(kw));
+      
+      // If no food content detected, return "cannot identify" message instead of garbage
+      const displayAnalysis = hasFoodContent ? result.text : 'I cannot identify this food from the photo. Please describe what you are eating and I\'ll give you portion advice.';
+      
       return NextResponse.json({
-        analysis: result.text,
-        portionAdvice: analysis.advice,
-        onPhase: analysis.onPhase,
-        corrections: analysis.corrections,
+        analysis: displayAnalysis,
+        portionAdvice: hasFoodContent ? analysis.advice : 'Please describe your meal so I can help with portions.',
+        onPhase: hasFoodContent ? analysis.onPhase : false,
+        corrections: hasFoodContent ? analysis.corrections : [],
         provider: result.provider,
         photoDeleted: true,
       });
@@ -253,26 +263,31 @@ function getPhotoAnalysisPrompt(context: CoachContext): string {
     ? { protein: '6 ounces', fibrousVegetables: '2 cups', fat: '1-2 tablespoons' }
     : { protein: '4 ounces', fibrousVegetables: '1-2 cups', fat: '1 tablespoon' };
 
-  return `You are a nutrition coach analyzing a meal photo. Look at the food and:
+  return `You are a NUTRITION COACH. Your ONLY job is to analyze food in photos and give nutrition advice.
 
-1. Describe what you see in the meal (converted to text)
-2. Identify the food categories present (protein, vegetables, starch, fat)
-3. For the client's current phase (Phase ${context.currentPhase}), give portion advice:
-   - Phase 1: NO starch allowed. Focus on ${portions.protein} protein, ${portions.fibrousVegetables} fibrous vegetables, ${portions.fat} healthy fat
-   - Phase 2: Add starch (${context.gender === 'male' ? '1-2 cups' : '1 cup'}) on Wed/Sat/Sun to first 2 meals only
-4. If the meal is off-phase (e.g., pasta, bread, rice in Phase 1), give specific advice like "Eat only 1/4 of the plate" or "Skip the starch portion"
-5. Keep responses punchy and coach-like
+STRICT RULES — FOLLOW THESE OR FAIL:
+1. ONLY respond with food identification and nutrition advice — nothing else
+2. DO NOT write stories, poems, or any creative content. DO NOT mention animals, weather, or unrelated topics
+3. If you cannot identify the food, say EXACTLY: "I cannot identify this food. Please describe what you are eating."
+4. Your response MUST identify: (a) what food you see, (b) is it Phase ${context.currentPhase} compliant, (c) portion advice
 
-IMPORTANT — Vegetable classification:
-- FIBROUS vegetables (legal on Phase 1): broccoli, spinach, asparagus, zucchini, green peppers, GREEN BEANS, mushrooms, lettuce, tomatoes, cucumbers, celery, cabbage, onions
-- STARCHY vegetables (NOT legal on Phase 1): potatoes (including hashbrowns, fries, mashed), sweet potatoes, rice, pasta, bread, corn, peas, kidney beans, black beans, pinto beans, quinoa, oats, cereal
+NUTRITION RULES:
+- Phase 1: NO starch, NO dairy, NO sugar. Focus on lean protein, fibrous vegetables, healthy fats.
+- Phase 2: Add starch on Wed/Sat/Sun only (${context.gender === 'male' ? '1-2 cups' : '1 cup'} cooked)
+- Phase 3: Check with coach
+- Phase 4: Maintenance — starch allowed every meal
 
-Client info:
-- Gender: ${context.gender}
-- Current Phase: ${context.currentPhase}
-- Goal: ${context.goalWeight} lbs
-- Current: ${context.currentWeight} lbs
-${context.eventDate ? `- Event in: ${Math.ceil((new Date(context.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000))} weeks` : ''}
+PORTION SIZES:
+- Protein: ${portions.protein} per meal
+- Vegetables: ${portions.fibrousVegetables} per meal
+- Fat: ${portions.fat} per meal
 
-Be specific and practical. Use coaching voice.`;
+NUTS: Nuts (almonds, walnuts, mixed nuts, peanuts, etc.) are a FAT source, NOT protein. Portion is about 1oz (a small handful = ~2 tablespoons). Note if salted/flavored.
+
+EXAMPLE RESPONSES:
+- "Mixed nuts — that's a healthy fat. Phase 1 OK. Portion: 1oz (small handful). Watch the salt if flavored. Good choice! 💪"
+- "I see pasta with sauce. Phase 1 VIOLATION — that's starch. Skip the pasta, eat only the meat/sauce portion."
+- "I cannot identify this food. Please describe what you are eating."
+
+NOW ANALYZE THIS PHOTO. Respond with ONLY nutrition advice. No stories.`;
 }
