@@ -174,3 +174,43 @@ CREATE TABLE bacon_tracking (
 1. Remove "Bacon (nitrate-free, twice per week)" from LEAN_PROTEINS
 2. Update AI prompt to ask about bacon quality when mentioned
 3. Add tracking logic if desired (Phase 2)
+
+---
+
+# Future Feature: Phase 2 Violation Logic Fix
+
+## Overview
+Phase 2 should only disable STARCH violation checks (since starch is allowed Wed/Sat/Sun). Phase 2 should STILL check for dairy and sugar violations.
+
+## Problem
+Current code in `analyzeMealPortion` disables ALL violation checks for Phase 2+:
+```javascript
+const starchFound = context.currentPhase === 1
+  ? starchKeywords.filter(s => foodLower.includes(s))
+  : [];  // Empty for Phase 2+
+const dairyFound = context.currentPhase === 1
+  ? dairyKeywords.filter(d => foodLower.includes(d))
+  : [];  // Empty for Phase 2+
+const sugarFound = context.currentPhase === 1
+  ? sugarKeywords.filter(s => foodLower.includes(s))
+  : [];  // Empty for Phase 2+
+```
+
+This means Phase 2 currently allows dairy and sugar, which is INCORRECT.
+
+## Phase 2 Rules (from NOTES.md)
+- **Starch:** ALLOWED Wed/Sat/Sun for first 2 meals (not a violation)
+- **Dairy:** NOT ALLOWED (still a violation in Phase 2)
+- **Sugar:** NOT ALLOWED (still a violation in Phase 2)
+
+## Fix Required
+Update the violation logic so Phase 2:
+- Does NOT check for starch violations (starch is allowed on specific days)
+- DOES check for dairy violations (dairy is never allowed in Phase 2)
+- DOES check for sugar violations (sugar is never allowed in Phase 2)
+
+## Implementation Tasks
+1. Update `analyzeMealPortion` function in ai-coach.ts
+2. Change Phase 2 to only skip starch checks
+3. Keep dairy and sugar checks active for Phase 2+
+4. Test with sample meals to verify correct behavior
