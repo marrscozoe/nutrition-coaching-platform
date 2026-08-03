@@ -2,7 +2,7 @@ import { AIResponse, AIMessage } from '../ai-coach';
 
 const apiKey = process.env.GEMINI_API_KEY || '';
 // Gemini 1.5 Flash is free tier eligible: 15 req/min, 1,500/day
-const MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+const MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash-001';
 
 /**
  * Google Gemini Vision API Provider
