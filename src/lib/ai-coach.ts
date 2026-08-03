@@ -474,7 +474,19 @@ export function getMealAnalysisPrompt(context: CoachContext, mealData: {
     'alfredo sauce', 'queso', 'nacho cheese', 'velveeta', 'mac and cheese',
     'cheese fries', 'cheese curds', 'cream gravy', 'white sauce', 'bechamel',
   ];
-  const sugarKeywords = ['sugar', 'syrup', 'honey', 'agave', 'molasses', 'cane juice', 'high fructose', 'aspartame', 'splenda', 'equal', 'sweetener', 'stevia'];
+  const sugarKeywords = [
+    // Original
+    'sugar', 'syrup', 'honey', 'agave', 'molasses', 'cane juice', 'high fructose', 'aspartame', 'splenda', 'equal', 'sweetener', 'stevia',
+    // Added - sugars
+    'brown sugar', 'powdered sugar', 'white sugar', 'raw sugar', 'turbinado', 'coconut sugar',
+    'maple syrup', 'pancake syrup', 'corn syrup', 'piloncillo', 'date sugar',
+    // Added - sweeteners
+    'monk fruit', 'monkfruit', 'erythritol', 'xylitol', 'allulose', 'maltitol', 'sorbitol',
+    'saccharin', 'sucralose', 'maltodextrin', 'dextrose', 'maltose', 'fructose', 'glucose', 'sucrose',
+    // Added - candy/sweets
+    'candy', 'gummy', 'jelly', 'jam', 'preserves', 'compote', 'fruit juice concentrate',
+    'caramel', 'toffee', 'fudge', 'marshmallow', 'fondant', 'royal icing', 'glaze', 'drizzle',
+  ];
 
   const starchFound = context.currentPhase === 1
     ? starchKeywords.filter(s => foodLower.includes(s))
