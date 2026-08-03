@@ -302,6 +302,23 @@ export const LEAN_PROTEINS = [
   'Turkey breast',
   'Shrimp',
   'Plain non-fat Greek yogurt',
+  // Added
+  'Tilapia',
+  'Cod',
+  'Halibut',
+  'Trout',
+  'Catfish',
+  'Scallops',
+  'Crab',
+  'Lobster',
+  'Bison',
+  'Venison',
+  'Elk',
+  'Ostrich',
+  'Egg beaters',
+  'Liquid eggs',
+  'Protein powder',
+  'Whey protein',
 ];
 
 // No cheese or dairy while dieting
