@@ -439,7 +439,32 @@ export function getMealAnalysisPrompt(context: CoachContext, mealData: {
 
   // Check for Phase 1 violations - starch, dairy, AND sugar
   const foodLower = mealData.foodDescription.toLowerCase();
-  const starchKeywords = ['pasta', 'bread', 'rice', 'potato', 'noodles', 'spaghetti', 'lasagna', 'tortilla', 'cereal', 'oatmeal', 'kidney beans', 'pinto beans', 'black beans', 'corn', 'peas', 'quinoa', 'couscous', 'bagel', 'muffin', 'croissant', 'pancake', 'waffle', 'roll'];
+  const starchKeywords = [
+    // Original
+    'pasta', 'bread', 'rice', 'potato', 'noodles', 'spaghetti', 'lasagna', 'tortilla', 'cereal', 'oatmeal',
+    'kidney beans', 'pinto beans', 'black beans', 'corn', 'peas', 'quinoa', 'couscous',
+    'bagel', 'muffin', 'croissant', 'pancake', 'waffle', 'roll',
+    // Potato dishes
+    'french fries', 'fry', 'hash browns', 'mashed potatoes', 'baked potato', 'potato chips',
+    'sweet potato fries', 'tater tots', 'potato salad', 'home fries', 'breakfast potatoes',
+    // Bread/grains
+    'crackers', 'saltines', 'graham crackers', 'biscuits', 'cornbread', 'stuffing', 'croutons',
+    'focaccia', 'naan', 'pita bread', 'flour tortilla', 'cornbread',
+    // Pasta/rice
+    'mac and cheese', 'macaroni', 'ravioli', 'gnocchi', 'fried rice', 'risotto', 'pilaf',
+    'white rice', 'instant rice', 'rice noodles', 'cellophane noodles',
+    // Snacks
+    'pretzels', 'popcorn', 'tortilla chips', 'corn chips', 'pita chips', 'rice cakes',
+    'chex', 'cheez-its', 'goldfish', 'tortilla snack bags', 'snack crackers',
+    // Breakfast
+    'granola', 'grits', 'hominy', 'biscuits and gravy', 'french toast', 'waffle sticks',
+    // Beans
+    'refried beans', 'baked beans', 'canned beans', 'hummus', 'chickpeas',
+    // Desserts/sweets
+    'pie crust', 'cake', 'cookies', 'brownies', 'pastries', 'donuts', 'scones', 'cobbler', 'dumplings',
+    // Other
+    'breadcrumbs', 'tempura', 'egg roll wrapper', 'wonton wrapper', 'flour', 'cornmeal', 'pancake mix',
+  ];
   const dairyKeywords = ['cream', 'milk', 'cheese', 'yogurt', 'butter', 'sour cream', 'half and half', 'creamer', 'whipped cream', 'ice cream', 'cottage cheese', 'ricotta'];
   const sugarKeywords = ['sugar', 'syrup', 'honey', 'agave', 'molasses', 'cane juice', 'high fructose', 'aspartame', 'splenda', 'equal', 'sweetener', 'stevia'];
 
