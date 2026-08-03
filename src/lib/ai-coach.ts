@@ -319,6 +319,7 @@ export const LEAN_PROTEINS = [
   'Liquid eggs',
   'Protein powder',
   'Whey protein',
+  'Bacon (nitrate-free, twice per week)',
 ];
 
 // No cheese or dairy while dieting
@@ -505,7 +506,7 @@ export function getMealAnalysisPrompt(context: CoachContext, mealData: {
     // Other
     'breadcrumbs', 'tempura', 'egg roll wrapper', 'wonton wrapper', 'flour', 'cornmeal', 'pancake mix',
     // Processed meats
-    'sausage', 'pepperoni', 'hot dog', 'bacon', 'ham', 'spam', 'vienna sausages',
+    'sausage', 'pepperoni', 'hot dog', 'ham', 'spam', 'vienna sausages',
   ];
   const dairyKeywords = [
     // Original
