@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db_run } from '@/lib/db';
 
-const VALID_PROGRAMS = ['lose_body_fat', 'muscle_gain', 'event_ready', 'general_health'];
+const VALID_PROGRAMS = ['get_shredded', 'muscle_gain', 'event_ready', 'general_health'];
 
 export async function POST(request: NextRequest) {
   try {

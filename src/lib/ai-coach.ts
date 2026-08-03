@@ -251,6 +251,10 @@ export interface CoachContext {
   todayWaterIntake?: number; // oz of water consumed today
   todayCoffeeIntake?: number; // oz of coffee consumed today (adds to water requirement)
   mealsLoggedToday?: number; // number of meals logged today to calculate remaining
+  // Phase 4 tracking
+  todayDairyServings?: number; // dairy servings logged today (men: 2 allowed, women: 1 allowed)
+  todaySugarServings?: number; // sugar servings logged today (men: 2 allowed, women: 1 allowed)
+  todayProcessedMeals?: number; // processed meals logged today (1 allowed)
 }
 
 export const PORTION_SIZES = {
@@ -505,7 +509,7 @@ export function getMealAnalysisPrompt(context: CoachContext, mealData: {
   const status = mealData.messedUp ? 'OFF PHASE' : mealData.onPhase ? 'ON PHASE' : 'NEEDS REVIEW';
   const emoji = mealData.messedUp ? '⚠️' : mealData.onPhase ? '✅' : '🤔';
 
-  // Check for Phase 1 violations - starch, dairy, AND sugar
+  // Check for violations based on phase
   const foodLower = mealData.foodDescription.toLowerCase();
   const starchKeywords = [
     // Original
@@ -557,20 +561,57 @@ export function getMealAnalysisPrompt(context: CoachContext, mealData: {
     'candy', 'gummy', 'jelly', 'jam', 'preserves', 'compote', 'fruit juice concentrate',
     'caramel', 'toffee', 'fudge', 'marshmallow', 'fondant', 'royal icing', 'glaze', 'drizzle',
   ];
+  const processedFoodKeywords = [
+    // Fast food / processed
+    'mcdonalds', 'burger king', 'wendys', 'taco bell', 'chipotle', 'chick-fil-a', 'pizza hut',
+    'dominos', 'little caesars', 'popeyes', 'kfc', 'subway', 'panera', 'starbucks',
+    // Processed snacks
+    'hot pocket', 'pizza rolls', 'tater tots', 'fish sticks', 'chicken nuggets', 'chicken tenders',
+    'onion rings', 'mozzarella sticks', 'jalapeño poppers', 'mac and cheese (boxed)',
+    // Frozen/processed meals
+    'frozen meal', 'tv dinner', 'microwave dinner', 'frozen pizza', 'frozen burrito',
+    // Processed meats
+    'spam', 'vienna sausages', 'bologna', 'salami', 'pepperoni', 'hot dog', 'corn dog',
+    // Candy/snacks
+    'candy bar', 'chocolate bar', 'potato chips', 'cheese puffs', 'frito', 'dorito',
+    // Other
+    'fast food', 'takeout', 'delivery', 'frozen', 'boxed', 'canned',
+  ];
 
-  const starchFound = context.currentPhase === 1
-    ? starchKeywords.filter(s => foodLower.includes(s))
-    : [];
-  const dairyFound = context.currentPhase === 1
-    ? dairyKeywords.filter(d => foodLower.includes(d))
-    : [];
-  const sugarFound = context.currentPhase === 1
-    ? sugarKeywords.filter(s => foodLower.includes(s))
-    : [];
+  // Phase-based violation checks:
+  // Phase 1: Check starch, dairy, AND sugar violations
+  // Phase 2: Only check dairy and sugar violations (starch is allowed on Wed/Sat/Sun)
+  // Phase 3: Same as Phase 2 until decision made
+  // Phase 4: Track portions but don't flag violations (maintenance mode)
+  
+  let starchFound: string[] = [];
+  let dairyFound: string[] = [];
+  let sugarFound: string[] = [];
+  let processedFound: string[] = [];
+  
+  if (context.currentPhase === 1) {
+    // Phase 1: ALL violations checked
+    starchFound = starchKeywords.filter(s => foodLower.includes(s));
+    dairyFound = dairyKeywords.filter(d => foodLower.includes(d));
+    sugarFound = sugarKeywords.filter(s => foodLower.includes(s));
+  } else if (context.currentPhase === 2 || context.currentPhase === 3) {
+    // Phase 2 & 3: Starch allowed on specific days, but dairy and sugar still violations
+    // For now, skip starch check (handled in analyzeMealPortion with day-of-week logic)
+    starchFound = [];
+    dairyFound = dairyKeywords.filter(d => foodLower.includes(d));
+    sugarFound = sugarKeywords.filter(s => foodLower.includes(s));
+  } else if (context.currentPhase === 4) {
+    // Phase 4: Maintenance - no violations but track portions and processed food
+    starchFound = [];
+    dairyFound = dairyKeywords.filter(d => foodLower.includes(d));
+    sugarFound = sugarKeywords.filter(s => foodLower.includes(s));
+    processedFound = processedFoodKeywords.filter(p => foodLower.includes(p));
+  }
 
   const hasStarchViolation = starchFound.length > 0 && context.currentPhase === 1;
-  const hasDairyViolation = dairyFound.length > 0 && context.currentPhase === 1;
-  const hasSugarViolation = sugarFound.length > 0 && context.currentPhase === 1;
+  const hasDairyViolation = dairyFound.length > 0 && (context.currentPhase === 1 || context.currentPhase === 2 || context.currentPhase === 3);
+  const hasSugarViolation = sugarFound.length > 0 && (context.currentPhase === 1 || context.currentPhase === 2 || context.currentPhase === 3);
+  const hasProcessedFood = processedFound.length > 0;
   const hasViolation = hasStarchViolation || hasDairyViolation || hasSugarViolation;
 
   return `You are ALLEN'S AI NUTRITION COACH. A client just logged a meal. Give SHORT, PUNCHY coaching feedback (1-3 sentences).
@@ -714,6 +755,15 @@ export function analyzeMealPortion(
     }
   } else if (context.currentPhase === 2) {
     // Phase 2: Starch allowed ONLY on Wed, Sat, Sun for first 2 meals
+    // BUT dairy and sugar are STILL NOT ALLOWED (same as Phase 1)
+    if (dairyFound) {
+      corrections.push(`⚠️ Phase 2 - NO dairy! Skip the ${dairyFound} completely.`);
+      onPhase = false;
+    }
+    if (sugarFound) {
+      corrections.push(`⚠️ Phase 2 - NO sugar! Skip the ${sugarFound} completely.`);
+      onPhase = false;
+    }
     if (starchFound && context.mealDate) {
       const mealDateObj = new Date(context.mealDate + 'T12:00:00');
       const dayOfWeek = mealDateObj.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
@@ -734,14 +784,80 @@ export function analyzeMealPortion(
   } else if (context.currentPhase === 3) {
     // Phase 3: EVALUATION CHECKPOINT - not a diet phase, it's a decision point
     // Are you at goal? NO = back to Phase 1, YES = Phase 4
-    // Starch rules stay same as Phase 2 until decision is made
+    // Until decision is made, same rules as Phase 2 apply (dairy/sugar still violations)
+    
+    // Check dairy violation (dairy is NEVER allowed until Phase 4)
+    if (dairyFound) {
+      corrections.push(`⚠️ Phase 3 - NO dairy allowed! Skip the ${dairyFound} completely.`);
+      onPhase = false;
+    }
+    
+    // Check sugar violation (sugar is NEVER allowed until Phase 4)
+    if (sugarFound) {
+      corrections.push(`⚠️ Phase 3 - NO sugar allowed! Skip the ${sugarFound} completely.`);
+      onPhase = false;
+    }
+    
     if (starchFound) {
       corrections.push(`⚠️ Phase 3 is an EVALUATION CHECKPOINT. If you're not at goal yet, you should be back in Phase 1. Check with your coach.`);
       onPhase = false;
     }
   } else if (context.currentPhase === 4) {
-    // Phase 4: Maintenance - starch allowed every meal but still portion control + natural food focus
+    // Phase 4: Maintenance - starch allowed every meal, dairy/sugar ALLOWED in controlled portions
     // If 5+ lbs over goal = back to Phase 1
+    
+    // Phase 4 portion limits per meal
+    const maxDairyServings = context.gender === 'male' ? 2 : 1;
+    const maxSugarServings = context.gender === 'male' ? 2 : 1;
+    
+    // Dairy portion warning
+    if (dairyFound) {
+      const dairyServings = 1; // Each dairy item counts as 1 serving
+      if (dairyServings > maxDairyServings) {
+        corrections.push(`⚠️ Phase 4 - Dairy portion exceeded! You can have ${maxDairyServings} serving${maxDairyServings > 1 ? 's' : ''} per meal (${context.gender === 'male' ? 'men' : 'women'} limit). Skip the ${dairyFound} or reduce portions.`);
+        onPhase = false;
+      } else {
+        corrections.push(`💡 Phase 4 - Dairy allowed (${dairyServings}/${maxDairyServings} serving). Keep portions in check.`);
+      }
+    }
+    
+    // Sugar portion warning
+    if (sugarFound) {
+      const sugarServings = 1; // Each sugar item counts as 1 serving
+      if (sugarServings > maxSugarServings) {
+        corrections.push(`⚠️ Phase 4 - Sugar portion exceeded! You can have ${maxSugarServings} serving${maxSugarServings > 1 ? 's' : ''} per meal (${context.gender === 'male' ? 'men' : 'women'} limit). Skip the ${sugarFound} or reduce portions.`);
+        onPhase = false;
+      } else {
+        corrections.push(`💡 Phase 4 - Sugar allowed (${sugarServings}/${maxSugarServings} serving). Keep portions in check.`);
+      }
+    }
+    
+    // Processed food detection and warning
+    const processedFoodKeywords = [
+      'frozen dinner', 'frozen meal', 'canned soup', 'instant noodles', 'microwave meal',
+      'fast food', 'drive through', 'burger king', "mcdonald", 'wendys', 'taco bell',
+      'chipotle', 'pizza', 'hot dog', 'sausage', 'pepperoni', 'bacon',
+      'chips', 'soda', 'candy', 'ice cream', 'cookies', 'cake', 'pastries',
+      'cereal', 'granola bar', 'protein bar', 'meal replacement bar',
+      'tv dinner', 'pot pie', 'fish sticks', 'chicken nuggets', 'chicken tenders',
+      'french fries', 'onion rings', 'mozzarella sticks', 'nachos', 'queso'
+    ];
+    const processedFoodFound = processedFoodKeywords.find(p => foodLower.includes(p));
+    const mealsLoggedToday = context.mealsLoggedToday || 0;
+    
+    if (processedFoodFound) {
+      // Warn if this appears to be a processed meal
+      corrections.push(`⚠️ Phase 4 - Processed food detected (${processedFoodFound}). ~1 processed meal per day max. You've had ${mealsLoggedToday} meal${mealsLoggedToday !== 1 ? 's' : ''} logged today. Get back to natural food!`);
+      onPhase = false;
+    }
+    
+    // Phase 4 weight check - if 5+ lbs over goal, suggest returning to Phase 1
+    const weightOverGoal = context.currentWeight - context.goalWeight;
+    if (weightOverGoal >= 5) {
+      corrections.push(`⚠️ Phase 4 - You're ${weightOverGoal.toFixed(1)} lbs over goal. Time to reset to Phase 1 to get back on track!`);
+      onPhase = false;
+    }
+    
     if (starchFound) {
       corrections.push(`💡 Phase 4 - Starch allowed every meal. Keep portions in check: ${portions.protein} protein, ${portions.fibrousVegetables} veg. Natural starches preferred over processed.`);
     }

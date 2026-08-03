@@ -26,7 +26,7 @@ function OnboardingContent() {
   // Form data
   const [name, setName] = useState(nameParam);
   const [gender, setGender] = useState<'male' | 'female'>('male');
-  const [programType, setProgramType] = useState<'event_ready' | 'muscle_gain' | 'general_health' | 'first_responder'>('event_ready');
+  const [programType, setProgramType] = useState<'event_ready' | 'get_shredded' | 'muscle_gain' | 'general_health'>('event_ready');
   const [goalWeight, setGoalWeight] = useState('');
   const [currentWeight, setCurrentWeight] = useState('');
   const [eventDate, setEventDate] = useState('');
@@ -214,13 +214,13 @@ function OnboardingContent() {
               <label className="block text-sm text-brand-cream/80 mb-2">Program Type</label>
               <select
                 value={programType}
-                onChange={(e) => setProgramType(e.target.value as 'event_ready' | 'muscle_gain' | 'general_health' | 'first_responder')}
+                onChange={(e) => setProgramType(e.target.value as 'event_ready' | 'get_shredded' | 'muscle_gain' | 'general_health')}
                 className="w-full px-4 py-3 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream focus:outline-none focus:border-brand-orange"
               >
-                <option value="event_ready">🎯 Event Ready (Wedding, Beach, etc.)</option>
+                <option value="event_ready">🎯 Event Ready</option>
+                <option value="get_shredded">🔥 Get Shredded</option>
                 <option value="muscle_gain">💪 Muscle Gain</option>
                 <option value="general_health">🏥 General Health</option>
-                <option value="first_responder">🚒 First Responder</option>
               </select>
             </div>
 
