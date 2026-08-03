@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db_get, db_all, db_run } from '@/lib/db';
+import { db_all, db_run, getAdminClient } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
 // GET - Fetch weight history for a client
@@ -50,9 +50,10 @@ export async function POST(request: NextRequest) {
       weighInId, clientId, weight, bodyFatPercent || null, pantSize || null, waistSize || null, notes || null, weighDay || null, now
     );
 
-    // Check for milestones
-    const client = await db_get('SELECT * FROM clients WHERE id = ?', clientId) as any;
-    
+    // Check for milestones - use admin client to bypass RLS
+    const supabase = getAdminClient();
+    const { data: client } = await supabase.from('clients').select('*').eq('id', clientId).single();
+
     // If starting_weight is not set, set it to this first weight
     if (!client?.starting_weight) {
       await db_run(
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
 
       // Phase progression check on weight log
       try {
-        const updatedClient = await db_get('SELECT * FROM clients WHERE id = ?', clientId) as any;
+        const { data: updatedClient } = await supabase.from('clients').select('*').eq('id', clientId).single();
         if (updatedClient) {
           const currentPhase = updatedClient.current_phase || 1;
           const goalWeight = updatedClient.goal_weight;
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
       );
       milestones.push('goal');
     } else if (weightLost >= 30) {
-      const existing = await db_get("SELECT id FROM milestones WHERE client_id = ? AND milestone_type = '30lb'", clientId);
+      const { data: existing } = await supabase.from('milestones').select('id').eq('client_id', clientId).eq('milestone_type', '30lb').single();
       if (!existing) {
         await db_run(
           `INSERT INTO milestones (id, client_id, milestone_type, achieved_at) VALUES (?, ?, '30lb', ?)`,
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
         milestones.push('30lb');
       }
     } else if (weightLost >= 20) {
-      const existing = await db_get("SELECT id FROM milestones WHERE client_id = ? AND milestone_type = '20lb'", clientId);
+      const { data: existing } = await supabase.from('milestones').select('id').eq('client_id', clientId).eq('milestone_type', '20lb').single();
       if (!existing) {
         await db_run(
           `INSERT INTO milestones (id, client_id, milestone_type, achieved_at) VALUES (?, ?, '20lb', ?)`,
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
         milestones.push('20lb');
       }
     } else if (weightLost >= 10) {
-      const existing = await db_get("SELECT id FROM milestones WHERE client_id = ? AND milestone_type = '10lb'", clientId);
+      const { data: existing } = await supabase.from('milestones').select('id').eq('client_id', clientId).eq('milestone_type', '10lb').single();
       if (!existing) {
         await db_run(
           `INSERT INTO milestones (id, client_id, milestone_type, achieved_at) VALUES (?, ?, '10lb', ?)`,

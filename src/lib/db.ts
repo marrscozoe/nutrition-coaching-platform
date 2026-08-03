@@ -6,18 +6,41 @@ import { v4 as uuidv4 } from 'uuid';
 // ============================================
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 let supabase: SupabaseClient;
+let supabaseAdmin: SupabaseClient | null = null;
 
 console.log('[Supabase] Init - URL:', supabaseUrl, 'KEY length:', supabaseAnonKey.length);
 try {
   supabase = createClient(supabaseUrl, supabaseAnonKey);
   console.log('[Supabase] Client initialized, URL:', supabaseUrl ? '✓' : '✗');
   console.log('[Supabase] ANON_KEY set:', !!supabaseAnonKey);
+  
+  // Admin client (service role) for server-side operations - bypasses RLS
+  if (supabaseServiceKey) {
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    console.log('[Supabase] Admin (service role) client initialized ✓');
+  } else {
+    console.log('[Supabase] SUPABASE_SERVICE_ROLE_KEY not set - using anon key only');
+  }
 } catch (e) {
   console.error('[Supabase] Failed to initialize:', e);
   supabase = createClient('http://placeholder', 'placeholder');
 }
+
+// Export admin client getter for use in API routes
+function getAdminClient() {
+  if (!supabaseAdmin) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
+  }
+  return supabaseAdmin;
+}
+
+// Re-export for convenience
+export { getAdminClient };
 
 // ============================================
 // Prepared Statement Wrapper (for SQL.js compatibility)
@@ -223,7 +246,9 @@ export async function db_run(sql: string | PreparedStatement, ...params: any[]):
         whereConditions[match[1]] = whereParams[paramIdx++];
       }
       
-      let query = supabase.from(table).update(obj);
+      // Use admin client for updates to bypass RLS
+      const updateClient = supabaseAdmin || supabase;
+      let query = updateClient.from(table).update(obj);
       for (const [key, value] of Object.entries(whereConditions)) {
         query = query.eq(key, value);
       }
@@ -249,7 +274,9 @@ export async function db_run(sql: string | PreparedStatement, ...params: any[]):
         whereConditions[match[1]] = allParams[paramIdx++];
       }
       
-      let query = supabase.from(table).delete();
+      // Use admin client for deletes to bypass RLS
+      const deleteClient = supabaseAdmin || supabase;
+      let query = deleteClient.from(table).delete();
       for (const [key, value] of Object.entries(whereConditions)) {
         query = query.eq(key, value);
       }

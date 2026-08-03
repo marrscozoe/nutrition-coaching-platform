@@ -56,7 +56,7 @@ export default function ProfilePage() {
   function handleLogout() {
     localStorage.removeItem('user');
     localStorage.removeItem('userType');
-    router.push('/');
+    window.location.href = '/';
   }
 
   const PROGRAMS = [

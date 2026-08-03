@@ -57,17 +57,17 @@ function checkProviderHasKey(provider: string): boolean {
     case 'openai':
       return !!process.env.OPENAI_API_KEY;
     case 'minimax':
-      return !!process.env.MINIMAX_API_KEY && !!process.env.MINIMAX_GROUP_ID;
+      return !!process.env.MINIMAX_API_KEY;
     case 'ollama':
-      // Ollama is local, always "available" if server is running
-      return true;
+      // Ollama is local - DISABLED by Allen
+      return false;
     default:
       return false;
   }
 }
 
 // Fallback chain order - tried in sequence until one succeeds
-const FALLBACK_CHAIN = ['gemini', 'openai', 'minimax', 'ollama'];
+const FALLBACK_CHAIN = ['gemini', 'openai', 'minimax'];
 
 // Get configured provider or fallback chain for a given env var
 function getProviderChainFromEnv(envKey: string): string[] {
@@ -430,13 +430,26 @@ export function getMealAnalysisPrompt(context: CoachContext, mealData: {
   const status = mealData.messedUp ? 'OFF PHASE' : mealData.onPhase ? 'ON PHASE' : 'NEEDS REVIEW';
   const emoji = mealData.messedUp ? '⚠️' : mealData.onPhase ? '✅' : '🤔';
 
-  // Check for Phase 1 starch violations - look for common starch words in the food description
+  // Check for Phase 1 violations - starch, dairy, AND sugar
   const foodLower = mealData.foodDescription.toLowerCase();
   const starchKeywords = ['pasta', 'bread', 'rice', 'potato', 'noodles', 'spaghetti', 'lasagna', 'tortilla', 'cereal', 'oatmeal', 'kidney beans', 'pinto beans', 'black beans', 'corn', 'peas', 'quinoa', 'couscous', 'bagel', 'muffin', 'croissant', 'pancake', 'waffle', 'roll'];
-  const starchFound = context.currentPhase === 1 
+  const dairyKeywords = ['cream', 'milk', 'cheese', 'yogurt', 'butter', 'sour cream', 'half and half', 'creamer', 'whipped cream', 'ice cream', 'cottage cheese', 'ricotta'];
+  const sugarKeywords = ['sugar', 'syrup', 'honey', 'agave', 'molasses', 'cane juice', 'high fructose', 'aspartame', 'splenda', 'equal', 'sweetener', 'stevia'];
+
+  const starchFound = context.currentPhase === 1
     ? starchKeywords.filter(s => foodLower.includes(s))
     : [];
+  const dairyFound = context.currentPhase === 1
+    ? dairyKeywords.filter(d => foodLower.includes(d))
+    : [];
+  const sugarFound = context.currentPhase === 1
+    ? sugarKeywords.filter(s => foodLower.includes(s))
+    : [];
+
   const hasStarchViolation = starchFound.length > 0 && context.currentPhase === 1;
+  const hasDairyViolation = dairyFound.length > 0 && context.currentPhase === 1;
+  const hasSugarViolation = sugarFound.length > 0 && context.currentPhase === 1;
+  const hasViolation = hasStarchViolation || hasDairyViolation || hasSugarViolation;
 
   return `You are ALLEN'S AI NUTRITION COACH. A client just logged a meal. Give SHORT, PUNCHY coaching feedback (1-3 sentences).
 
@@ -453,16 +466,19 @@ CLIENT CONTEXT:
 - Current: ${context.currentWeight}lbs → Goal: ${context.goalWeight}lbs
 
 COACHING RULES (CRITICAL - FOLLOW THESE):
-1. Phase 1 = NO STARCH allowed! If the meal contains rice, pasta, bread, potatoes, beans, or any starch, that's a VIOLATION!
-2. If the meal has a starch violation in Phase 1: "Swap that!" and tell them to skip/remove the starch
-3. If ON PHASE (and no starch in Phase 1): "Nice!", "Great choice!", "Stay on track" + what to do NEXT
+1. PHASE 1 = ZERO tolerance! NO STARCH, NO DAIRY, NO SUGAR allowed! If the meal contains ANY of these, it's a VIOLATION!
+   - NO starch: rice, pasta, bread, potatoes, beans, corn, oats, cereal, etc.
+   - NO dairy: cream, milk, cheese, butter, yogurt, half & half, creamer, etc.
+   - NO sugar: sugar, syrup, honey, sweetener, etc.
+2. If the meal has ANY Phase 1 violation: "Swap that!" and tell them exactly what to remove/swap
+3. If ON PHASE (and no violations): "Nice!", "Great choice!", "Stay on track" + what to do NEXT
 4. If OFF PHASE for other reasons: "Swap the [X] for [Y]" or "Drop the [X]" - give specific correction
 5. If needs review: Ask a quick question or give portion reminder
 6. End with what they should do for their NEXT meal
 7. Never lecture, never long paragraphs
 8. Use 🔥 💪 🙌 sparingly
 
-${hasStarchViolation ? `\n⚠️ IMPORTANT: This meal contains "${starchFound.join(', ')}" which is STARCH. In Phase 1, NO STARCH is allowed! Response must be: "Swap that! Drop the ${starchFound[0]}!" or similar.` : ''}
+${hasViolation ? `\n⚠️ VIOLATION DETECTED: This meal contains: ${[...starchFound, ...dairyFound, ...sugarFound].join(', ')}. In Phase 1, NO starch, NO dairy, NO sugar allowed! Response MUST be corrective: "Swap that! Drop the ${[...starchFound, ...dairyFound, ...sugarFound][0]}!" or similar.` : ''}
 
 Give coaching feedback now:`;
 }
@@ -534,14 +550,39 @@ export function analyzeMealPortion(
     'cracker', 'pretzel', 'chips', 'fries', 'grits', 'polenta', 'hashbrowns'
   ];
   
+  // Dairy keywords (NO dairy in Phase 1)
+  const dairyKeywords = [
+    'cream', 'milk', 'cheese', 'yogurt', 'butter', 'sour cream', 
+    'half and half', 'creamer', 'whipped cream', 'ice cream', 
+    'cottage cheese', 'ricotta', 'mozzarella', 'cheddar', 'parmesan',
+    'feta', 'goat cheese', 'brie', 'gouda', 'cream cheese'
+  ];
+  
+  // Sugar keywords (NO sugar in Phase 1)
+  const sugarKeywords = [
+    'sugar', 'syrup', 'honey', 'agave', 'molasses', 'cane juice', 
+    'high fructose', 'aspartame', 'splenda', 'equal', 'sweetener', 
+    'stevia', 'truvia', 'brown sugar', 'powdered sugar', 'confectioner'
+  ];
+  
   // Check if food contains starch
   const starchFound = starchKeywords.find(starch => foodLower.includes(starch));
+  const dairyFound = dairyKeywords.find(d => foodLower.includes(d));
+  const sugarFound = sugarKeywords.find(s => foodLower.includes(s));
   
-  // Phase-based starch rules
+  // Phase-based rules: starch, dairy, and sugar
   if (context.currentPhase === 1) {
-    // Phase 1: NO starch allowed
+    // Phase 1: NO starch, NO dairy, NO sugar allowed
     if (starchFound) {
       corrections.push(`⚠️ Phase 1 - NO starch! Skip the ${starchFound} completely.`);
+      onPhase = false;
+    }
+    if (dairyFound) {
+      corrections.push(`⚠️ Phase 1 - NO dairy! Skip the ${dairyFound} completely.`);
+      onPhase = false;
+    }
+    if (sugarFound) {
+      corrections.push(`⚠️ Phase 1 - NO sugar! Skip the ${sugarFound} completely.`);
       onPhase = false;
     }
   } else if (context.currentPhase === 2) {

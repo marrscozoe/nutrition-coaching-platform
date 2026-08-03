@@ -2,7 +2,38 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db_get, db_run, forceSyncDb } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
-import { getSignupToken, deleteSignupToken } from '@/lib/tokenStore';
+
+const TOKEN_TTL = 10 * 60 * 1000; // 10 minutes
+
+// Decode token from base64-encoded URL format
+function decodeSignupToken(token: string): { email: string; name: string; passwordHash: string; createdAt: number } | null {
+  try {
+    const decoded = Buffer.from(token, 'base64url').toString('utf8');
+    const data = JSON.parse(decoded);
+    
+    // Validate required fields
+    if (!data.email || !data.name || !data.passwordHash || !data.createdAt) {
+      console.error('[decodeSignupToken] Missing required fields:', data);
+      return null;
+    }
+    
+    // Check if expired
+    if (Date.now() - data.createdAt > TOKEN_TTL) {
+      console.log('[decodeSignupToken] Token expired');
+      return null;
+    }
+    
+    return {
+      email: data.email,
+      name: data.name,
+      passwordHash: data.passwordHash,
+      createdAt: data.createdAt,
+    };
+  } catch (e) {
+    console.error('[decodeSignupToken] Failed to decode token:', e);
+    return null;
+  }
+}
 
 // Validate bcrypt hash format to prevent storing invalid hashes
 // bcrypt hashes look like: $2a$10$... (60 chars total)
@@ -23,7 +54,8 @@ export async function POST(request: NextRequest) {
 
     // Check if this is a token-based signup
     if (token) {
-      const tokenData = await getSignupToken(token);
+      // Try to decode as base64-encoded token first
+      const tokenData = decodeSignupToken(token);
       if (!tokenData) {
         return NextResponse.json(
           { error: 'Invalid or expired signup token. Please sign up again.' },
@@ -43,16 +75,13 @@ export async function POST(request: NextRequest) {
           passwordHashLength: passwordHash?.length,
           passwordHashPrefix: passwordHash?.substring(0, 10)
         });
-        // Delete the corrupted token
-        await deleteSignupToken(token);
         return NextResponse.json(
           { error: 'Signup session corrupted. Please sign up again.' },
           { status: 400 }
         );
       }
 
-      // Delete the token after use (one-time use)
-      await deleteSignupToken(token);
+      // Token is self-contained, no need to delete from database
     } else {
       // Traditional signup with direct credentials
       const { email: emailBody, password, name: nameBody } = body;

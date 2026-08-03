@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db_get } from '@/lib/db';
+import { getAdminClient } from '@/lib/db';
 import { 
   chatWithChatAI, 
   CoachContext, 
@@ -26,8 +26,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { message, mealData, weightData, preferredProvider } = body;
 
-    // Get client context
-    const client = await db_get('SELECT * FROM clients WHERE id = ?', clientId) as any;
+    // Get client context using admin client to bypass RLS
+    const supabase = getAdminClient();
+    const { data: client, error } = await supabase.from('clients').select('*').eq('id', clientId).single();
+    if (error || !client) {
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    }
     
     if (!client) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 });

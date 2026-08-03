@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db_get } from '@/lib/db';
+import { getAdminClient } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
@@ -14,20 +14,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check client first, then trainer
+    // Use admin client to bypass RLS
     let user;
     let userType = 'client';
 
     console.log('[Login] Attempting login for:', email, 'type:', type);
     
-    if (type === 'trainer') {
-      user = await db_get('SELECT * FROM trainers WHERE email = ?', email);
-      userType = 'trainer';
-    } else {
-      user = await db_get('SELECT * FROM clients WHERE email = ?', email);
+    // Use admin client to bypass RLS on server-side
+    let supabase;
+    try {
+      supabase = getAdminClient();
+    } catch (e) {
+      console.error('[Login] Admin client not available:', e);
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
     
-    console.log('[Login] db_get returned:', user ? 'user found' : 'null');
+    if (type === 'trainer') {
+      const { data, error } = await supabase.from('trainers').select('*').eq('email', email).single();
+      user = data;
+      userType = 'trainer';
+      if (error) console.log('[Login] Trainer query error:', error.message);
+    } else {
+      const { data, error } = await supabase.from('clients').select('*').eq('email', email).single();
+      user = data;
+      if (error) console.log('[Login] Client query error:', error.message);
+    }
+    
+    console.log('[Login] db query returned:', user ? 'user found' : 'null');
 
     if (!user) {
       console.log('[Login] No user found for email:', email);

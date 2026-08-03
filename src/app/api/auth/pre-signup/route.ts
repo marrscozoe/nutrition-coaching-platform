@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db_get } from '@/lib/db';
 import bcrypt from 'bcryptjs';
-import { generateSignupToken } from '@/lib/tokenStore';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,8 +26,15 @@ export async function POST(request: NextRequest) {
     // Hash password for temporary storage
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Generate a temporary token - must await to ensure it's stored before returning
-    const token = await generateSignupToken({ email, name, passwordHash });
+    // Encode token data directly in URL (base64 encoded JSON)
+    // This avoids database storage issues with kv_store
+    const tokenData = {
+      email,
+      name,
+      passwordHash,
+      createdAt: Date.now(),
+    };
+    const token = Buffer.from(JSON.stringify(tokenData)).toString('base64url');
 
     return NextResponse.json({
       success: true,

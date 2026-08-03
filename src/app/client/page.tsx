@@ -189,8 +189,16 @@ export default function ClientDashboard() {
   }
 
   function getCurrentWeek(startDate?: string): number {
-    if (!startDate) return 1;
+    // Defensive: if startDate is missing/invalid, try current_week from API first
+    if (!startDate || startDate === 'undefined' || startDate === 'null' || startDate === 'Invalid Date') {
+      // Fall back to current_week from client data if available, else default to 1
+      return (client as any)?.current_week || 1;
+    }
     const start = new Date(startDate + 'T12:00:00');
+    // If date is still invalid, use current_week fallback
+    if (isNaN(start.getTime())) {
+      return (client as any)?.current_week || 1;
+    }
     const now = new Date();
     const diffMs = now.getTime() - start.getTime();
     const diffDays = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
@@ -200,7 +208,7 @@ export default function ClientDashboard() {
   function handleLogout() {
     localStorage.removeItem('user');
     localStorage.removeItem('userType');
-    router.push('/');
+    window.location.href = '/';
   }
 
   if (loading || !client) {

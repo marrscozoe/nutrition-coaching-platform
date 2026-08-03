@@ -1,28 +1,26 @@
 import { AIResponse, AIMessage } from '../ai-coach';
 
 const apiKey = process.env.MINIMAX_API_KEY || '';
-const GROUP_ID = process.env.MINIMAX_GROUP_ID || '';
-const MODEL = process.env.MINIMAX_MODEL || 'abab6.5s-chat';
+const MODEL = process.env.MINIMAX_MODEL || 'MiniMax-M2.7';
 
-// MiniMax API endpoint
-const BASE_URL = 'https://api.minimax.chat/v1';
+// MiniMax API endpoint - includes v1 path
+const BASE_URL = 'https://api.minimax.io/v1';
 
 /**
  * MiniMax AI Provider
  * 
  * Environment:
- * - MINIMAX_API_KEY: Your MiniMax API key
- * - MINIMAX_GROUP_ID: Your MiniMax Group ID
- * - MINIMAX_MODEL: Model to use (default: abab6.5s-chat)
+ * - MINIMAX_API_KEY: *** API key
+ * - MINIMAX_MODEL: Model to use (default: MiniMax-M2.7)
  */
 export async function chatWithMinimax(
   messages: AIMessage[],
   prompt: string
 ): Promise<AIResponse> {
-  if (!apiKey || !GROUP_ID) {
+  if (!apiKey) {
     return { 
       text: '', 
-      error: 'MiniMax API key or Group ID not configured. Set MINIMAX_API_KEY and MINIMAX_GROUP_ID environment variables.' 
+      error: 'MiniMax API key not configured. Set MINIMAX_API_KEY environment variable.' 
     };
   }
 
@@ -32,7 +30,7 @@ export async function chatWithMinimax(
       { role: 'user' as const, content: prompt },
     ];
 
-    const response = await fetch(`${BASE_URL}/text/chatcompletion_v2?GroupId=${GROUP_ID}`, {
+    const response = await fetch(`${BASE_URL}/text/chatcompletion_v2`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -49,7 +47,6 @@ export async function chatWithMinimax(
     if (!response.ok) {
       const error = await response.text();
       
-      // Check for rate limiting
       if (response.status === 429) {
         return { 
           text: '', 
@@ -63,11 +60,11 @@ export async function chatWithMinimax(
     }
 
     const data = await response.json();
-    const text = data.choices?.[0]?.message?.content || '';
+    const text = data.choices?.[0]?.message?.content || 
+                 data.choices?.[0]?.message?.reasoning_content || '';
     
     return { text };
   } catch (err: any) {
-    // Check for network errors
     if (err.message?.includes('network') || err.code === 'ENOTFOUND') {
       return { 
         text: '', 
@@ -84,21 +81,18 @@ export async function analyzeImageWithMinimax(
   imageBase64: string,
   prompt: string
 ): Promise<AIResponse> {
-  if (!apiKey || !GROUP_ID) {
+  if (!apiKey) {
     return { 
       text: '', 
-      error: 'MiniMax API key or Group ID not configured. Set MINIMAX_API_KEY and MINIMAX_GROUP_ID environment variables.',
+      error: 'MiniMax API key not configured. Set MINIMAX_API_KEY environment variable.',
       provider: 'minimax'
     };
   }
 
   try {
-    // MiniMax supports image input via URL or base64
-    // For base64, we need to determine the image type
-    const imageType = detectImageType(imageBase64);
-    const imageUrl = `data:${imageType};base64,${imageBase64}`;
+    const imageUrl = imageBase64;
 
-    const response = await fetch(`${BASE_URL}/text/chatcompletion_v2?GroupId=${GROUP_ID}`, {
+    const response = await fetch(`${BASE_URL}/text/chatcompletion_v2`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -112,9 +106,7 @@ export async function analyzeImageWithMinimax(
             contents: [
               {
                 type: 'image_url',
-                image_url: {
-                  url: imageUrl,
-                },
+                image_url: { url: imageUrl },
               },
               {
                 type: 'text',
@@ -131,7 +123,6 @@ export async function analyzeImageWithMinimax(
     if (!response.ok) {
       const error = await response.text();
       
-      // Check for rate limiting
       if (response.status === 429) {
         return { 
           text: '', 
@@ -141,7 +132,6 @@ export async function analyzeImageWithMinimax(
         };
       }
       
-      // Check for quota errors
       if (error.includes('quota') || error.includes('limit')) {
         return { 
           text: '', 
@@ -163,7 +153,6 @@ export async function analyzeImageWithMinimax(
     
     return { text };
   } catch (err: any) {
-    // Check for network errors
     if (err.message?.includes('network') || err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
       return { 
         text: '', 
@@ -176,28 +165,21 @@ export async function analyzeImageWithMinimax(
   }
 }
 
-/**
- * Detect image type from base64 data
- */
 function detectImageType(base64: string): string {
-  // Check for common image signatures
   if (base64.startsWith('/9j/')) return 'image/jpeg';
   if (base64.startsWith('iVBOR')) return 'image/png';
   if (base64.startsWith('R0lGO')) return 'image/gif';
   if (base64.startsWith('UklGR')) return 'image/webp';
-  return 'image/jpeg'; // Default
+  return 'image/jpeg';
 }
 
-/**
- * Check if MiniMax API is available
- */
 export async function checkMinimaxHealth(): Promise<{ available: boolean; error?: string }> {
-  if (!apiKey || !GROUP_ID) {
-    return { available: false, error: 'API key or Group ID not configured' };
+  if (!apiKey) {
+    return { available: false, error: 'API key not configured' };
   }
 
   try {
-    const response = await fetch(`${BASE_URL}/text/chatcompletion_v2?GroupId=${GROUP_ID}`, {
+    const response = await fetch(`${BASE_URL}/text/chatcompletion_v2`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

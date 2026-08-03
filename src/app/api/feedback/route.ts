@@ -1,37 +1,106 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db_get, db_run, db_all } from '@/lib/db';
+import { db_all, db_get, db_run } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
-// Send to Allen's Telegram DM for immediate attention
-const ALLEN_TELEGRAM_ID = '7954801708';
+// Nutrition App Telegram group chat ID
+const NUTRITION_APP_GROUP_ID = '-5427254371';
 
-// Send Telegram notification for new feedback using Bot API
-async function sendFeedbackNotification(clientName: string, message: string, feedbackId: string) {
+// Build the bug report message text
+function buildBugReportText(clientName: string, message: string, feedbackId: string): string {
+  const timestamp = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' });
+  return `🐛 *Bug Report*
+
+*From:* ${clientName}
+*Time:* ${timestamp}
+
+*Problem:*
+${message}
+
+---
+Feedback ID: \`${feedbackId}\``;
+}
+
+// Try sending via OpenClaw gateway first (for local dev / same-machine deployments)
+async function sendViaGateway(messageText: string): Promise<boolean> {
+  const gatewayToken = process.env.OPENCLAW_TOKEN;
+  if (!gatewayToken) return false;
+
+  const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL || 'http://127.0.0.1:18789';
+
   try {
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    if (!botToken) {
-      console.error('Telegram bot token not found in environment');
-      return;
-    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
-    const text = `🐛 *New Bug Report*\n\n*Client:* ${clientName}\n*Problem:* ${message}\n\nFeedback ID: \`${feedbackId}\`\n\n@Zoe`;
-    
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    
-    const response = await fetch(url, {
+    const res = await fetch(`${gatewayUrl}/api/messages/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${gatewayToken}`,
+      },
       body: JSON.stringify({
-        chat_id: ALLEN_TELEGRAM_ID,
-        text: text,
-        parse_mode: 'Markdown'
-      })
+        channel: 'telegram',
+        target: NUTRITION_APP_GROUP_ID,
+        message: messageText,
+      }),
+      signal: controller.signal,
     });
-    
-    const result = await response.json();
-    console.log('Telegram API response:', result);
-  } catch (e) {
-    console.error('Failed to send Telegram notification:', e);
+
+    clearTimeout(timeout);
+
+    if (res.ok) {
+      console.log('[Feedback] Gateway send OK');
+      return true;
+    } else {
+      const body = await res.text();
+      console.error(`[Feedback] Gateway error ${res.status}: ${body}`);
+      return false;
+    }
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      console.error('[Feedback] Gateway timeout (unreachable)');
+    } else {
+      console.error('[Feedback] Gateway error:', e.message);
+    }
+    return false;
+  }
+}
+
+// Fall back to Telegram Bot API
+async function sendViaBotApi(messageText: string): Promise<void> {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  console.log('[Feedback] Bot API - token present:', !!botToken, 'length:', botToken ? botToken.length : 0);
+  if (!botToken) {
+    console.error('[Feedback] TELEGRAM_BOT_TOKEN not set — cannot send via Bot API');
+    return;
+  }
+
+  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: NUTRITION_APP_GROUP_ID,
+      text: messageText,
+      parse_mode: 'Markdown',
+    }),
+  });
+
+  const result = await res.json();
+  if (!result.ok) {
+    console.error('[Feedback] Telegram Bot API error:', result.description);
+  } else {
+    console.log('[Feedback] Bot API send OK, msg_id:', result.result?.message_id);
+  }
+}
+
+// Main send function: gateway first, then Bot API
+async function sendFeedbackNotification(clientName: string, message: string, feedbackId: string) {
+  const messageText = buildBugReportText(clientName, message, feedbackId);
+
+  const ok = await sendViaGateway(messageText);
+  if (!ok) {
+    await sendViaBotApi(messageText);
   }
 }
 
@@ -64,7 +133,11 @@ export async function POST(request: NextRequest) {
 
     // Send Telegram notification to Nutrition App group
     const clientName = client?.name || 'Unknown Client';
-    sendFeedbackNotification(clientName, message.trim(), feedbackId).catch(console.error);
+    try {
+      await sendFeedbackNotification(clientName, message.trim(), feedbackId);
+    } catch (e) {
+      console.error('[Feedback] Notification error:', e);
+    }
 
     return NextResponse.json({
       success: true,
@@ -89,7 +162,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'pending';
 
     const feedback = await db_all(
-      `SELECT f.*, c.name as client_name 
+      `SELECT f.*, c.name as client_name
        FROM feedback f
        JOIN clients c ON f.client_id = c.id
        WHERE f.trainer_id = ? AND f.status = ?

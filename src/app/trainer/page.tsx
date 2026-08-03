@@ -63,7 +63,7 @@ export default function TrainerDashboard() {
   function handleLogout() {
     localStorage.removeItem('user');
     localStorage.removeItem('userType');
-    router.push('/');
+    window.location.href = '/';
   }
 
   function getStatusColor(status: string): string {
