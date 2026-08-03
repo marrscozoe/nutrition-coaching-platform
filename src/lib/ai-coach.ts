@@ -465,7 +465,15 @@ export function getMealAnalysisPrompt(context: CoachContext, mealData: {
     // Other
     'breadcrumbs', 'tempura', 'egg roll wrapper', 'wonton wrapper', 'flour', 'cornmeal', 'pancake mix',
   ];
-  const dairyKeywords = ['cream', 'milk', 'cheese', 'yogurt', 'butter', 'sour cream', 'half and half', 'creamer', 'whipped cream', 'ice cream', 'cottage cheese', 'ricotta'];
+  const dairyKeywords = [
+    // Original
+    'cream', 'milk', 'cheese', 'yogurt', 'butter', 'sour cream', 'half and half', 'creamer', 'whipped cream', 'ice cream', 'cottage cheese', 'ricotta',
+    // Added
+    'cream cheese', 'philadelphia', 'heavy cream', 'heavy whipping cream', 'milk chocolate',
+    'butter pecan', 'cheese sauce', 'cheese dip', 'cheese ball', 'cheese spread',
+    'alfredo sauce', 'queso', 'nacho cheese', 'velveeta', 'mac and cheese',
+    'cheese fries', 'cheese curds', 'cream gravy', 'white sauce', 'bechamel',
+  ];
   const sugarKeywords = ['sugar', 'syrup', 'honey', 'agave', 'molasses', 'cane juice', 'high fructose', 'aspartame', 'splenda', 'equal', 'sweetener', 'stevia'];
 
   const starchFound = context.currentPhase === 1
