@@ -200,3 +200,4 @@ export async function checkGeminiHealth(): Promise<{ available: boolean; error?:
     return { available: false, error: err.message };
   }
 }
+// redeploy trigger
