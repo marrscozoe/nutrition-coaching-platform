@@ -2,7 +2,7 @@ import { AIResponse, AIMessage } from '../ai-coach';
 
 const apiKey = process.env.GEMINI_API_KEY || '';
 // Gemini 1.5 Flash is free tier eligible: 15 req/min, 1,500/day
-const MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash-001';
+const MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
 
 /**
  * Google Gemini Vision API Provider
@@ -34,7 +34,7 @@ export async function chatWithGemini(
     });
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,7 +103,7 @@ export async function analyzeImageWithGemini(
     const imageData = `data:${mimeType};base64,${imageBase64}`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -187,7 +187,7 @@ export async function checkGeminiHealth(): Promise<{ available: boolean; error?:
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/${MODEL}?key=${apiKey}`,
       { method: 'GET' }
     );
 
