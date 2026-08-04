@@ -121,7 +121,7 @@ export async function addCorrection(
   foodName: string,
   correctCategory: string,
   submittedBy: string,
-  approved: boolean = true,
+  approved: boolean = false, // Default to NOT approved - trainer must review
   reviewedBy?: string
 ): Promise<FoodCorrection> {
   const supabase = getAdminClient();

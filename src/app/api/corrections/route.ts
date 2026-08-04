@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/db';
-import { initializeCorrectionsCache, addCorrection, getAllCorrections, isCacheLoaded } from '@/lib/food-corrections-cache';
+import { initializeCorrectionsCache, addCorrection, getAllCorrections, isCacheLoaded, invalidateCache } from '@/lib/food-corrections-cache';
 
 /**
  * GET /api/corrections
@@ -30,6 +30,54 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     console.error('[Corrections API] GET error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/corrections
+ * Approve or reject a correction (admin only)
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const trainerId = request.headers.get('x-trainer-id');
+    if (!trainerId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { id, approved } = body;
+
+    if (!id || approved === undefined) {
+      return NextResponse.json({ error: 'id and approved are required' }, { status: 400 });
+    }
+
+    const supabase = getAdminClient();
+    const now = new Date().toISOString();
+
+    // Update the correction
+    const { data, error } = await supabase
+      .from('food_corrections')
+      .update({
+        approved,
+        reviewed_by: trainerId,
+        reviewed_at: now,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[Corrections API] PATCH error:', error);
+      return NextResponse.json({ error: 'Failed to update correction' }, { status: 500 });
+    }
+
+    // Invalidate and reload the cache so AI gets the updated corrections
+    await invalidateCache();
+
+    return NextResponse.json({ success: true, correction: data });
+  } catch (e: any) {
+    console.error('[Corrections API] PATCH error:', e);
+    return NextResponse.json({ error: e.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -64,12 +112,12 @@ export async function POST(request: NextRequest) {
       await initializeCorrectionsCache();
     }
 
-    // Add the correction
+    // Add the correction (not auto-approved - trainer must review and approve)
     const correction = await addCorrection(
       foodName,
       correctCategory,
       clientId,
-      true, // auto-approve for now (testers are trusted)
+      false, // NOT auto-approved - pending trainer review
     );
 
     return NextResponse.json({ success: true, correction });

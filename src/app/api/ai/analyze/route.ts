@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       
       if (result.error && !result.text) {
         // All providers failed - fallback to rule-based analysis
-        const analysis = analyzeMealPortion(foodDescription || 'Unknown meal', context);
+        const analysis = await analyzeMealPortion(foodDescription || 'Unknown meal', context);
         return NextResponse.json({
           analysis: result.error,
           portionAdvice: analysis.advice,
@@ -177,8 +177,8 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Convert photo analysis to portion advice
-      const analysis = analyzeMealPortion(result.text, context);
+      // Convert photo analysis to portion advice + apply corrections cache
+      const analysis = await analyzeMealPortion(result.text, context);
       
       // Check if AI response contains food/nutrition content
       // If not, the AI likely gave an irrelevant response (like a story)
@@ -187,7 +187,14 @@ export async function POST(request: NextRequest) {
       const hasFoodContent = foodKeywords.some(kw => lowerResponse.includes(kw));
       
       // If no food content detected, return "cannot identify" message instead of garbage
-      const displayAnalysis = hasFoodContent ? result.text : 'I cannot identify this food from the photo. Please describe what you are eating and I\'ll give you portion advice.';
+      let displayAnalysis = hasFoodContent ? result.text : 'I cannot identify this food from the photo. Please describe what you are eating and I\'ll give you portion advice.';
+      
+      // If corrections were applied by analyzeMealPortion, append correction note to display
+      // This tells the user when the AI misclassified something and the correction took effect
+      if (hasFoodContent && analysis.corrections && analysis.corrections.length > 0) {
+        const correctionNote = '\n\n📝 **Correction applied:** The AI\'s classification has been corrected based on previous feedback. See portion advice below.';
+        displayAnalysis = displayAnalysis + correctionNote;
+      }
       
       return NextResponse.json({
         analysis: displayAnalysis,
@@ -211,7 +218,7 @@ export async function POST(request: NextRequest) {
 
     if (aiResult.text) {
       // AI succeeded - use AI response plus rule-based corrections for onPhase status
-      const analysis = analyzeMealPortion(foodDescription, context);
+      const analysis = await analyzeMealPortion(foodDescription, context);
       return NextResponse.json({
         analysis: aiResult.text,
         portionAdvice: aiResult.text,
@@ -222,7 +229,7 @@ export async function POST(request: NextRequest) {
     }
 
     // AI failed - fallback to rule-based
-    const analysis = analyzeMealPortion(foodDescription || '', context);
+    const analysis = await analyzeMealPortion(foodDescription || '', context);
     return NextResponse.json({
       analysis: analysis.advice,
       portionAdvice: analysis.advice,

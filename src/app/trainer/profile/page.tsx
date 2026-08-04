@@ -156,6 +156,10 @@ export default function TrainerProfilePage() {
             <span className="text-xl">👥</span>
             <span className="text-xs mt-1">Clients</span>
           </Link>
+          <Link href="/trainer/corrections" className="flex flex-col items-center text-brand-cream/50 hover:text-brand-cream">
+            <span className="text-xl">🤖</span>
+            <span className="text-xs mt-1">Corrections</span>
+          </Link>
           <Link href="/trainer/profile" className="flex flex-col items-center text-brand-orange">
             <span className="text-xl">👤</span>
             <span className="text-xs mt-1">Profile</span>

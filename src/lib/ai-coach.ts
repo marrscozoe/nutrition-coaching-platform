@@ -2,11 +2,18 @@
 // Supports any AI provider: OpenAI, Anthropic, Gemini, Ollama, etc.
 
 // Import corrections cache (server-only)
-import { initializeCorrectionsCache, getCorrection, getAllCorrections } from './food-corrections-cache';
+import { initializeCorrectionsCache, getCorrection, getAllCorrections, isCacheLoaded } from './food-corrections-cache';
 
 // Initialize corrections cache on module load (server-only)
 if (typeof process !== 'undefined' && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   initializeCorrectionsCache().catch(console.error);
+}
+
+// Ensure cache is loaded before any correction lookup
+async function ensureCacheLoaded(): Promise<void> {
+  if (!isCacheLoaded()) {
+    await initializeCorrectionsCache();
+  }
 }
 
 export interface AIProvider {
@@ -708,10 +715,12 @@ ${isMaintained ? `- MAINTAINED: Acknowledge it positively. "Holding steady! Cons
 Give coaching feedback now:`;
 }
 
-export function analyzeMealPortion(
+export async function analyzeMealPortion(
   foodDescription: string,
   context: CoachContext
-): { advice: string; onPhase: boolean; corrections: string[] } {
+): Promise<{ advice: string; onPhase: boolean; corrections: string[] }> {
+  // Ensure corrections cache is loaded before doing any correction lookups
+  await ensureCacheLoaded();
   const portions = PORTION_SIZES[context.gender];
   const violationMessages: string[] = [];
   let onPhase = true;

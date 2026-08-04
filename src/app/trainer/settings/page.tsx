@@ -64,9 +64,9 @@ export default function TrainerSettingsPage() {
   async function loadCorrectionSettings(trainerId: string) {
     try {
       // Get correction_feature_enabled from kv_store
-      const res = await fetch('/api/admin/settings?key=correction_feature_enabled');
+      const res = await fetch('/api/admin/settings');
       const data = await res.json();
-      if (data.value === 'true') {
+      if (data.settings?.correction_feature_enabled) {
         setCorrectionFeatureEnabled(true);
       }
     } catch (e) {
@@ -95,8 +95,8 @@ export default function TrainerSettingsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          key: 'correction_feature_enabled',
-          value: enabled ? 'true' : 'false',
+          settings: { correction_feature_enabled: enabled },
+          
         }),
       });
       if (res.ok) {
@@ -383,6 +383,10 @@ export default function TrainerSettingsPage() {
           <Link href="/trainer/clients" className="flex flex-col items-center text-brand-cream/50 hover:text-brand-cream">
             <span className="text-xl">👥</span>
             <span className="text-xs mt-1">Clients</span>
+          </Link>
+          <Link href="/trainer/corrections" className="flex flex-col items-center text-brand-cream/50 hover:text-brand-cream">
+            <span className="text-xl">🤖</span>
+            <span className="text-xs mt-1">Corrections</span>
           </Link>
           <Link href="/trainer/settings" className="flex flex-col items-center text-brand-orange">
             <span className="text-xl">⚙️</span>

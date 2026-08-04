@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
 
       if (result.error || !result.text) {
         // Fallback to rule-based response
-        const fallback = analyzeMealPortion(mealData.foodDescription || '', context);
+        const fallback = await analyzeMealPortion(mealData.foodDescription || '', context);
         return NextResponse.json({
           response: fallback.advice,
           type: 'meal_analysis',
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
     const result = await chatWithChatAI([systemMessage], message, preferredProvider);
     
     if (result.error || !result.text) {
-      const fallback = getFallbackResponse(message, context);
+      const fallback = await getFallbackResponse(message, context);
       return NextResponse.json({
         response: fallback,
         type: 'fallback',
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function getFallbackResponse(message: string, context: CoachContext): string {
+async function getFallbackResponse(message: string, context: CoachContext): Promise<string> {
   // Normalize apostrophes - replace curly/smart apostrophes with straight apostrophe
   const normalizedMessage = message.replace(/['\u2019]/g, "'");
   const lower = normalizedMessage.toLowerCase();
@@ -297,7 +297,7 @@ Ask me anything about specific foods! 💪`;
       lower.includes('veggie') || lower.includes('vegetable') ||
       lower.includes('fat') || lower.includes('starch') ||
       lower.includes('what can i') || lower.includes('what should i') || lower.includes('what am i')) {
-    const fallback = analyzeMealPortion(message, context);
+    const fallback = await analyzeMealPortion(message, context);
     return fallback.advice;
   }
 

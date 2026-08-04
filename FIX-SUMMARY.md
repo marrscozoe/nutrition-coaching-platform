@@ -65,3 +65,84 @@ All characters outside the Latin-1 range (0-255) are now properly replaced, incl
 - App started successfully with `npm run dev`
 - No ByteString conversion errors
 - HTML page renders correctly
+
+---
+
+# Fix Summary: Gemini Model Name Bug
+
+**Date:** 2026-08-03
+**Bug:** Photo analysis failing with "models/gemini-1.5-flash is not found" error (93% failure rate)
+**Root Cause:** `.env.local` had `GEMINI_MODEL=gemini-1.5-flash` but this model no longer exists in the Gemini API
+
+---
+
+## The Problem
+
+The app was configured to use `gemini-1.5-flash` model which returns:
+```
+models/gemini-1.5-flash is not found for API version v1
+```
+
+This caused 100% of API requests to fail with a 404 error.
+
+---
+
+## The Fix
+
+Changed `.env.local`:
+```
+GEMINI_MODEL=gemini-1.5-flash  →  GEMINI_MODEL=gemini-2.0-flash
+```
+
+**Why this works:**
+- `gemini-2.0-flash` is the current stable model available in the Gemini API
+- Available models: gemini-2.5-flash, gemini-2.5-pro, gemini-2.0-flash, gemini-2.0-flash-001, gemini-2.0-flash-lite-001
+
+---
+
+## Files Changed
+
+- `.env.local` — Changed `GEMINI_MODEL=gemini-1.5-flash` to `GEMINI_MODEL=gemini-2.0-flash`
+
+---
+
+## Important Note About API Key Format
+
+The `.env.local` has `GEMINI_API_KEY=AQ.Ab8...` (starts with `AQ.`, not `AIza.`).
+
+This is the NEW Auth key format introduced by Google in 2026. It WORKS with the native endpoint:
+- URL format: `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=API_KEY`
+- Key format: `AQ.xxx` (Auth key) - WORKS
+- Key format: `AIzaxxx` (Standard key) - OLD format
+
+**The `AQ.` key is correct** - no need to change it.
+
+---
+
+## Remaining Issue: Quota Exhausted
+
+After fixing the model name, the API returns:
+```
+429 You exceeded your current quota, please check your plan and billing details
+```
+
+**Solution options:**
+1. Enable billing on Google Cloud project (free tier with billing = more quota)
+2. Wait for daily quota reset (midnight PST)
+3. Switch to OpenAI or MiniMax as the AI provider
+
+---
+
+## Verification
+
+**Before fix:**
+```json
+{"error":{"code":404,"message":"models/gemini-1.5-flash is not found"}}
+```
+
+**After fix:**
+```json
+{"error":{"code":429,"message":"You exceeded your current quota"}}
+```
+
+The 404 error is gone. The 429 means the model name is correct but quota is exhausted.

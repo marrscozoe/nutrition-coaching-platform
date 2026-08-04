@@ -174,6 +174,10 @@ export default function TrainerClientsPage() {
             <span className="text-xl">👥</span>
             <span className="text-xs mt-1">Clients</span>
           </Link>
+          <Link href="/trainer/corrections" className="flex flex-col items-center text-brand-cream/50 hover:text-brand-cream">
+            <span className="text-xl">🤖</span>
+            <span className="text-xs mt-1">Corrections</span>
+          </Link>
           <Link href="/trainer/settings" className="flex flex-col items-center text-brand-cream/50 hover:text-brand-cream">
             <span className="text-xl">⚙️</span>
             <span className="text-xs mt-1">Settings</span>

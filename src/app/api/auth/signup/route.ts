@@ -110,9 +110,9 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
 
     const result = await db_run(
-      `INSERT INTO clients (id, email, password_hash, name, gender, program_type, starting_weight, current_weight, goal_weight, goal_start_date, event_date, lead_source, current_phase, phase_start_date, current_week, waiver_signed, subscription_status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1, ?, 'trial', ?, ?)`,
-      clientId, email, passwordHash, name, gender || null, programType || null, currentWeight || null, currentWeight || null, goalWeight || null, now, eventDate || null, leadSource || null, now, waiver_accepted ? 1 : 0, now, now
+      `INSERT INTO clients (id, trainer_id, email, password_hash, name, gender, program_type, starting_weight, current_weight, goal_weight, goal_start_date, event_date, current_phase, phase_start_date, current_week, waiver_signed, subscription_status, lead_source, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1, ?, 'trial', ?, ?, ?)`,
+      clientId, email, passwordHash, name, gender || null, programType || null, currentWeight || null, currentWeight || null, goalWeight || null, now, eventDate || null, now, waiver_accepted ? 1 : 0, leadSource || null, now, now
     );
 
     if (!result.success) {
