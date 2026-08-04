@@ -38,9 +38,9 @@ export default function ClientDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in
-    const userData = localStorage.getItem('user');
-    const userType = localStorage.getItem('userType');
+    // Check if user is logged in (use separate client keys to avoid overwriting trainer session)
+    const userData = localStorage.getItem('client_user');
+    const userType = localStorage.getItem('client_user_type');
 
     if (!userData || userType !== 'client') {
       router.push('/');
@@ -78,8 +78,8 @@ export default function ClientDashboard() {
       if (res.ok) {
         const data = await res.json();
         setClient(data.user);
-        // Update localStorage with fresh data
-        localStorage.setItem('user', JSON.stringify(data.user));
+        // Update localStorage with fresh data (use client-specific key)
+        localStorage.setItem('client_user', JSON.stringify(data.user));
       }
     } catch (err) {
       console.error('Failed to fetch client data:', err);
@@ -87,7 +87,7 @@ export default function ClientDashboard() {
   }
 
   async function handleRefresh() {
-    const userData = localStorage.getItem('user');
+    const userData = localStorage.getItem('client_user');
     if (userData) {
       const user = JSON.parse(userData);
       await Promise.all([

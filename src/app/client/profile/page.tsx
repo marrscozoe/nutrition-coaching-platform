@@ -41,8 +41,8 @@ export default function ProfilePage() {
   const [editEventDate, setEditEventDate] = useState('');
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    const userType = localStorage.getItem('userType');
+    const userData = localStorage.getItem('client_user');
+    const userType = localStorage.getItem('client_user_type');
 
     if (!userData || userType !== 'client') {
       router.push('/');
@@ -239,7 +239,7 @@ export default function ProfilePage() {
                 onClick={async () => {
                   if (!editGoalWeight) return;
                   try {
-                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                    const user = JSON.parse(localStorage.getItem('client_user') || '{}');
                     const res = await fetch('/api/client/update-goal', {
                       method: 'POST',
                       headers: { 'x-client-id': user.id, 'Content-Type': 'application/json' },
@@ -253,7 +253,7 @@ export default function ProfilePage() {
                       if (fresh.ok) {
                         const data = await fresh.json();
                         setClient(data.user);
-                        localStorage.setItem('user', JSON.stringify(data.user));
+                        localStorage.setItem('client_user', JSON.stringify(data.user));
                       }
                       setToast({ message: 'Goal updated! Week counter reset.', type: 'success' });
                     }
@@ -383,7 +383,7 @@ export default function ProfilePage() {
                         starting_weight: parseFloat(editStartingWeight)
                       };
                       setClient(updatedClient);
-                      localStorage.setItem('user', JSON.stringify(updatedClient));
+                      localStorage.setItem('client_user', JSON.stringify(updatedClient));
                       setShowEditWeight(false);
                     } else {
                       setToast({ message: 'Failed to update weight. Please try again.', type: 'error' });
@@ -473,7 +473,7 @@ export default function ProfilePage() {
                         event_date: selectedProgram === 'event_ready' ? (editEventDate || client.event_date) : client.event_date,
                       };
                       setClient(updatedClient);
-                      localStorage.setItem('user', JSON.stringify(updatedClient));
+                      localStorage.setItem('client_user', JSON.stringify(updatedClient));
                       setShowEditProgram(false);
                       setToast({ message: 'Program updated successfully!', type: 'success' });
                     } else {
@@ -548,7 +548,7 @@ export default function ProfilePage() {
                         event_date: editEventDate,
                       };
                       setClient(updatedClient);
-                      localStorage.setItem('user', JSON.stringify(updatedClient));
+                      localStorage.setItem('client_user', JSON.stringify(updatedClient));
                       setShowEventDateModal(false);
                       setToast({ message: 'Event date set successfully!', type: 'success' });
                     } else {

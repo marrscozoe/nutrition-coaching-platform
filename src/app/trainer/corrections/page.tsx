@@ -36,8 +36,8 @@ export default function TrainerCorrectionsPage() {
   const [tab, setTab] = useState<'pending' | 'approved' | 'all'>('pending');
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    const userType = localStorage.getItem('userType');
+    const userData = localStorage.getItem('trainer_user');
+    const userType = localStorage.getItem('trainer_user_type');
 
     if (!userData || userType !== 'trainer') {
       router.push('/');

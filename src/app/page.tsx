@@ -15,12 +15,18 @@ export default function HomePage() {
   // Check if already logged in and redirect (only run once on mount)
   useEffect(() => {
     try {
-      const userData = localStorage.getItem('user');
-      const userType = localStorage.getItem('userType');
-      if (userData && userType === 'client') {
-        router.push('/client');
-      } else if (userData && userType === 'trainer') {
+      // Check trainer session first, then client session
+      const trainerUser = localStorage.getItem('trainer_user');
+      const trainerType = localStorage.getItem('trainer_user_type');
+      if (trainerUser && trainerType === 'trainer') {
         router.push('/trainer');
+        return;
+      }
+      
+      const clientUser = localStorage.getItem('client_user');
+      const clientType = localStorage.getItem('client_user_type');
+      if (clientUser && clientType === 'client') {
+        router.push('/client');
       }
     } catch (e) {
       // If localStorage fails, just show login page
@@ -55,9 +61,14 @@ export default function HomePage() {
           return;
         }
 
-        // Store user data in localStorage
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('userType', data.userType);
+        // Store user data in localStorage (use separate keys for each user type to prevent overwriting)
+        if (data.userType === 'trainer') {
+          localStorage.setItem('trainer_user', JSON.stringify(data.user));
+          localStorage.setItem('trainer_user_type', 'trainer');
+        } else {
+          localStorage.setItem('client_user', JSON.stringify(data.user));
+          localStorage.setItem('client_user_type', 'client');
+        }
 
         // Redirect based on user type
         if (data.userType === 'trainer') {

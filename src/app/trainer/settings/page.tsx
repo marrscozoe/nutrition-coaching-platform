@@ -40,8 +40,8 @@ export default function TrainerSettingsPage() {
   const [loadingClients, setLoadingClients] = useState(false);
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    const userType = localStorage.getItem('userType');
+    const userData = localStorage.getItem('trainer_user');
+    const userType = localStorage.getItem('trainer_user_type');
 
     if (!userData || userType !== 'trainer') {
       router.push('/');
@@ -144,7 +144,7 @@ export default function TrainerSettingsPage() {
       brand_color: brandColor,
     };
     setTrainer(updated as any);
-    localStorage.setItem('user', JSON.stringify(updated));
+    localStorage.setItem('trainer_user', JSON.stringify(updated));
 
     setSaving(false);
     setSaved(true);
@@ -354,8 +354,10 @@ export default function TrainerSettingsPage() {
           <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wider mb-4">Account</h2>
           <button
             onClick={() => {
-              localStorage.removeItem('user');
-              localStorage.removeItem('userType');
+              localStorage.removeItem('trainer_user');
+              localStorage.removeItem('trainer_user_type');
+              localStorage.removeItem('user'); // Legacy cleanup
+              localStorage.removeItem('userType'); // Legacy cleanup
               router.push('/');
             }}
             className="w-full py-3 rounded-xl bg-red-500/20 text-red-400 font-medium hover:bg-red-500/30 transition-colors"

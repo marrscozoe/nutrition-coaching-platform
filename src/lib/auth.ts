@@ -3,9 +3,13 @@ import { supabase } from './supabase';
 
 export async function logout(): Promise<void> {
   try {
-    // Clear localStorage
-    localStorage.removeItem('user');
-    localStorage.removeItem('userType');
+    // Clear all user session data from localStorage
+    localStorage.removeItem('trainer_user');
+    localStorage.removeItem('trainer_user_type');
+    localStorage.removeItem('client_user');
+    localStorage.removeItem('client_user_type');
+    localStorage.removeItem('user'); // Legacy key cleanup
+    localStorage.removeItem('userType'); // Legacy key cleanup
     
     // Sign out from Supabase (clears any auth session)
     await supabase.auth.signOut();
@@ -24,15 +28,36 @@ export async function logout(): Promise<void> {
 
 export function getCurrentUser(): { user: any; userType: string | null } | null {
   try {
+    // Check trainer session first
+    const trainerData = localStorage.getItem('trainer_user');
+    const trainerType = localStorage.getItem('trainer_user_type');
+    if (trainerData && trainerType === 'trainer') {
+      return {
+        user: JSON.parse(trainerData),
+        userType: 'trainer'
+      };
+    }
+    
+    // Check client session
+    const clientData = localStorage.getItem('client_user');
+    const clientType = localStorage.getItem('client_user_type');
+    if (clientData && clientType === 'client') {
+      return {
+        user: JSON.parse(clientData),
+        userType: 'client'
+      };
+    }
+    
+    // Legacy support: check old keys
     const userData = localStorage.getItem('user');
     const userType = localStorage.getItem('userType');
-    
     if (userData && userType) {
       return {
         user: JSON.parse(userData),
         userType
       };
     }
+    
     return null;
   } catch {
     return null;
@@ -42,4 +67,28 @@ export function getCurrentUser(): { user: any; userType: string | null } | null 
 export function isAuthenticated(): boolean {
   const currentUser = getCurrentUser();
   return currentUser !== null;
+}
+
+export function getTrainerUser(): { user: any } | null {
+  try {
+    const trainerData = localStorage.getItem('trainer_user');
+    if (trainerData) {
+      return { user: JSON.parse(trainerData) };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function getClientUser(): { user: any } | null {
+  try {
+    const clientData = localStorage.getItem('client_user');
+    if (clientData) {
+      return { user: JSON.parse(clientData) };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }

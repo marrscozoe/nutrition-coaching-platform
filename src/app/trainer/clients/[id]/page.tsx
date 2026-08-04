@@ -66,8 +66,8 @@ export default function ClientDetailPage() {
   const [currentWeek, setCurrentWeek] = useState(1);
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    const userType = localStorage.getItem('userType');
+    const userData = localStorage.getItem('trainer_user');
+    const userType = localStorage.getItem('trainer_user_type');
 
     if (!userData || userType !== 'trainer') {
       router.push('/');
