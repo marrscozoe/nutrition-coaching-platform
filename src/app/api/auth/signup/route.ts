@@ -109,10 +109,53 @@ export async function POST(request: NextRequest) {
     const clientId = uuidv4();
     const now = new Date().toISOString();
 
+    // Build the insert object directly to avoid column/param ordering issues
+    const insertObj = {
+      id: clientId,
+      trainer_id: null,
+      email,
+      password_hash: passwordHash,
+      name,
+      gender: gender || 'male',
+      program_type: programType || 'general_health',
+      starting_weight: currentWeight || null,
+      current_weight: currentWeight || null,
+      goal_weight: goalWeight || null,
+      goal_start_date: now,
+      event_date: eventDate || null,
+      current_phase: 1,
+      phase_start_date: now,
+      current_week: 1,
+      waiver_signed: waiver_accepted ? 1 : 0,
+      subscription_status: 'trial',
+      lead_source: leadSource || null,
+      created_at: now,
+      updated_at: now,
+    };
+
     const result = await db_run(
       `INSERT INTO clients (id, trainer_id, email, password_hash, name, gender, program_type, starting_weight, current_weight, goal_weight, goal_start_date, event_date, current_phase, phase_start_date, current_week, waiver_signed, subscription_status, lead_source, created_at, updated_at)
-       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1, ?, 'trial', ?, ?, ?)`,
-      clientId, email, passwordHash, name, gender || null, programType || null, currentWeight || null, currentWeight || null, goalWeight || null, now, eventDate || null, now, waiver_accepted ? 1 : 0, leadSource || null, now, now
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      insertObj.id,
+      insertObj.trainer_id,
+      insertObj.email,
+      insertObj.password_hash,
+      insertObj.name,
+      insertObj.gender,
+      insertObj.program_type,
+      insertObj.starting_weight,
+      insertObj.current_weight,
+      insertObj.goal_weight,
+      insertObj.goal_start_date,
+      insertObj.event_date,
+      insertObj.current_phase,
+      insertObj.phase_start_date,
+      insertObj.current_week,
+      insertObj.waiver_signed,
+      insertObj.subscription_status,
+      insertObj.lead_source,
+      insertObj.created_at,
+      insertObj.updated_at
     );
 
     if (!result.success) {
