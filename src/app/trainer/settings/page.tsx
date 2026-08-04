@@ -319,7 +319,7 @@ export default function TrainerSettingsPage() {
           <div className="flex gap-2">
             <input
               type="text"
-              value={`${typeof window !== 'undefined' ? window.location.origin : ''}/onboarding?trainer=${trainer?.id}`}
+              value={`${typeof window !== 'undefined' ? window.location.origin : ''}/signup?trainer=${trainer?.id}`}
               readOnly
               className="flex-1 px-4 py-3 rounded-lg bg-brand-charcoal/40 border border-brand-cream/20 text-brand-cream/70 text-sm"
             />
