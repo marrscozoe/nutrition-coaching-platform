@@ -71,6 +71,16 @@ function OnboardingContent() {
         return;
       }
 
+      // Set localStorage to log the client in
+      const clientData = {
+        id: data.clientId,
+        email: email,
+        name: nameParam,
+        trainer_id: trainerId || null,
+      };
+      localStorage.setItem('user', JSON.stringify(clientData));
+      localStorage.setItem('userType', 'client');
+
       setSuccessMessage('Account created! Redirecting to your dashboard...');
       setTimeout(() => window.location.href = '/client', 2000);
     } catch (err) {
