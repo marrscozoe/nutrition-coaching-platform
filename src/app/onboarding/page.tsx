@@ -78,8 +78,16 @@ function OnboardingContent() {
         name: nameParam,
         trainer_id: trainerId || null,
       };
-      localStorage.setItem('user', JSON.stringify(clientData));
-      localStorage.setItem('userType', 'client');
+      // Clear only client session data (preserve trainer session if one exists in same browser)
+      // This prevents the bug where a trainer would be logged out when a client signs up in the same browser
+      localStorage.removeItem('client_user');
+      localStorage.removeItem('client_user_type');
+      localStorage.removeItem('user'); // Legacy cleanup
+      localStorage.removeItem('userType'); // Legacy cleanup
+      // Do NOT clear trainer_user/trainer_user_type - preserve trainer session
+      // Set client session using dedicated keys (separate from trainer keys)
+      localStorage.setItem('client_user', JSON.stringify(clientData));
+      localStorage.setItem('client_user_type', 'client');
 
       setSuccessMessage('Account created! Redirecting to your dashboard...');
       setTimeout(() => window.location.href = '/client', 2000);
