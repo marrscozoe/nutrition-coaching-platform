@@ -9,8 +9,12 @@ import {
   getMealAnalysisPrompt,
   AIMessage,
 } from '@/lib/ai-coach';
+import { initializeCorrectionsCache } from '@/lib/food-corrections-cache';
 import { existsSync, unlinkSync, mkdirSync } from 'fs';
 import { join } from 'path';
+
+// Initialize corrections cache on server startup
+initializeCorrectionsCache().catch(console.error);
 
 // Ensure uploads directory exists
 const UPLOADS_DIR = join(process.cwd(), 'uploads');

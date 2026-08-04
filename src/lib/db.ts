@@ -398,6 +398,7 @@ export interface Client {
   subscription_end_date?: string;
   notes?: string;
   lead_source?: string;
+  is_tester?: boolean;
   created_at: string;
   updated_at: string;
 }

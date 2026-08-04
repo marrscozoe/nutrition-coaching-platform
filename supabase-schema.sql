@@ -233,6 +233,62 @@ CREATE POLICY "Public can insert clients" ON clients
 CREATE POLICY "Public can view clients by email" ON clients
   FOR SELECT USING (true);
 
+-- =============================================
+-- AI CORRECTIONS FEATURE
+-- =============================================
+
+-- Add is_tester column to clients table
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS is_tester BOOLEAN DEFAULT false;
+
+-- Food corrections table
+CREATE TABLE IF NOT EXISTS food_corrections (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  food_name TEXT NOT NULL,
+  correct_category TEXT NOT NULL CHECK (correct_category IN ('protein', 'vegetable', 'fat', 'starch', 'dairy', 'sugar', 'other')),
+  submitted_by UUID REFERENCES clients(id) ON DELETE SET NULL,
+  submitted_by_name TEXT,
+  submitted_at TIMESTAMPTZ DEFAULT NOW(),
+  approved BOOLEAN DEFAULT false,
+  approved_by UUID REFERENCES trainers(id) ON DELETE SET NULL,
+  approved_at TIMESTAMPTZ
+);
+
+-- RLS for food_corrections
+ALTER TABLE food_corrections ENABLE ROW LEVEL SECURITY;
+
+-- Clients can submit corrections
+CREATE POLICY "Clients can insert corrections" ON food_corrections
+  FOR INSERT WITH CHECK (submitted_by = auth.uid());
+
+-- Trainers can view corrections for their clients
+CREATE POLICY "Trainers can view corrections" ON food_corrections
+  FOR SELECT USING (
+    submitted_by IN (
+      SELECT id FROM clients WHERE trainer_id IN (
+        SELECT id FROM trainers WHERE email = (SELECT email FROM trainers WHERE id = auth.uid())
+      )
+    )
+  );
+
+-- Public can insert food_corrections (for client-side without auth)
+CREATE POLICY "Public can insert food_corrections" ON food_corrections FOR INSERT WITH CHECK (true);
+
+-- Public can view food_corrections
+CREATE POLICY "Public can view food_corrections" ON food_corrections FOR SELECT USING (true);
+
+-- Trainers can update corrections (approve/reject)
+CREATE POLICY "Trainers can update corrections" ON food_corrections
+  FOR UPDATE USING (
+    approved_by IN (
+      SELECT id FROM trainers WHERE email = (SELECT email FROM trainers WHERE id = auth.uid())
+    )
+  );
+
+-- Index for food_corrections
+CREATE INDEX IF NOT EXISTS idx_food_corrections_submitted_by ON food_corrections(submitted_by);
+CREATE INDEX IF NOT EXISTS idx_food_corrections_food_name ON food_corrections(food_name);
+CREATE INDEX IF NOT EXISTS idx_food_corrections_approved ON food_corrections(approved);
+
 -- Allow public operations on meals, weigh_ins, feedback for now
 -- (RLS will restrict based on user ID once auth is properly set up)
 CREATE POLICY "Public can insert meals" ON meals FOR INSERT WITH CHECK (true);
@@ -247,3 +303,23 @@ CREATE POLICY "Public can view feedback" ON feedback FOR SELECT USING (true);
 
 CREATE POLICY "Public can insert milestones" ON milestones FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public can view milestones" ON milestones FOR SELECT USING (true);
+
+-- =============================================
+-- KV STORE TABLE (for simple key-value settings)
+-- =============================================
+CREATE TABLE IF NOT EXISTS kv_store (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS for kv_store
+ALTER TABLE kv_store ENABLE ROW LEVEL SECURITY;
+
+-- Public can read kv_store (for feature flags)
+CREATE POLICY "Public can view kv_store" ON kv_store FOR SELECT USING (true);
+
+-- Public can insert/update kv_store
+CREATE POLICY "Public can insert kv_store" ON kv_store FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public can update kv_store" ON kv_store FOR UPDATE USING (true);

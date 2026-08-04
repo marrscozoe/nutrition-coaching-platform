@@ -17,6 +17,7 @@ interface ClientData {
   event_date?: string;
   current_week: number;
   notes?: string;
+  is_tester?: boolean;
 }
 
 export default function LogMealPage() {
@@ -46,6 +47,13 @@ export default function LogMealPage() {
   const [messedUp, setMessedUp] = useState(false);
   const [showMessedUpConfirm, setShowMessedUpConfirm] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  
+  // Correction dialog state
+  const [showCorrectionDialog, setShowCorrectionDialog] = useState(false);
+  const [correctionFoodName, setCorrectionFoodName] = useState('');
+  const [correctionCategory, setCorrectionCategory] = useState('protein');
+  const [canSeeCorrection, setCanSeeCorrection] = useState(false);
+  const [submittingCorrection, setSubmittingCorrection] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -59,7 +67,24 @@ export default function LogMealPage() {
     const user = JSON.parse(userData);
     setClient(user);
     setLoading(false);
+    
+    // Check if user can see correction button
+    checkCorrectionStatus(user.id);
   }, [router]);
+  
+  async function checkCorrectionStatus(clientId: string) {
+    try {
+      const res = await fetch('/api/client/correction-status', {
+        headers: { 'x-client-id': clientId }
+      });
+      const data = await res.json();
+      if (data.canSeeCorrectionButton) {
+        setCanSeeCorrection(true);
+      }
+    } catch (e) {
+      console.error('Error checking correction status:', e);
+    }
+  }
 
   // Get the date (YYYY-MM-DD) for a given day index (0=Mon)
   function getDateForDay(dayIndex: number): string {
@@ -269,6 +294,46 @@ export default function LogMealPage() {
     setShowMessedUpConfirm(false);
   }
 
+  function handleOpenCorrectionDialog() {
+    // Pre-fill with the logged food description
+    setCorrectionFoodName(foodDescription || '');
+    setCorrectionCategory('protein');
+    setShowCorrectionDialog(true);
+  }
+
+  async function handleSubmitCorrection() {
+    if (!correctionFoodName.trim() || !client) return;
+    
+    setSubmittingCorrection(true);
+    try {
+      const res = await fetch('/api/corrections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-id': client.id,
+        },
+        body: JSON.stringify({
+          foodName: correctionFoodName.trim(),
+          correctCategory: correctionCategory,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setToast({ message: 'Thanks! AI will learn from this correction. 🙏', type: 'success' });
+        setShowCorrectionDialog(false);
+      } else {
+        setToast({ message: data.error || 'Failed to submit correction', type: 'error' });
+      }
+    } catch (err) {
+      console.error('Correction submit failed:', err);
+      setToast({ message: 'Failed to submit correction', type: 'error' });
+    } finally {
+      setSubmittingCorrection(false);
+    }
+  }
+
   if (loading || !client) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -469,6 +534,17 @@ export default function LogMealPage() {
                 </div>
               </div>
             )}
+            
+            {/* Report AI Mistake Button - Only visible to Allen + testers */}
+            {canSeeCorrection && (
+              <button
+                type="button"
+                onClick={handleOpenCorrectionDialog}
+                className="mt-3 text-sm text-brand-orange hover:underline"
+              >
+                🤖 Report AI Mistake
+              </button>
+            )}
           </div>
         )}
 
@@ -496,6 +572,67 @@ export default function LogMealPage() {
           </p>
         </div>
       </div>
+
+      {/* Correction Dialog */}
+      {showCorrectionDialog && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-brand-charcoal rounded-2xl p-6 w-full max-w-md border border-brand-cream/20">
+            <h3 className="text-lg font-semibold text-brand-cream mb-4">🤖 Report AI Mistake</h3>
+            
+            <p className="text-sm text-brand-cream/70 mb-4">
+              Which food was the AI wrong about, and what should it actually be classified as?
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-brand-cream/80 mb-2">Food name</label>
+                <input
+                  type="text"
+                  value={correctionFoodName}
+                  onChange={(e) => setCorrectionFoodName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream focus:outline-none focus:border-brand-orange"
+                  placeholder="e.g., bacon, grilled chicken"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-brand-cream/80 mb-2">What should it be classified as?</label>
+                <select
+                  value={correctionCategory}
+                  onChange={(e) => setCorrectionCategory(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream focus:outline-none focus:border-brand-orange"
+                >
+                  <option value="protein">Protein</option>
+                  <option value="vegetable">Vegetable</option>
+                  <option value="fat">Fat</option>
+                  <option value="starch">Starch (Phase 1 violation)</option>
+                  <option value="dairy">Dairy (Phase 1 violation)</option>
+                  <option value="sugar">Sugar (Phase 1 violation)</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCorrectionDialog(false)}
+                  className="flex-1 py-3 rounded-xl bg-brand-charcoal/80 text-brand-cream font-medium hover:bg-brand-charcoal transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitCorrection}
+                  disabled={submittingCorrection || !correctionFoodName.trim()}
+                  className="flex-1 py-3 rounded-xl bg-brand-orange text-white font-semibold hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
+                >
+                  {submittingCorrection ? 'Submitting...' : 'Submit Correction'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notifications */}
       {toast && (
