@@ -152,7 +152,7 @@ export default function TrainerSettingsPage() {
   }
 
   function copyReferralLink() {
-    const link = `${window.location.origin}/onboarding?trainer=${trainer?.id}`;
+    const link = `${window.location.origin}/signup?trainer=${trainer?.id}`;
     navigator.clipboard.writeText(link);
     setCopiedMessage('Link copied!');
     setTimeout(() => setCopiedMessage(''), 3000);

@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 const TOKEN_TTL = 10 * 60 * 1000; // 10 minutes
 
 // Decode token from base64-encoded URL format
-function decodeSignupToken(token: string): { email: string; name: string; passwordHash: string; createdAt: number } | null {
+function decodeSignupToken(token: string): { email: string; name: string; passwordHash: string; trainer_id: string | null; createdAt: number } | null {
   try {
     const decoded = Buffer.from(token, 'base64url').toString('utf8');
     const data = JSON.parse(decoded);
@@ -27,6 +27,7 @@ function decodeSignupToken(token: string): { email: string; name: string; passwo
       email: data.email,
       name: data.name,
       passwordHash: data.passwordHash,
+      trainer_id: data.trainer_id || null,
       createdAt: data.createdAt,
     };
   } catch (e) {
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
     let email: string;
     let name: string;
     let passwordHash: string;
+    let trainerId: string | null = null;
 
     // Check if this is a token-based signup
     if (token) {
@@ -65,6 +67,7 @@ export async function POST(request: NextRequest) {
       email = tokenData.email;
       name = tokenData.name;
       passwordHash = tokenData.passwordHash;
+      trainerId = tokenData.trainer_id;
 
       // Validate that passwordHash from token is valid before creating account
       // This prevents accounts being created with invalid/empty hashes
@@ -112,7 +115,7 @@ export async function POST(request: NextRequest) {
     // Build the insert object directly to avoid column/param ordering issues
     const insertObj = {
       id: clientId,
-      trainer_id: null,
+      trainer_id: trainerId,
       email,
       password_hash: passwordHash,
       name,

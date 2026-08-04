@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const trainerId = searchParams.get('trainer') || '';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -34,7 +36,7 @@ export default function SignupPage() {
       const res = await fetch('/api/auth/pre-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name, password }),
+        body: JSON.stringify({ email, name, password, trainer_id: trainerId || undefined }),
       });
 
       const data = await res.json();
@@ -47,7 +49,10 @@ export default function SignupPage() {
 
       // Redirect to onboarding with token (use string concat to avoid template literal issues)
       const signupToken = data.token;
-      const redirectUrl = '/onboarding?token=' + encodeURIComponent(signupToken) + '&email=' + encodeURIComponent(email) + '&name=' + encodeURIComponent(name);
+      let redirectUrl = '/onboarding?token=' + encodeURIComponent(signupToken) + '&email=' + encodeURIComponent(email) + '&name=' + encodeURIComponent(name);
+      if (trainerId) {
+        redirectUrl += '&trainer_id=' + encodeURIComponent(trainerId);
+      }
       router.push(redirectUrl);
     } catch (err) {
       setError('Something went wrong. Please try again.');

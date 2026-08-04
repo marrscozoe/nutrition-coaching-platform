@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, name, password } = body;
+    const { email, name, password, trainer_id } = body;
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       email,
       name,
       passwordHash,
+      trainer_id: trainer_id || null,
       createdAt: Date.now(),
     };
     const token = Buffer.from(JSON.stringify(tokenData)).toString('base64url');
