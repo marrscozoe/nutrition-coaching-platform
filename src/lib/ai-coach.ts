@@ -266,6 +266,7 @@ export interface CoachContext {
   todayWaterIntake?: number; // oz of water consumed today
   todayCoffeeIntake?: number; // oz of coffee consumed today (adds to water requirement)
   mealsLoggedToday?: number; // number of meals logged today to calculate remaining
+  mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack'; // meal type for Phase 2 starch validation
   // Phase 4 tracking
   todayDairyServings?: number; // dairy servings logged today (men: 2 allowed, women: 1 allowed)
   todaySugarServings?: number; // sugar servings logged today (men: 2 allowed, women: 1 allowed)
@@ -434,14 +435,20 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
   const asksAboutPlan = lowerMessage.includes('what can i eat') || lowerMessage.includes('my plan') || lowerMessage.includes('show me') || lowerMessage.includes('what am i') || lowerMessage.includes('meal example') || lowerMessage.includes('example meal') || lowerMessage.includes('phase') || lowerMessage.includes('portion') || lowerMessage.includes('categories') || lowerMessage.includes('what to eat') || lowerMessage.includes('swap') || lowerMessage.includes('exchange');
 
   if (asksAboutPlan) {
-    const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - lean protein, veggies, healthy fats only' :
-                            context.currentPhase === 2 ? 'Add starch (Wed, Sat, Sun) to first 2 meals' :
-                            context.currentPhase === 3 ? 'Check with coach for next steps' :
-                            'Maintenance mode - add starch to every meal';
+    const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - 14 days of lean protein, veggies, healthy fats only' :
+                            context.currentPhase === 2 ? 'STARCH ONLY for BREAKFAST & LUNCH on Wed/Sat/Sun - dinner & snack NEVER get starch' :
+                            context.currentPhase === 3 ? 'EVALUATION CHECKPOINT - simple: at goal → Phase 4 (celebrate!) or not at goal → Phase 1 (keep working!)' :
+                            'MAINTENANCE - starch every meal, weigh Fri only';
+    const phaseNext = context.currentPhase === 1 ? 'Phase 2: Add starch Wed/Sat/Sun' :
+                      context.currentPhase === 2 ? 'Phase 3: Evaluation checkpoint' :
+                      context.currentPhase === 3 ? 'Phase 4 (at goal!) or Phase 1 (keep working!)' :
+                      'You\'re done - maintenance!';
     
-    const proteinExamples = context.gender === 'male' ? '6oz chicken/fish/egg, 4oz beef/pork' : '4oz chicken/fish/egg, 3oz beef/pork';
+    const proteinExamples = context.gender === 'male' 
+      ? '6oz protein per meal (2-3 whole eggs)' 
+      : '4oz protein per meal (1-2 whole eggs)';
     const veggieExamples = 'broccoli, spinach, asparagus, zucchini, peppers, salad';
-    const fatExamples = 'olive oil, avocado, almonds, cheese';
+    const fatExamples = 'olive oil, avocado, almonds';
     const mealExample = context.gender === 'male' 
       ? '6oz grilled salmon, 2 cups broccoli with olive oil, 1/2 avocado' 
       : '4oz grilled chicken, 1.5 cups spinach with olive oil, few almonds';
@@ -494,176 +501,24 @@ COACHING RULES:
 4. If client asks for motivation → Give 1-2 sentence hype ONLY
 5. If client asks about phases/portions → Give the structured plan response above
 6. If client asks about anything unrelated to nutrition → "I'm a nutrition coach — I only help with food and fitness!"
+7. HEALTHY FATS ARE GOOD — Never tell client to skip or eliminate healthy fats like avocado, olive oil, or nuts. AVOCADO IS A HEALTHY FAT and should be ENCOURAGED in every meal! The fat limit is a MAXIMUM, not a target to minimize. NEVER say "skip the avocado" or "reduce fat" — instead encourage healthy fats!
 
 CLIENT CONTEXT:
 - Name: ${context.clientName || 'Client'}
-- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 3 = check with coach, Phase 4 = maintenance)
+- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 3 = at goal? → Phase 4! Not yet? → Phase 1, Phase 4 = maintenance)
 - Gender: ${context.gender} (${context.gender === 'male' ? 'MALE — use MALE portions only' : 'FEMALE — use FEMALE portions only'})
 - Goal: ${context.goalWeight}lbs, Started: ${context.startingWeight}lbs, Current: ${context.currentWeight}lbs
 ${context.eventDate ? `- Event in ${weeksUntilEvent} weeks` : ''}
 
 PHASE RULES (for YOUR reference only — give personalized advice for THIS client, not generic phase descriptions):
 - Phase 1: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, NO starch, NO dairy, NO sugar, ${context.gender === 'male' ? '128' : '80'}oz water
-- Phase 2: Same + starch Wed/Sat/Sun to first 2 meals
-- Phase 3: Check with coach
+- Phase 2: Same as Phase 1 + starch for BREAKFAST & LUNCH ONLY on Wed/Sat/Sun. Dinner and snack NEVER get starch in Phase 2!
+- Phase 3: EVALUATION CHECKPOINT — simple: at goal → Phase 4 (celebrate)! Not at goal → Phase 1 (keep working hard!)!
 - Phase 4: Add starch every meal, weigh Fri only
 
 CLIENT'S MESSAGE: "${message}"
 
 Respond as Allen would. Short. Direct. Helpful. Tell them what to do NEXT. Only reference THIS CLIENT'S portions — never mention male/female side by side.`;
-}
-
-export function getMealAnalysisPrompt(context: CoachContext, mealData: {
-  mealType: string;
-  foodDescription: string;
-  analyzedText?: string;
-  onPhase: boolean;
-  messedUp?: boolean;
-}): string {
-  const portions = PORTION_SIZES[context.gender];
-  const status = mealData.messedUp ? 'OFF PHASE' : mealData.onPhase ? 'ON PHASE' : 'NEEDS REVIEW';
-  const emoji = mealData.messedUp ? '⚠️' : mealData.onPhase ? '✅' : '🤔';
-
-  // Check for violations based on phase
-  const foodLower = mealData.foodDescription.toLowerCase();
-  const starchKeywords = [
-    // Original
-    'pasta', 'bread', 'rice', 'potato', 'noodles', 'spaghetti', 'lasagna', 'tortilla', 'cereal', 'oatmeal',
-    'kidney beans', 'pinto beans', 'black beans', 'corn', 'peas', 'quinoa', 'couscous',
-    'bagel', 'muffin', 'croissant', 'pancake', 'waffle', 'roll',
-    // Potato dishes
-    'french fries', 'fry', 'hash browns', 'mashed potatoes', 'baked potato', 'potato chips',
-    'sweet potato fries', 'tater tots', 'potato salad', 'home fries', 'breakfast potatoes',
-    // Bread/grains
-    'crackers', 'saltines', 'graham crackers', 'biscuits', 'cornbread', 'stuffing', 'croutons',
-    'focaccia', 'naan', 'pita bread', 'flour tortilla', 'cornbread',
-    // Pasta/rice
-    'mac and cheese', 'macaroni', 'ravioli', 'gnocchi', 'fried rice', 'risotto', 'pilaf',
-    'white rice', 'instant rice', 'rice noodles', 'cellophane noodles',
-    // Snacks
-    'pretzels', 'popcorn', 'tortilla chips', 'corn chips', 'pita chips', 'rice cakes',
-    'chex', 'cheez-its', 'goldfish', 'tortilla snack bags', 'snack crackers',
-    // Breakfast
-    'granola', 'grits', 'hominy', 'biscuits and gravy', 'french toast', 'waffle sticks',
-    // Beans
-    'refried beans', 'baked beans', 'canned beans', 'hummus', 'chickpeas',
-    // Desserts/sweets
-    'pie crust', 'cake', 'cookies', 'brownies', 'pastries', 'donuts', 'scones', 'cobbler', 'dumplings',
-    // Other
-    'breadcrumbs', 'tempura', 'egg roll wrapper', 'wonton wrapper', 'flour', 'cornmeal', 'pancake mix',
-    // Processed meats
-    'sausage', 'pepperoni', 'hot dog', 'ham', 'spam', 'vienna sausages',
-  ];
-  const dairyKeywords = [
-    // Original
-    'cream', 'milk', 'cheese', 'yogurt', 'butter', 'sour cream', 'half and half', 'creamer', 'whipped cream', 'ice cream', 'cottage cheese', 'ricotta',
-    // Added
-    'cream cheese', 'philadelphia', 'heavy cream', 'heavy whipping cream', 'milk chocolate',
-    'butter pecan', 'cheese sauce', 'cheese dip', 'cheese ball', 'cheese spread',
-    'alfredo sauce', 'queso', 'nacho cheese', 'velveeta', 'mac and cheese',
-    'cheese fries', 'cheese curds', 'cream gravy', 'white sauce', 'bechamel',
-  ];
-  const sugarKeywords = [
-    // Original
-    'sugar', 'syrup', 'honey', 'agave', 'molasses', 'cane juice', 'high fructose', 'aspartame', 'splenda', 'equal', 'sweetener', 'stevia',
-    // Added - sugars
-    'brown sugar', 'powdered sugar', 'white sugar', 'raw sugar', 'turbinado', 'coconut sugar',
-    'maple syrup', 'pancake syrup', 'corn syrup', 'piloncillo', 'date sugar',
-    // Added - sweeteners
-    'monk fruit', 'monkfruit', 'erythritol', 'xylitol', 'allulose', 'maltitol', 'sorbitol',
-    'saccharin', 'sucralose', 'maltodextrin', 'dextrose', 'maltose', 'fructose', 'glucose', 'sucrose',
-    // Added - candy/sweets
-    'candy', 'gummy', 'jelly', 'jam', 'preserves', 'compote', 'fruit juice concentrate',
-    'caramel', 'toffee', 'fudge', 'marshmallow', 'fondant', 'royal icing', 'glaze', 'drizzle',
-  ];
-  const processedFoodKeywords = [
-    // Fast food / processed
-    'mcdonalds', 'burger king', 'wendys', 'taco bell', 'chipotle', 'chick-fil-a', 'pizza hut',
-    'dominos', 'little caesars', 'popeyes', 'kfc', 'subway', 'panera', 'starbucks',
-    // Processed snacks
-    'hot pocket', 'pizza rolls', 'tater tots', 'fish sticks', 'chicken nuggets', 'chicken tenders',
-    'onion rings', 'mozzarella sticks', 'jalapeño poppers', 'mac and cheese (boxed)',
-    // Frozen/processed meals
-    'frozen meal', 'tv dinner', 'microwave dinner', 'frozen pizza', 'frozen burrito',
-    // Processed meats
-    'spam', 'vienna sausages', 'bologna', 'salami', 'pepperoni', 'hot dog', 'corn dog',
-    // Candy/snacks
-    'candy bar', 'chocolate bar', 'potato chips', 'cheese puffs', 'frito', 'dorito',
-    // Other
-    'fast food', 'takeout', 'delivery', 'frozen', 'boxed', 'canned',
-  ];
-
-  // Phase-based violation checks:
-  // Phase 1: Check starch, dairy, AND sugar violations
-  // Phase 2: Only check dairy and sugar violations (starch is allowed on Wed/Sat/Sun)
-  // Phase 3: Same as Phase 2 until decision made
-  // Phase 4: Track portions but don't flag violations (maintenance mode)
-  
-  let starchFound: string[] = [];
-  let dairyFound: string[] = [];
-  let sugarFound: string[] = [];
-  let processedFound: string[] = [];
-  
-  if (context.currentPhase === 1) {
-    // Phase 1: ALL violations checked
-    starchFound = starchKeywords.filter(s => foodLower.includes(s));
-    dairyFound = dairyKeywords.filter(d => foodLower.includes(d));
-    sugarFound = sugarKeywords.filter(s => foodLower.includes(s));
-  } else if (context.currentPhase === 2 || context.currentPhase === 3) {
-    // Phase 2 & 3: Starch allowed on specific days, but dairy and sugar still violations
-    // For now, skip starch check (handled in analyzeMealPortion with day-of-week logic)
-    starchFound = [];
-    dairyFound = dairyKeywords.filter(d => foodLower.includes(d));
-    sugarFound = sugarKeywords.filter(s => foodLower.includes(s));
-  } else if (context.currentPhase === 4) {
-    // Phase 4: Maintenance - no violations but track portions and processed food
-    starchFound = [];
-    dairyFound = dairyKeywords.filter(d => foodLower.includes(d));
-    sugarFound = sugarKeywords.filter(s => foodLower.includes(s));
-    processedFound = processedFoodKeywords.filter(p => foodLower.includes(p));
-  }
-
-  const hasStarchViolation = starchFound.length > 0 && context.currentPhase === 1;
-  const hasDairyViolation = dairyFound.length > 0 && (context.currentPhase === 1 || context.currentPhase === 2 || context.currentPhase === 3);
-  const hasSugarViolation = sugarFound.length > 0 && (context.currentPhase === 1 || context.currentPhase === 2 || context.currentPhase === 3);
-  const hasProcessedFood = processedFound.length > 0;
-  const hasViolation = hasStarchViolation || hasDairyViolation || hasSugarViolation;
-
-  return `You are ALLEN'S AI NUTRITION COACH. A client just logged a meal. Give SHORT, PUNCHY coaching feedback (1-3 sentences).
-
-⚠️ CRITICAL: You are a NUTRITION COACH. Your ONLY job is to give nutrition feedback.
-- DO NOT write stories, poems, or any creative content
-- DO NOT talk about animals, weather, news, or anything unrelated to nutrition
-- If you cannot analyze the food, say "I can't identify this food — describe what you ate"
-
-MEAL LOGGED:
-- Type: ${mealData.mealType}
-- Food: ${mealData.foodDescription}
-${mealData.analyzedText ? `- AI Analysis: ${mealData.analyzedText}` : ''}
-- Status: ${status} ${emoji}
-
-CLIENT CONTEXT:
-- Name: ${context.clientName || 'Client'}
-- Phase: ${context.currentPhase}
-- Gender: ${context.gender}
-- Current: ${context.currentWeight}lbs → Goal: ${context.goalWeight}lbs
-
-COACHING RULES (CRITICAL - FOLLOW THESE):
-1. PHASE 1 = ZERO CARBOHYDRATES. This means NO rice, NO pasta, NO bread, NO potatoes, NO beans, NO corn, NO oats, NO cereal — and NO sugar, NO honey, NO syrup, NO sweetener of any kind. Sugar IS a simple carbohydrate. "No starch" means ZERO CARBS — the AI coach must use COMMON SENSE: if something is sweet or starchy, it's off-limits in Phase 1.
-   - NO DAIRY either: cream, milk, cheese, butter, yogurt, half & half, creamer, etc.
-2. If the meal has ANY Phase 1 violation: "Swap that!" and tell them exactly what to remove/swap
-3. If ON PHASE (and no violations): "Nice!", "Great choice!", "Stay on track" + what to do NEXT
-4. If OFF PHASE for other reasons: "Swap the [X] for [Y]" or "Drop the [X]" - give specific correction
-5. If needs review: Ask a quick question or give portion reminder
-6. End with what they should do for their NEXT meal
-7. Never lecture, never long paragraphs
-8. Use 🔥 💪 🙌 sparingly
-
-IMPORTANT: Think about what the client ACTUALLY ate. "Coffee with cream and sugar" = cream (dairy) + sugar (carb) = DOUBLE VIOLATION. Say "Swap that!" and tell them to remove both.
-
-${hasViolation ? `\n⚠️ VIOLATION DETECTED: This meal contains: ${[...starchFound, ...dairyFound, ...sugarFound].join(', ')}. In Phase 1, NO starch, NO dairy, NO sugar allowed! Response MUST be corrective: "Swap that! Drop the ${[...starchFound, ...dairyFound, ...sugarFound][0]}!" or similar.` : ''}
-
-Give coaching feedback now:`;
 }
 
 export function getWeightAnalysisPrompt(context: CoachContext, weightData: {
@@ -717,7 +572,8 @@ Give coaching feedback now:`;
 
 export async function analyzeMealPortion(
   foodDescription: string,
-  context: CoachContext
+  context: CoachContext,
+  mealType?: string
 ): Promise<{ advice: string; onPhase: boolean; corrections: string[] }> {
   // Ensure corrections cache is loaded before doing any correction lookups
   await ensureCacheLoaded();
@@ -830,44 +686,65 @@ export async function analyzeMealPortion(
       violationMessages.push(`⚠️ Phase 2 - NO sugar! Skip the ${sugarFound} completely.`);
       onPhase = false;
     }
-    if (starchFound && context.mealDate) {
-      const mealDateObj = new Date(context.mealDate + 'T12:00:00');
-      const dayOfWeek = mealDateObj.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-      const allowedDays = [0, 3, 6]; // Sun (0), Wed (3), Sat (6)
+    // Phase 2: Starch allowed ONLY on Wed, Sat, Sun for BREAKFAST and LUNCH (first 2 meals)
+    // dinner and snack NEVER get starch in Phase 2 (same as Phase 1)
+    if (starchFound) {
+      const isBreakfastOrLunch = mealType === 'breakfast' || mealType === 'lunch';
+      const isDinnerOrSnack = mealType === 'dinner' || mealType === 'snack';
       
-      if (!allowedDays.includes(dayOfWeek)) {
-        violationMessages.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. No ${starchFound} today. Remove it or swap for extra veg.`);
+      if (isDinnerOrSnack) {
+        // dinner and snack NEVER get starch in Phase 2
+        violationMessages.push(`⚠️ Phase 2 - NO starch for ${mealType}! Only breakfast and lunch get starch in Phase 2. Skip the ${starchFound}.`);
         onPhase = false;
-      } else {
-        violationMessages.push(`⚠️ Phase 2 - starch allowed only in first 2 meals today. If this is meal 3 or later, skip the ${starchFound}.`);
+      } else if (isBreakfastOrLunch && context.mealDate) {
+        // Breakfast/lunch: check allowed day and meal count
+        const mealDateObj = new Date(context.mealDate + 'T12:00:00');
+        const dayOfWeek = mealDateObj.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+        const allowedDays = [0, 3, 6]; // Sun (0), Wed (3), Sat (6)
+        
+        if (!allowedDays.includes(dayOfWeek)) {
+          violationMessages.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. No ${starchFound} today. Remove it or swap for extra veg.`);
+          onPhase = false;
+        } else {
+          // On allowed day - check meal count
+          const mealsLogged = context.mealsLoggedToday || 0;
+          if (mealsLogged >= 2) {
+            violationMessages.push(`⚠️ Phase 2 - starch only in first 2 meals. You've had ${mealsLogged} meals today. Skip the ${starchFound}.`);
+            onPhase = false;
+          }
+          // If meal 1 or 2 on allowed day, starch is ALLOWED - don't add violation
+        }
+      } else if (isBreakfastOrLunch && !context.mealDate) {
+        // If no mealDate, be conservative and warn
+        violationMessages.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. Check if today is an allowed day before eating ${starchFound}.`);
         onPhase = false;
+      } else if (!mealType || mealType === 'meal') {
+        // Backwards compatibility: no specific mealType, use old meal-count logic
+        if (context.mealDate) {
+          const mealDateObj = new Date(context.mealDate + 'T12:00:00');
+          const dayOfWeek = mealDateObj.getDay();
+          const allowedDays = [0, 3, 6];
+          
+          if (!allowedDays.includes(dayOfWeek)) {
+            violationMessages.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. No ${starchFound} today. Remove it or swap for extra veg.`);
+            onPhase = false;
+          } else {
+            violationMessages.push(`⚠️ Phase 2 - starch allowed only in first 2 meals today. If this is meal 3 or later, skip the ${starchFound}.`);
+            onPhase = false;
+          }
+        } else {
+          violationMessages.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. Check if today is an allowed day before eating ${starchFound}.`);
+          onPhase = false;
+        }
       }
-    } else if (starchFound && !context.mealDate) {
-      // If no mealDate, be conservative and warn
-      violationMessages.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. Check if today is an allowed day before eating ${starchFound}.`);
-      onPhase = false;
     }
   } else if (context.currentPhase === 3) {
-    // Phase 3: EVALUATION CHECKPOINT - not a diet phase, it's a decision point
-    // Are you at goal? NO = back to Phase 1, YES = Phase 4
-    // Until decision is made, same rules as Phase 2 apply (dairy/sugar still violations)
-    
-    // Check dairy violation (dairy is NEVER allowed until Phase 4)
-    if (dairyFound) {
-      violationMessages.push(`⚠️ Phase 3 - NO dairy allowed! Skip the ${dairyFound} completely.`);
-      onPhase = false;
-    }
-    
-    // Check sugar violation (sugar is NEVER allowed until Phase 4)
-    if (sugarFound) {
-      violationMessages.push(`⚠️ Phase 3 - NO sugar allowed! Skip the ${sugarFound} completely.`);
-      onPhase = false;
-    }
-    
-    if (starchFound) {
-      violationMessages.push(`⚠️ Phase 3 is an EVALUATION CHECKPOINT. If you're not at goal yet, you should be back in Phase 1. Check with your coach.`);
-      onPhase = false;
-    }
+    // Phase 3: EVALUATION CHECKPOINT - NOT a diet phase!
+    // Phase transition happens AUTOMATICALLY based on weight:
+    //   - At goal weight → Phase 4 (celebrate!)
+    //   - Not at goal → Phase 1 (keep working!)
+    // NO food advice or warnings in Phase 3 - let the app handle the transition automatically
+    // Just pass through without any food-specific guidance
   } else if (context.currentPhase === 4) {
     // Phase 4: Maintenance - starch allowed every meal, dairy/sugar ALLOWED in controlled portions
     // If 5+ lbs over goal = back to Phase 1
@@ -954,24 +831,47 @@ export async function analyzeMealPortion(
   const coffeeKeywords = ['coffee', 'cafe', 'espresso', 'latte', 'cappuccino', 'mocha', 'americano'];
   const hasCoffee = coffeeKeywords.some(c => foodLower.includes(c));
   
+  // Extract water amount from food description (e.g., "32 oz of water" → 32)
+  // Support formats: "32 oz", "32oz", "32 ounces", "32 ounce"
+  let loggedWaterOz = 0;
+  if (hasWater) {
+    const waterAmountMatch = foodDescription.match(/(\d+)\s*(?:oz|ounces?|oz\.)/i);
+    if (waterAmountMatch) {
+      loggedWaterOz = parseInt(waterAmountMatch[1], 10);
+    }
+  }
+  
   // Calculate water tracking
   const baseWaterOz = context.gender === 'male' ? 128 : 80;
   const todayCoffee = context.todayCoffeeIntake || 0;
   const todayWater = context.todayWaterIntake || 0;
   const mealsLogged = context.mealsLoggedToday || 0;
   const totalWaterNeeded = baseWaterOz + todayCoffee;
-  const remainingMeals = Math.max(1, 4 - mealsLogged); // at least 1 meal remaining
-  const remainingWater = Math.max(0, totalWaterNeeded - todayWater);
-  const waterPerMeal = Math.round((remainingWater / remainingMeals) * 10) / 10; // round to 1 decimal
+  // Include water logged in THIS meal in the running total
+  const effectiveTodayWater = todayWater + loggedWaterOz;
+  // remaining meals AFTER this meal is logged (mealsLogged doesn't include this meal)
+  const remainingMeals = Math.max(1, 3 - mealsLogged);
+  const remainingWater = Math.max(0, totalWaterNeeded - effectiveTodayWater);
+  const waterPerMeal = remainingMeals > 0 ? Math.round((remainingWater / remainingMeals) * 10) / 10 : 0; // round to 1 decimal
   
   // Build water tracking message
   let waterTrackingMessage = '';
   if (hasWater) {
-    // Client mentioned water - acknowledge and give remaining target
-    if (waterPerMeal > 0) {
-      waterTrackingMessage = `💧 Water tracked. You need ${waterPerMeal}oz water per remaining meal today.`;
+    // Client mentioned water - acknowledge the logged amount and give remaining target
+    if (loggedWaterOz > 0) {
+      // Acknowledge the specific amount logged
+      if (waterPerMeal > 0) {
+        waterTrackingMessage = `💧 Water tracked: ${loggedWaterOz}oz logged. You need ${waterPerMeal}oz water per remaining meal today.`;
+      } else {
+        waterTrackingMessage = `💧 Great job staying hydrated! ${loggedWaterOz}oz logged - you're on track with water today!`;
+      }
     } else {
-      waterTrackingMessage = `💧 Great job staying hydrated! You're on track with water today.`;
+      // Water mentioned but no specific amount detected - use generic message
+      if (waterPerMeal > 0) {
+        waterTrackingMessage = `💧 Water tracked. You need ${waterPerMeal}oz water per remaining meal today.`;
+      } else {
+        waterTrackingMessage = `💧 Great job staying hydrated! You're on track with water today.`;
+      }
     }
   } else if (hasCoffee) {
     // Coffee counts toward fluid but still need water
@@ -1065,16 +965,8 @@ export async function analyzeMealPortion(
       }
     }
   } else if (context.currentPhase === 3) {
-    // Phase 3: Evaluation checkpoint - same rules as Phase 2 until decision
-    if (!hasProtein && !hasVeg) {
-      violationMessages.push(`💡 Add ${portions.protein} lean protein + ${portions.fibrousVegetables} fibrous vegetables + ${portions.fat} olive oil or ${portions.avocado} avocado. ${waterTrackingMessage}`);
-    } else if (!hasProtein) {
-      violationMessages.push(`💡 Add ${portions.protein} lean protein + ${portions.fat} olive oil or ${portions.avocado} avocado. ${waterTrackingMessage}`);
-    } else if (!hasVeg) {
-      violationMessages.push(`💡 Add ${portions.fibrousVegetables} fibrous vegetables + ${portions.fat} olive oil or ${portions.avocado} avocado. ${waterTrackingMessage}`);
-    } else if (!hasFat) {
-      violationMessages.push(`💡 Add ${portions.fat} olive oil or ${portions.avocado} avocado. ${waterTrackingMessage}`);
-    }
+    // Phase 3: NO food suggestions - evaluation happens automatically based on weight
+    // The app will transition to Phase 4 (at goal) or Phase 1 (not at goal)
   }
   
   if (violationMessages.length === 0) {
@@ -1147,7 +1039,7 @@ export function getPhaseAdvice(clientPhase: number): string {
     case 2:
       return 'Phase 2: Add starch on Wed/Sat/Sun to first 2 meals only.';
     case 3:
-      return 'Phase 3: Evaluation checkpoint - are you at goal?';
+      return 'Phase 3: Evaluation checkpoint - at goal? Celebrate → Phase 4! Not yet → Phase 1, keep going!';
     case 4:
       return 'Phase 4: Maintenance mode - add starch to every meal, weigh Fridays only.';
     default:

@@ -47,17 +47,13 @@ function SignupForm() {
         return;
       }
 
-      // Redirect to onboarding with token using URLSearchParams for proper encoding
+      // Redirect to onboarding with token (use string concat to avoid template literal issues)
       const signupToken = data.token;
-      const params = new URLSearchParams({
-        token: signupToken,
-        email: email,
-        name: name,
-      });
+      let redirectUrl = '/onboarding?token=' + encodeURIComponent(signupToken) + '&email=' + encodeURIComponent(email) + '&name=' + encodeURIComponent(name);
       if (trainerId) {
-        params.set('trainer', trainerId);
+        redirectUrl += '&trainer_id=' + encodeURIComponent(trainerId);
       }
-      router.push(`/onboarding?${params.toString()}`);
+      router.push(redirectUrl);
     } catch (err) {
       setError('Something went wrong. Please try again.');
       setLoading(false);

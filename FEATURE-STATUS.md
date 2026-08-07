@@ -25,3 +25,11 @@
 - App URL: https://nutrition-coaching-platform.vercel.app
 - Photo analysis will work once Gemini quota resets (midnight PST)
 - All bugs from today are fixed (logout, trainer routes, etc.)
+
+## 2026-08-06 - Fat Content Bug
+- **Bug:** AI chat suggests too much fat in meals (e.g., 3 eggs + ½ avocado = 41g fat)
+- **Correct limits:**
+  - Men: ~2 tbsp fat per meal (~28g) = 2 eggs + ¼ avocado
+  - Women: ~1 tbsp fat per meal (~14g) = 1 egg + ¼ avocado
+- **Rule:** Better slightly low on fat than over
+- **Status:** Added to fix list - needs AI prompt update

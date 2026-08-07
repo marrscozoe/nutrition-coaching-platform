@@ -5,7 +5,6 @@ import {
   CoachContext, 
   AIMessage, 
   getCoachPrompt, 
-  getMealAnalysisPrompt,
   getWeightAnalysisPrompt,
   analyzeMealPortion, 
   getWeightResponse,
@@ -56,22 +55,18 @@ export async function POST(request: NextRequest) {
       trainerNotes: client.notes,
     };
 
-    // Handle meal analysis request
+    // Handle meal analysis request - use getCoachPrompt (same as chat!)
     if (mealData) {
-      const prompt = getMealAnalysisPrompt(context, {
-        mealType: mealData.mealType || 'meal',
-        foodDescription: mealData.foodDescription || mealData.description || '',
-        analyzedText: mealData.analyzedText,
-        onPhase: mealData.onPhase !== false,
-        messedUp: mealData.messedUp,
-      });
+      const foodDescription = mealData.foodDescription || mealData.description || '';
+      const mealMessage = `I'm eating ${foodDescription}`;
+      const coachPrompt = getCoachPrompt(context, mealMessage);
 
-      const systemMessage: AIMessage = { role: 'system', content: prompt };
-      const result = await chatWithChatAI([systemMessage], '', preferredProvider);
+      const systemMessage: AIMessage = { role: 'system', content: coachPrompt };
+      const result = await chatWithChatAI([systemMessage], mealMessage, preferredProvider);
 
       if (result.error || !result.text) {
         // Fallback to rule-based response
-        const fallback = await analyzeMealPortion(mealData.foodDescription || '', context);
+        const fallback = await analyzeMealPortion(foodDescription, context, mealData.mealType);
         return NextResponse.json({
           response: fallback.advice,
           type: 'meal_analysis',

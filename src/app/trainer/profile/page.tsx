@@ -24,7 +24,7 @@ export default function TrainerProfilePage() {
     const userType = localStorage.getItem('trainer_user_type');
 
     if (!userData || userType !== 'trainer') {
-      router.push('/');
+      router.push('/?login=trainer');
       return;
     }
 
@@ -32,7 +32,7 @@ export default function TrainerProfilePage() {
       const user = JSON.parse(userData);
       setTrainer(user);
     } catch (e) {
-      router.push('/');
+      router.push('/?login=trainer');
       return;
     } finally {
       setLoading(false);

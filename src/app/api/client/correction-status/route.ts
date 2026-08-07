@@ -40,15 +40,10 @@ export async function GET(request: NextRequest) {
       trainerError = result.error;
     }
     
-    // Check if it's Allen (superadmin) - for now, check by known email
-    // Allen's trainer account should be amarsbody@gmail.com or similar
-    // If trainer_id is null, default to showing correction button for testing
+    // Check if it's Allen (superadmin) - check by known email
     const isAllen = trainer?.email === process.env.ALLEN_TRAINER_EMAIL || 
                     trainer?.email === 'amarsbody@gmail.com' ||
                     trainer?.email === 'allen@amarsbody.com';
-    
-    // If no trainer assigned (null trainer_id), show the button for testing
-    const hasNoTrainer = !client.trainer_id || !trainer;
     
     // Get the correction_feature_enabled setting
     const { data: setting } = await supabase
@@ -60,9 +55,8 @@ export async function GET(request: NextRequest) {
     const featureEnabled = setting?.value === 'true';
     const isTester = client.is_tester === true;
     
-    // Allen always sees the button, testers see it if feature is enabled
-    // Also show button if client has no trainer assigned (for development/testing)
-    const canSeeCorrectionButton = isAllen || hasNoTrainer || (isTester && featureEnabled);
+    // Only testers with the feature enabled should see the correction button
+    const canSeeCorrectionButton = isTester && featureEnabled;
     
     return NextResponse.json({
       isTester,

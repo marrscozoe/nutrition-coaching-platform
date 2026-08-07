@@ -6,7 +6,6 @@ import {
   analyzeMealPortion,
   analyzeImageWithPhotoAI,
   chatWithChatAI,
-  getMealAnalysisPrompt,
   AIMessage,
 } from '@/lib/ai-coach';
 import { initializeCorrectionsCache } from '@/lib/food-corrections-cache';
@@ -86,6 +85,7 @@ export async function POST(request: NextRequest) {
       eventDate, 
       weekNumber, 
       trainerNotes,
+      mealType,
     } = body;
     
     // NOTE: Photo deletion is ALWAYS enforced server-side.
@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
         eventDate,
         weekNumber: weekNumber || 1,
         trainerNotes,
+        mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
       };
     } else {
       // Try to get from Redis
@@ -134,6 +135,7 @@ export async function POST(request: NextRequest) {
             return Math.max(1, diffDays + 1);
           })(),
           trainerNotes: clientData.notes,
+          mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
         };
       } else {
         // Default context
@@ -148,6 +150,7 @@ export async function POST(request: NextRequest) {
           eventDate,
           weekNumber: weekNumber || 1,
           trainerNotes,
+          mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
         };
       }
     }
@@ -156,69 +159,73 @@ export async function POST(request: NextRequest) {
     if (photoBase64) {
       const prompt = getPhotoAnalysisPrompt(context);
       
-      // Use PHOTO_AI_PROVIDER (or fallback chain)
-      const result = await analyzeImageWithPhotoAI(photoBase64, prompt);
+      // Use PHOTO_AI_PROVIDER (or fallback chain) - Vision AI only identifies food, does NOT give advice
+      const visionResult = await analyzeImageWithPhotoAI(photoBase64, prompt);
       
       // ALWAYS delete photo after analysis - enforced server-side
       // This is a security/privacy requirement, not client-optional
       deletePhotoServerSide(photoPath);
       
-      if (result.error && !result.text) {
+      if (visionResult.error && !visionResult.text) {
         // All providers failed - fallback to rule-based analysis
-        const analysis = await analyzeMealPortion(foodDescription || 'Unknown meal', context);
+        const analysis = await analyzeMealPortion(foodDescription || 'Unknown meal', context, mealType);
         return NextResponse.json({
-          analysis: result.error,
+          analysis: visionResult.error,
           portionAdvice: analysis.advice,
           onPhase: analysis.onPhase,
           corrections: analysis.corrections,
-          aiError: result.error,
-          provider: result.provider || 'none',
+          aiError: visionResult.error,
+          provider: visionResult.provider || 'none',
           photoDeleted: true,
         });
       }
 
-      // Convert photo analysis to portion advice + apply corrections cache
-      const analysis = await analyzeMealPortion(result.text, context);
-      
-      // Check if AI response contains food/nutrition content
-      // If not, the AI likely gave an irrelevant response (like a story)
-      const foodKeywords = ['protein', 'starch', 'phase', 'oz', 'cup', 'fat', 'vegetable', 'chicken', 'beef', 'fish', 'salad', 'rice', 'pasta', 'bread', 'nut', 'almond', 'walnut', 'broccoli', 'spinach', 'potato', 'egg', 'yogurt', 'cheese', 'milk', 'cream', 'avocado', 'oil', 'calorie', 'gram', 'fiber', 'sodium', 'sugar', 'frozen', 'canned', 'fresh', 'portion', 'handful', 'tablespoon', 'ounce'];
-      const lowerResponse = (result.text || '').toLowerCase();
+      // Check if Vision AI identified food content
+      const foodKeywords = ['protein', 'starch', 'phase', 'oz', 'cup', 'fat', 'vegetable', 'chicken', 'beef', 'fish', 'salad', 'rice', 'pasta', 'bread', 'nut', 'almond', 'walnut', 'broccoli', 'spinach', 'potato', 'egg', 'yogurt', 'cheese', 'milk', 'cream', 'avocado', 'oil', 'calorie', 'gram', 'fiber', 'sodium', 'sugar', 'frozen', 'canned', 'fresh', 'portion', 'handful', 'tablespoon', 'ounce', 'food', 'eat', 'meal', 'dish', 'sauce', 'salad', 'fruit', 'meat', 'fish', 'seafood', 'toast', 'bacon', 'sausage', 'ham', 'turkey', 'steak', 'pork', 'shrimp'];
+      const lowerResponse = (visionResult.text || '').toLowerCase();
       const hasFoodContent = foodKeywords.some(kw => lowerResponse.includes(kw));
       
-      // If no food content detected, return "cannot identify" message instead of garbage
-      let displayAnalysis = hasFoodContent ? result.text : 'I cannot identify this food from the photo. Please describe what you are eating and I\'ll give you portion advice.';
-      
-      // If corrections were applied by analyzeMealPortion, append correction note to display
-      // This tells the user when the AI misclassified something and the correction took effect
-      if (hasFoodContent && analysis.corrections && analysis.corrections.length > 0) {
-        const correctionNote = '\n\n📝 **Correction applied:** The AI\'s classification has been corrected based on previous feedback. See portion advice below.';
-        displayAnalysis = displayAnalysis + correctionNote;
+      // If no food content detected, return "cannot identify" message
+      if (!hasFoodContent) {
+        return NextResponse.json({
+          analysis: 'I cannot identify this food from the photo. Please describe what you are eating and I\'ll give you portion advice.',
+          portionAdvice: 'Please describe your meal so I can help with portions.',
+          onPhase: false,
+          corrections: [],
+          provider: visionResult.provider,
+          photoDeleted: true,
+        });
       }
+
+      // Use getCoachPrompt for photo analysis - same prompt as chat!
+      // Format as a meal description for the coach to evaluate
+      const mealMessage = `I'm eating ${visionResult.text}`;
+      const coachPrompt = getCoachPrompt(context, mealMessage);
+      const systemMessage: AIMessage = { role: 'system', content: coachPrompt };
+      const chatResult = await chatWithChatAI([systemMessage], mealMessage);
+      
+      // Get rule-based corrections for onPhase status
+      const ruleBasedAnalysis = await analyzeMealPortion(visionResult.text, context, mealType);
       
       return NextResponse.json({
-        analysis: displayAnalysis,
-        portionAdvice: hasFoodContent ? analysis.advice : 'Please describe your meal so I can help with portions.',
-        onPhase: hasFoodContent ? analysis.onPhase : false,
-        corrections: hasFoodContent ? analysis.corrections : [],
-        provider: result.provider,
+        analysis: visionResult.text, // Vision AI's food identification
+        portionAdvice: chatResult.text || ruleBasedAnalysis.advice, // Chat AI's advice, fallback to rule-based
+        onPhase: ruleBasedAnalysis.onPhase,
+        corrections: ruleBasedAnalysis.corrections,
+        provider: visionResult.provider,
         photoDeleted: true,
       });
     }
 
-    // Text-based analysis - use AI instead of rule-based
-    const mealPrompt = getMealAnalysisPrompt(context, {
-      mealType: 'meal',
-      foodDescription: foodDescription || '',
-      onPhase: true,
-    });
-
-    const systemMessage: AIMessage = { role: 'system', content: mealPrompt };
-    const aiResult = await chatWithChatAI([systemMessage], '');
+    // Text-based analysis - use getCoachPrompt (same as chat!)
+    const mealMessage = `I'm eating ${foodDescription || ''}`;
+    const coachPrompt = getCoachPrompt(context, mealMessage);
+    const systemMessage: AIMessage = { role: 'system', content: coachPrompt };
+    const aiResult = await chatWithChatAI([systemMessage], mealMessage);
 
     if (aiResult.text) {
       // AI succeeded - use AI response plus rule-based corrections for onPhase status
-      const analysis = await analyzeMealPortion(foodDescription, context);
+      const analysis = await analyzeMealPortion(foodDescription || '', context, mealType);
       return NextResponse.json({
         analysis: aiResult.text,
         portionAdvice: aiResult.text,
@@ -229,7 +236,7 @@ export async function POST(request: NextRequest) {
     }
 
     // AI failed - fallback to rule-based
-    const analysis = await analyzeMealPortion(foodDescription || '', context);
+    const analysis = await analyzeMealPortion(foodDescription || '', context, mealType);
     return NextResponse.json({
       analysis: analysis.advice,
       portionAdvice: analysis.advice,
@@ -270,35 +277,9 @@ export async function GET() {
 }
 
 function getPhotoAnalysisPrompt(context: CoachContext): string {
-  const portions = context.gender === 'male' 
-    ? { protein: '6 ounces', fibrousVegetables: '2 cups', fat: '1-2 tablespoons' }
-    : { protein: '4 ounces', fibrousVegetables: '1-2 cups', fat: '1 tablespoon' };
+  return `Identify what food you see in this photo. Describe it briefly.
 
-  return `You are a NUTRITION COACH. Your ONLY job is to analyze food in photos and give nutrition advice.
+If you cannot identify the food, say EXACTLY: "I cannot identify this food. Please describe what you are eating."
 
-STRICT RULES — FOLLOW THESE OR FAIL:
-1. ONLY respond with food identification and nutrition advice — nothing else
-2. DO NOT write stories, poems, or any creative content. DO NOT mention animals, weather, or unrelated topics
-3. If you cannot identify the food, say EXACTLY: "I cannot identify this food. Please describe what you are eating."
-4. Your response MUST identify: (a) what food you see, (b) is it Phase ${context.currentPhase} compliant, (c) portion advice
-
-NUTRITION RULES:
-- Phase 1: NO starch, NO dairy, NO sugar. Focus on lean protein, fibrous vegetables, healthy fats.
-- Phase 2: Add starch on Wed/Sat/Sun only (${context.gender === 'male' ? '1-2 cups' : '1 cup'} cooked)
-- Phase 3: Check with coach
-- Phase 4: Maintenance — starch allowed every meal
-
-PORTION SIZES:
-- Protein: ${portions.protein} per meal
-- Vegetables: ${portions.fibrousVegetables} per meal
-- Fat: ${portions.fat} per meal
-
-NUTS: Nuts (almonds, walnuts, mixed nuts, peanuts, etc.) are a FAT source, NOT protein. Portion is about 1oz (a small handful = ~2 tablespoons). Note if salted/flavored.
-
-EXAMPLE RESPONSES:
-- "Mixed nuts — that's a healthy fat. Phase 1 OK. Portion: 1oz (small handful). Watch the salt if flavored. Good choice! 💪"
-- "I see pasta with sauce. Phase 1 VIOLATION — that's starch. Skip the pasta, eat only the meat/sauce portion."
-- "I cannot identify this food. Please describe what you are eating."
-
-NOW ANALYZE THIS PHOTO. Respond with ONLY nutrition advice. No stories.`;
+Be brief. Just identify the food — nothing else.`;
 }

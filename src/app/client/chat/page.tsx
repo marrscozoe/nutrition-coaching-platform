@@ -71,8 +71,9 @@ export default function ChatPage() {
     const user = JSON.parse(userData);
     setClient(user);
 
-    // Load chat history from localStorage
-    const history = localStorage.getItem('chat_history');
+    // Load chat history from localStorage (use client-specific key to prevent cross-contamination)
+    const chatKey = `chat_history_${user.id}`;
+    const history = localStorage.getItem(chatKey);
     if (history) {
       try {
         const parsed = JSON.parse(history);
@@ -144,14 +145,39 @@ export default function ChatPage() {
     saveHistory(updatedMessages);
 
     try {
-      // Call chat API with meal data for AI analysis
+      // If meal has coaching advice from the analyze endpoint (photo meals), use it
+      // portionAdvice contains Chat AI's coaching analysis via getCoachPrompt (same as chat!)
+      if (mealData.portionAdvice) {
+        const coachMessage: ChatMessage = {
+          id: `coach_meal_${Date.now()}`,
+          role: 'coach',
+          content: mealData.portionAdvice,
+          timestamp: new Date(),
+        };
+
+        const allMessages = [...updatedMessages, coachMessage];
+        setMessages(allMessages);
+        saveHistory(allMessages);
+        setAnalyzing(false);
+        return;
+      }
+
+      // If no existing coaching (text-only meal from log tab), call chat API with mealData
+      // This uses getCoachPrompt in the API (same prompt as chat!)
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-client-id': client!.id,
         },
-        body: JSON.stringify({ mealData }),
+        body: JSON.stringify({ 
+          mealData: {
+            mealType: mealData.mealType,
+            foodDescription: mealData.foodDescription,
+            onPhase: mealData.onPhase,
+            messedUp: mealData.messedUp,
+          }
+        }),
       });
 
       const data = await res.json();
@@ -250,7 +276,9 @@ export default function ChatPage() {
   }
 
   function saveHistory(allMessages: ChatMessage[]) {
-    localStorage.setItem('chat_history', JSON.stringify(allMessages));
+    if (!client) return;
+    const chatKey = `chat_history_${client.id}`;
+    localStorage.setItem(chatKey, JSON.stringify(allMessages));
   }
 
   // Auto-scroll to bottom
@@ -338,13 +366,15 @@ export default function ChatPage() {
   }
 
   function clearChat() {
+    if (!client) return;
+    const chatKey = `chat_history_${client.id}`;
     setMessages([{
       id: 'welcome',
       role: 'coach',
       content: "Chat cleared! What do you need? Ask me about meals, portions, your progress, or just chat! 💪",
       timestamp: new Date(),
     }]);
-    localStorage.removeItem('chat_history');
+    localStorage.removeItem(chatKey);
   }
 
   if (loading || !client) {

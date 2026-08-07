@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
@@ -32,10 +32,25 @@ interface MealLog {
 
 export default function ClientDashboard() {
   const router = useRouter();
-  const pathname = usePathname();
   const [client, setClient] = useState<ClientData | null>(null);
   const [recentMeals, setRecentMeals] = useState<MealLog[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Handle returning to the dashboard (e.g., after logging a meal)
+  // This catches cases where client-side navigation brings user back without pathname changing
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        const userData = localStorage.getItem('client_user');
+        if (userData) {
+          const user = JSON.parse(userData);
+          fetchRecentMeals(user.id);
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   useEffect(() => {
     // Check if user is logged in (use separate client keys to avoid overwriting trainer session)
@@ -54,7 +69,7 @@ export default function ClientDashboard() {
     fetchClientData(user.id);
     // Fetch recent meals
     fetchRecentMeals(user.id);
-  }, [router, pathname]);
+  }, [router]);
 
   async function fetchRecentMeals(clientId: string) {
     try {

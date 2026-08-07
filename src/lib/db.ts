@@ -76,9 +76,9 @@ export async function getDb() {
 // ============================================
 // Helper: Parse SQL and convert to Supabase query
 // ============================================
-function parseSql(sql: string | PreparedStatement) {
+function parseSql(sql: string | PreparedStatement, overrideParams?: any[]) {
   const sqlStr = typeof sql === 'string' ? sql : sql.sql;
-  const params = typeof sql === 'string' ? [] : (sql.params || []);
+  const params = overrideParams || (typeof sql === 'string' ? [] : (sql.params || []));
   
   // Parse table name
   const fromMatch = sqlStr.match(/FROM\s+(\w+)/i) || sqlStr.match(/UPDATE\s+(\w+)/i) || sqlStr.match(/INTO\s+(\w+)/i);
@@ -122,7 +122,7 @@ function parseSql(sql: string | PreparedStatement) {
 export async function db_all<T = any>(sql: string | PreparedStatement, ...params: any[]): Promise<T[]> {
   try {
     const allParams = params.length > 0 ? params : (sql instanceof PreparedStatement ? sql.params : []);
-    const { table, conditions, orderCol, orderDir, limit, offset } = parseSql(sql);
+    const { table, conditions, orderCol, orderDir, limit, offset } = parseSql(sql, allParams);
     
     if (!table) return [];
     
@@ -399,6 +399,7 @@ export interface Client {
   notes?: string;
   lead_source?: string;
   is_tester?: boolean;
+  phase2_start_weight?: number;
   created_at: string;
   updated_at: string;
 }

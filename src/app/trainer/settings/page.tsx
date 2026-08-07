@@ -36,6 +36,7 @@ export default function TrainerSettingsPage() {
   
   // Correction feature state
   const [correctionFeatureEnabled, setCorrectionFeatureEnabled] = useState(false);
+  const [trainerId, setTrainerId] = useState<string>('');
   const [clients, setClients] = useState<ClientData[]>([]);
   const [loadingClients, setLoadingClients] = useState(false);
 
@@ -44,7 +45,7 @@ export default function TrainerSettingsPage() {
     const userType = localStorage.getItem('trainer_user_type');
 
     if (!userData || userType !== 'trainer') {
-      router.push('/');
+      router.push('/?login=trainer');
       return;
     }
 
@@ -54,6 +55,7 @@ export default function TrainerSettingsPage() {
     setBusinessName(user.business_name || '');
     setBrandColor(user.brand_color || '#f97316');
     setEmail(user.email || '');
+    setTrainerId(user.id);
     setLoading(false);
     
     // Load correction feature settings and clients
@@ -64,7 +66,9 @@ export default function TrainerSettingsPage() {
   async function loadCorrectionSettings(trainerId: string) {
     try {
       // Get correction_feature_enabled from kv_store
-      const res = await fetch('/api/admin/settings');
+      const res = await fetch('/api/admin/settings', {
+        headers: { 'x-trainer-id': trainerId }
+      });
       const data = await res.json();
       if (data.settings?.correction_feature_enabled) {
         setCorrectionFeatureEnabled(true);
@@ -77,7 +81,9 @@ export default function TrainerSettingsPage() {
   async function loadClients(trainerId: string) {
     setLoadingClients(true);
     try {
-      const res = await fetch(`/api/admin/testers?trainer_id=${trainerId}`);
+      const res = await fetch(`/api/admin/testers?trainer_id=${trainerId}`, {
+        headers: { 'x-trainer-id': trainerId }
+      });
       const data = await res.json();
       if (Array.isArray(data.clients)) {
         setClients(data.clients);
@@ -93,10 +99,12 @@ export default function TrainerSettingsPage() {
     try {
       const res = await fetch('/api/admin/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-trainer-id': trainerId
+        },
         body: JSON.stringify({
           settings: { correction_feature_enabled: enabled },
-          
         }),
       });
       if (res.ok) {
@@ -111,7 +119,10 @@ export default function TrainerSettingsPage() {
     try {
       const res = await fetch('/api/admin/testers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-trainer-id': trainerId
+        },
         body: JSON.stringify({
           clientId,
           isTester,

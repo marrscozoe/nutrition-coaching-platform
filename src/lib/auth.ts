@@ -11,6 +11,29 @@ export async function logout(): Promise<void> {
     localStorage.removeItem('user'); // Legacy key cleanup
     localStorage.removeItem('userType'); // Legacy key cleanup
     
+    // Clear chat history for the current user type (prevents cross-contamination between sessions)
+    const trainerData = localStorage.getItem('trainer_user');
+    const trainerType = localStorage.getItem('trainer_user_type');
+    const clientData = localStorage.getItem('client_user');
+    const clientType = localStorage.getItem('client_user_type');
+
+    if (trainerData && trainerType === 'trainer') {
+      try {
+        const trainer = JSON.parse(trainerData);
+        localStorage.removeItem(`chat_history_trainer_${trainer.id}`);
+      } catch (e) {
+        // ignore parse errors
+      }
+    }
+    if (clientData && clientType === 'client') {
+      try {
+        const client = JSON.parse(clientData);
+        localStorage.removeItem(`chat_history_${client.id}`);
+      } catch (e) {
+        // ignore parse errors
+      }
+    }
+    
     // Sign out from Supabase (clears any auth session)
     await supabase.auth.signOut();
     

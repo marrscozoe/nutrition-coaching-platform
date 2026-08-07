@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 
 function LoadingFallback() {
   return (
@@ -12,7 +12,6 @@ function LoadingFallback() {
 }
 
 function OnboardingContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get('email') || '';
   const nameParam = searchParams.get('name') || '';
@@ -91,7 +90,7 @@ function OnboardingContent() {
       localStorage.setItem('client_user_type', 'client');
 
       setSuccessMessage('Account created! Redirecting to your dashboard...');
-      setTimeout(() => router.push('/client'), 2000);
+      setTimeout(() => window.location.href = '/client', 2000);
     } catch (err) {
       setError('Something went wrong. Please try again.');
       setLoading(false);

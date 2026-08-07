@@ -38,7 +38,7 @@ export default function TrainerDashboard() {
     const userType = localStorage.getItem('trainer_user_type');
 
     if (!userData || userType !== 'trainer') {
-      router.push('/');
+      router.push('/?login=trainer');
       return;
     }
 

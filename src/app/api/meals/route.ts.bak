@@ -109,66 +109,40 @@ export async function POST(request: NextRequest) {
         let newPhase = currentPhase;
         let resetStreak = false;
 
-        // Phase 1 → Phase 2: 14+ days in phase (simple, no extension)
-        if (currentPhase === 1 && daysInPhase >= 14) {
+        // Phase 1 → Phase 2: 14+ days in phase
+        // If client messed up, extend phase by 7 days (reset phase_start_date + 7 days)
+        if (currentPhase === 1 && messedUp) {
+          // Reset phase start + 7 day penalty
+          const extendedDate = new Date(new Date(phaseStartDate).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+          await supabase
+            .from('clients')
+            .update({
+              phase_start_date: extendedDate,
+              good_meal_streak: 0,
+              updated_at: now,
+            })
+            .eq('id', clientId);
+        } else if (currentPhase === 1 && daysInPhase >= 14) {
           // Phase 1 → Phase 2: 14+ days in phase
           newPhase = 2;
           resetStreak = true;
-          // Store current weight as phase2_start_weight for weight-based Phase 2 duration
-          const { data: clientForWeight } = await supabase
-            .from('clients')
-            .select('current_weight')
-            .eq('id', clientId)
-            .single();
-          if (clientForWeight?.current_weight) {
-            await supabase
-              .from('clients')
-              .update({ phase2_start_weight: clientForWeight.current_weight })
-              .eq('id', clientId);
-          }
         } else if (currentPhase === 2 && daysInPhase >= 7) {
-          // Phase 2 → Phase 3: weight-based duration
-          // If >2 lbs lost in Phase 2, need 14 days; otherwise 7 days
-          const { data: clientForPhase2 } = await supabase
-            .from('clients')
-            .select('current_weight, phase2_start_weight')
-            .eq('id', clientId)
-            .single();
-          const phase2StartWeight = clientForPhase2?.phase2_start_weight;
-          const currentWeight = clientForPhase2?.current_weight;
-          const weightLostInPhase2 = phase2StartWeight && currentWeight ? phase2StartWeight - currentWeight : 0;
-          const phase2Duration = weightLostInPhase2 > 2 ? 14 : 7;
-          if (daysInPhase >= phase2Duration) {
-            newPhase = 3;
-            resetStreak = true;
-          }
+          // Phase 2 → Phase 3: 7+ days in phase
+          newPhase = 3;
+          resetStreak = true;
         }
 
         if (newPhase !== currentPhase) {
           // Advance phase and reset phase_start_date
-          if (newPhase === 3) {
-            // Phase 2 → Phase 3: clear phase2_start_weight
-            await supabase
-              .from('clients')
-              .update({
-                current_phase: newPhase,
-                phase_start_date: now,
-                good_meal_streak: resetStreak ? 0 : newStreak,
-                phase2_start_weight: null,
-                updated_at: now,
-              })
-              .eq('id', clientId);
-          } else {
-            await supabase
-              .from('clients')
-              .update({
-                current_phase: newPhase,
-                phase_start_date: now,
-                good_meal_streak: resetStreak ? 0 : newStreak,
-                updated_at: now,
-              })
-              .eq('id', clientId);
-          }
+          await supabase
+            .from('clients')
+            .update({
+              current_phase: newPhase,
+              phase_start_date: now,
+              good_meal_streak: resetStreak ? 0 : newStreak,
+              updated_at: now,
+            })
+            .eq('id', clientId);
         } else if (newStreak !== currentStreak) {
           // Just update streak
           await supabase

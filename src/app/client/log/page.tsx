@@ -223,7 +223,10 @@ export default function LogMealPage() {
   }
 
   async function handleSubmit() {
-    if (!foodDescription && !photoPreview) return;
+    if (!foodDescription && !photoPreview) {
+      setToast({ message: 'Please enter a food description or take a photo', type: 'error' });
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -246,6 +249,11 @@ export default function LogMealPage() {
       });
 
       const data = await res.json();
+
+      if (!res.ok) {
+        setToast({ message: data.error || 'Failed to log meal. Please try again.', type: 'error' });
+        return;
+      }
 
       if (data.success) {
         // Prepare meal data to send to chat for AI analysis
@@ -280,10 +288,17 @@ export default function LogMealPage() {
             : "Great job logging! Keep it up! 👊", 
           type: 'success' 
         });
-        router.push('/client/chat');
+        
+        // Small delay to let toast show before navigation
+        setTimeout(() => {
+          router.push('/client/chat');
+        }, 800);
+      } else {
+        setToast({ message: data.error || 'Failed to log meal. Please try again.', type: 'error' });
       }
     } catch (err) {
       console.error('Submit failed:', err);
+      setToast({ message: 'Network error. Please check your connection and try again.', type: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -302,10 +317,23 @@ export default function LogMealPage() {
   }
 
   async function handleSubmitCorrection() {
-    if (!correctionFoodName.trim() || !client) return;
+    console.log('[Correction Debug] submit called, correctionFoodName:', JSON.stringify(correctionFoodName), 'client:', client?.id);
+    
+    if (!correctionFoodName.trim()) {
+      console.log('[Correction Debug] FAIL: correctionFoodName is empty');
+      setToast({ message: 'Please enter the food name that was misclassified', type: 'error' });
+      return;
+    }
+    
+    if (!client) {
+      console.log('[Correction Debug] FAIL: client is null');
+      setToast({ message: 'Session error. Please reload the page.', type: 'error' });
+      return;
+    }
     
     setSubmittingCorrection(true);
     try {
+      console.log('[Correction Debug] Sending API request with foodName:', correctionFoodName.trim(), 'category:', correctionCategory);
       const res = await fetch('/api/corrections', {
         method: 'POST',
         headers: {
@@ -318,11 +346,14 @@ export default function LogMealPage() {
         }),
       });
       
+      console.log('[Correction Debug] Response status:', res.status);
       const data = await res.json();
+      console.log('[Correction Debug] Response data:', JSON.stringify(data));
       
       if (data.success) {
         setToast({ message: 'Thanks! AI will learn from this correction. 🙏', type: 'success' });
         setShowCorrectionDialog(false);
+        setCorrectionFoodName('');
       } else {
         setToast({ message: data.error || 'Failed to submit correction', type: 'error' });
       }

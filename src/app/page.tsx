@@ -15,6 +15,16 @@ export default function HomePage() {
   // Check if already logged in and redirect (only run once on mount)
   useEffect(() => {
     try {
+      // Check if redirected from trainer route (e.g. /trainer without session → /?login=trainer)
+      // If so, auto-select the trainer login tab and don't redirect to /client
+      const urlParams = new URLSearchParams(window.location.search);
+      const loginType = urlParams.get('login');
+      if (loginType === 'trainer') {
+        setIsTrainer(true);
+        // Don't redirect - show trainer login page
+        return;
+      }
+      
       // Check trainer session first, then client session
       const trainerUser = localStorage.getItem('trainer_user');
       const trainerType = localStorage.getItem('trainer_user_type');

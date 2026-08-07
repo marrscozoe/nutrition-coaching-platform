@@ -40,7 +40,7 @@ export default function TrainerCorrectionsPage() {
     const userType = localStorage.getItem('trainer_user_type');
 
     if (!userData || userType !== 'trainer') {
-      router.push('/');
+      router.push('/?login=trainer');
       return;
     }
 
@@ -150,8 +150,28 @@ export default function TrainerCorrectionsPage() {
         <div className="w-12" />
       </header>
 
+      {/* Prominent Pending Count Banner */}
+      {pendingCorrections.length > 0 && (
+        <div className="mx-4 mb-2 p-3 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="text-red-400 font-semibold text-sm">
+                {pendingCorrections.length} correction{pendingCorrections.length !== 1 ? 's' : ''} waiting for review
+              </p>
+              <p className="text-red-400/60 text-xs">
+                AI improvements are paused until you approve them
+              </p>
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+            <span className="text-red-400 font-bold text-lg">{pendingCorrections.length}</span>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
-      <div className="px-4 flex gap-2 mb-4">
+      <div className="px-4 flex gap-2 mb-4 mt-2">
         <button
           onClick={() => setTab('pending')}
           className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
