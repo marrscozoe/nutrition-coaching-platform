@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db_all, db_get, db_run, getAdminClient, MealLog } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
+import { generatePhase5Plan } from '@/lib/ai-coach';
 
 // GET - Fetch meal logs for a client
 export async function GET(request: NextRequest) {
@@ -141,6 +142,33 @@ export async function POST(request: NextRequest) {
           if (daysInPhase >= phase2Duration) {
             newPhase = 3;
             resetStreak = true;
+          }
+        }
+        
+        // Phase 5: Check if plan has expired and needs regeneration
+        // Plan expires after 3 days (day 1, 2, 3 = 3 days total)
+        if (currentPhase === 5 && client.phase5_start_date) {
+          const phase5StartDate = new Date(client.phase5_start_date + 'T12:00:00');
+          const daysSinceStart = Math.floor((new Date(now).getTime() - phase5StartDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysSinceStart >= 3) {
+            // Plan expired - generate new 3-day plan
+            const newPhase5Plan = generatePhase5Plan();
+            await supabase
+              .from('clients')
+              .update({
+                phase5_plan: JSON.stringify(newPhase5Plan),
+                phase5_start_date: now.split('T')[0], // YYYY-MM-DD
+                good_meal_streak: newStreak,
+                updated_at: now,
+              })
+              .eq('id', clientId);
+            // Phase 5 plan regenerated - skip phase transition logic
+            return NextResponse.json({
+              success: true,
+              mealId,
+              message: 'Meal logged successfully',
+              phase5PlanRegenerated: true,
+            });
           }
         }
 

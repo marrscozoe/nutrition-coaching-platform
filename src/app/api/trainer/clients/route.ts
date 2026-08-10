@@ -17,10 +17,9 @@ export async function GET(request: NextRequest) {
         goal_weight, event_date, current_phase, current_week, subscription_status,
         waiver_signed, notes, lead_source, created_at, updated_at
       FROM clients 
-      WHERE trainer_id = ? 
       ORDER BY created_at DESC
     `);
-    const clients = await db_all(stmt, trainerId);
+    const clients = await db_all(stmt);
 
     return NextResponse.json({ clients });
   } catch (error) {

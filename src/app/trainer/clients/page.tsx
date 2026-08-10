@@ -129,9 +129,10 @@ export default function TrainerClientsPage() {
           </div>
         ) : (
           filteredClients.map((client) => (
-            <div
+            <Link
               key={client.id}
-              className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10"
+              href={`/trainer/clients/${client.id}`}
+              className="block p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 hover:border-brand-orange/50 transition-colors"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -158,7 +159,7 @@ export default function TrainerClientsPage() {
                   </p>
                 </div>
               </div>
-            </div>
+            </Link>
           ))
         )}
       </div>

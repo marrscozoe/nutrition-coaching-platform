@@ -271,6 +271,52 @@ export interface CoachContext {
   todayDairyServings?: number; // dairy servings logged today (men: 2 allowed, women: 1 allowed)
   todaySugarServings?: number; // sugar servings logged today (men: 2 allowed, women: 1 allowed)
   todayProcessedMeals?: number; // processed meals logged today (1 allowed)
+  // Phase 5 tracking
+  phase5Plan?: Phase5Day[]; // 3-day rotating plan
+  phase5StartDate?: string; // YYYY-MM-DD when the current 3-day plan started
+}
+
+export interface Phase5Day {
+  day: number;
+  rule: 'no_starch' | 'starch_2meals' | 'starch_all';
+  label: string;
+}
+
+// Generate a random 3-day Phase 5 plan
+export function generatePhase5Plan(): Phase5Day[] {
+  const options: Array<{ rule: Phase5Day['rule']; label: string }> = [
+    { rule: 'no_starch', label: 'No starch — lean protein, veggies, healthy fats only' },
+    { rule: 'starch_2meals', label: 'Starch allowed at breakfast & lunch only' },
+    { rule: 'starch_all', label: 'Starch allowed at every meal' },
+  ];
+  
+  // Pick 3 random options (can repeat)
+  const plan: Phase5Day[] = [];
+  for (let i = 1; i <= 3; i++) {
+    const randomIdx = Math.floor(Math.random() * options.length);
+    plan.push({ day: i, ...options[randomIdx] });
+  }
+  return plan;
+}
+
+// Get current day of Phase 5 plan (1, 2, or 3)
+export function getPhase5DayNumber(phase5StartDate: string): number {
+  if (!phase5StartDate) return 1;
+  const start = new Date(phase5StartDate + 'T12:00:00');
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  // Day 1 = start date, Day 2 = start + 1, Day 3 = start + 2
+  // After day 3 (diffDays >= 3), it will be a new plan
+  return Math.min(3, Math.max(1, diffDays + 1));
+}
+
+// Check if Phase 5 plan needs regeneration (after day 3)
+export function isPhase5PlanExpired(phase5StartDate: string): boolean {
+  if (!phase5StartDate) return true;
+  const start = new Date(phase5StartDate + 'T12:00:00');
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays >= 3; // Needs new plan after 3 days
 }
 
 export const PORTION_SIZES = {
@@ -435,13 +481,23 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
   const asksAboutPlan = lowerMessage.includes('what can i eat') || lowerMessage.includes('my plan') || lowerMessage.includes('show me') || lowerMessage.includes('what am i') || lowerMessage.includes('meal example') || lowerMessage.includes('example meal') || lowerMessage.includes('phase') || lowerMessage.includes('portion') || lowerMessage.includes('categories') || lowerMessage.includes('what to eat') || lowerMessage.includes('swap') || lowerMessage.includes('exchange');
 
   if (asksAboutPlan) {
+    // Build Phase 5 plan description if applicable
+    let phase5PlanDesc = '';
+    if (context.currentPhase === 5 && context.phase5Plan && context.phase5Plan.length > 0) {
+      const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
+      const todayRule = context.phase5Plan.find(d => d.day === dayNum);
+      phase5PlanDesc = `\n• You're on DAY ${dayNum} of your Phase 5 plan: ${todayRule?.label || 'Unknown'}`;
+    }
+
     const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - 14 days of lean protein, veggies, healthy fats only' :
                             context.currentPhase === 2 ? 'STARCH ONLY for BREAKFAST & LUNCH on Wed/Sat/Sun - dinner & snack NEVER get starch' :
                             context.currentPhase === 3 ? 'EVALUATION CHECKPOINT - simple: at goal → Phase 4 (celebrate!) or not at goal → Phase 1 (keep working!)' :
+                            context.currentPhase === 5 ? `AGGRESSIVE FAT LOSS - 3-day rotating plan${phase5PlanDesc}` :
                             'MAINTENANCE - starch every meal, weigh Fri only';
     const phaseNext = context.currentPhase === 1 ? 'Phase 2: Add starch Wed/Sat/Sun' :
                       context.currentPhase === 2 ? 'Phase 3: Evaluation checkpoint' :
                       context.currentPhase === 3 ? 'Phase 4 (at goal!) or Phase 1 (keep working!)' :
+                      context.currentPhase === 5 ? 'Phase 5 rotates every 3 days! After day 3, new plan generated.' :
                       'You\'re done - maintenance!';
     
     const proteinExamples = context.gender === 'male' 
@@ -505,7 +561,7 @@ COACHING RULES:
 
 CLIENT CONTEXT:
 - Name: ${context.clientName || 'Client'}
-- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 3 = at goal? → Phase 4! Not yet? → Phase 1, Phase 4 = maintenance)
+- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 3 = at goal? → Phase 4! Not yet? → Phase 1, Phase 4 = maintenance${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 3-day rotating plan${context.currentPhase === 5 && context.phase5Plan ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})
 - Gender: ${context.gender} (${context.gender === 'male' ? 'MALE — use MALE portions only' : 'FEMALE — use FEMALE portions only'})
 - Goal: ${context.goalWeight}lbs, Started: ${context.startingWeight}lbs, Current: ${context.currentWeight}lbs
 ${context.eventDate ? `- Event in ${weeksUntilEvent} weeks` : ''}
@@ -804,6 +860,49 @@ export async function analyzeMealPortion(
     if (starchFound) {
       violationMessages.push(`💡 Phase 4 - Starch allowed every meal. Keep portions in check: ${portions.protein} protein, ${portions.fibrousVegetables} veg. Natural starches preferred over processed.`);
     }
+  } else if (context.currentPhase === 5 && context.programType !== 'event_ready') {
+    // Phase 5: Aggressive Fat Loss - 3-day rotating plan (NOT for Event Ready clients)
+    // Determine which day of the plan we're on
+    const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
+    const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
+    const rule = currentDayRule?.rule || 'no_starch';
+    
+    // Phase 5 still has dairy and sugar restrictions (same as Phase 1)
+    if (dairyFound) {
+      violationMessages.push(`⚠️ Phase 5 - NO dairy! Skip the ${dairyFound} completely.`);
+      onPhase = false;
+    }
+    if (sugarFound) {
+      violationMessages.push(`⚠️ Phase 5 - NO sugar! Skip the ${sugarFound} completely.`);
+      onPhase = false;
+    }
+    
+    // Apply the appropriate starch rule for today
+    if (starchFound) {
+      if (rule === 'no_starch') {
+        // Day 1 or whichever day is no_starch
+        violationMessages.push(`⚠️ Phase 5 Day ${dayNum} - NO starch! Skip the ${starchFound} completely.`);
+        onPhase = false;
+      } else if (rule === 'starch_2meals') {
+        // Starch allowed at breakfast & lunch only
+        const isBreakfastOrLunch = mealType === 'breakfast' || mealType === 'lunch';
+        const isDinnerOrSnack = mealType === 'dinner' || mealType === 'snack';
+        
+        if (isDinnerOrSnack) {
+          violationMessages.push(`⚠️ Phase 5 Day ${dayNum} - starch allowed at breakfast & lunch ONLY. No starch at ${mealType}! Skip the ${starchFound}.`);
+          onPhase = false;
+        } else if (isBreakfastOrLunch) {
+          // Starch allowed at breakfast/lunch - don't add violation
+        } else {
+          // No specific meal type
+          violationMessages.push(`⚠️ Phase 5 Day ${dayNum} - starch allowed at breakfast & lunch only. No ${starchFound} at dinner or snacks.`);
+          onPhase = false;
+        }
+      } else if (rule === 'starch_all') {
+        // Starch allowed at every meal - no violation
+        violationMessages.push(`💡 Phase 5 Day ${dayNum} - starch allowed every meal. Keep portions in check!`);
+      }
+    }
   }
   
   // Check protein (avoid tofu/tempeh - processed)
@@ -967,6 +1066,40 @@ export async function analyzeMealPortion(
   } else if (context.currentPhase === 3) {
     // Phase 3: NO food suggestions - evaluation happens automatically based on weight
     // The app will transition to Phase 4 (at goal) or Phase 1 (not at goal)
+  } else if (context.currentPhase === 5 && context.programType !== 'event_ready') {
+    // Phase 5: Aggressive Fat Loss - follow the 3-day plan (NOT for Event Ready clients)
+    const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
+    const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
+    const rule = currentDayRule?.rule || 'no_starch';
+    
+    if (rule === 'no_starch' || rule === 'starch_2meals') {
+      // Strict phase - similar to Phase 1
+      if (!hasProtein && !hasVeg) {
+        let suggestion = `💡 Add ${portions.protein} lean protein + ${portions.fibrousVegetables} fibrous vegetables`;
+        if (!hasFat) suggestion += ` + ${portions.fat} olive oil or ${portions.avocado} avocado`;
+        suggestion += `. ${waterTrackingMessage}`;
+        violationMessages.push(suggestion);
+      } else if (!hasProtein) {
+        violationMessages.push(`💡 Add ${portions.protein} lean protein + ${portions.fat} olive oil or ${portions.avocado} avocado. ${waterTrackingMessage}`);
+      } else if (!hasVeg) {
+        violationMessages.push(`💡 Add ${portions.fibrousVegetables} fibrous vegetables + ${portions.fat} olive oil or ${portions.avocado} avocado. ${waterTrackingMessage}`);
+      } else if (!hasFat || isStandaloneFatFood) {
+        if (!isStandaloneFatFood) {
+          violationMessages.push(`💡 Add ${portions.fat} olive oil or ${portions.avocado} avocado for healthy fat. ${waterTrackingMessage}`);
+        }
+      }
+    } else if (rule === 'starch_all') {
+      // More lenient - similar to Phase 4
+      if (!hasProtein) {
+        violationMessages.push(`💡 Notice: Consider adding some lean protein to round out your meal.`);
+      }
+      if (!hasVeg) {
+        violationMessages.push(`💡 Notice: Adding some fibrous vegetables would be great for your meal.`);
+      }
+      if (!hasFat && !isStandaloneFatFood) {
+        violationMessages.push(`💡 Notice: Don't forget healthy fat like olive oil, avocado, or nuts. Stay hydrated with water too!`);
+      }
+    }
   }
   
   if (violationMessages.length === 0) {
@@ -1042,6 +1175,8 @@ export function getPhaseAdvice(clientPhase: number): string {
       return 'Phase 3: Evaluation checkpoint - at goal? Celebrate → Phase 4! Not yet → Phase 1, keep going!';
     case 4:
       return 'Phase 4: Maintenance mode - add starch to every meal, weigh Fridays only.';
+    case 5:
+      return 'Phase 5: Aggressive Fat Loss - 3-day rotating plan. Plan regenerates every 3 days.';
     default:
       return 'Keep following your plan!';
   }

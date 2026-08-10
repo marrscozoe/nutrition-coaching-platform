@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS clients (
   phase_start_date TIMESTAMPTZ,
   current_week INTEGER DEFAULT 1,
   good_meal_streak INTEGER DEFAULT 0,
+  phase5_plan TEXT,
+  phase5_start_date DATE,
   waiver_signed INTEGER DEFAULT 0,
   waiver_signed_at TIMESTAMPTZ,
   subscription_status TEXT DEFAULT 'active',

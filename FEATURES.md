@@ -393,3 +393,55 @@ Each program (Event Ready, Get Shredded, Muscle Gain, General Health) has differ
 6. Update AI coach to check program type when giving advice
 7. Add program-specific weight expectation tracking
 8. Test each program flow with sample client
+
+## Feature: Program Type Change (Mid-Program)
+
+**Date added:** 2026-08-09
+
+### Concept
+Allow program type to be changed mid-program for both clients and trainers.
+
+### Use Cases
+1. Client is in "event_ready" but decides they want to switch to "get_healthy" or "general_health"
+2. Trainer wants to adjust a client's program based on progress/conversation
+
+### Design Decisions
+
+**Option A: Reset to Phase 1 of new program**
+- Different goals = fresh start
+- Avoids keeping aggressive Event Ready rules when switching to relaxed Get Healthy
+- Mental reset helps with motivation
+- Pro: Clean slate for new goals
+- Con: May feel like a "punishment" for making positive change
+
+**Option B: Keep current phase**
+- They've earned their progress
+- Pro: Rewards positive change
+- Con: Event Ready is more aggressive, keeping Phase 2 of Event Ready when switching to Get Healthy could feel restrictive
+
+**Option C: Reset to Phase 1 of new program but keep week number**
+- Week tracks overall program progress (1-12 weeks) - this is still valid
+- Phase tracks diet stage - different goals = fresh start
+- Pro: Respects program investment while acknowledging goal change
+- Con: Slightly complex logic
+
+### Recommended Behavior (Option C)
+When program type changes:
+- **Keep:** Week number (they've been in program X weeks)
+- **Reset:** Phase to Phase 1, phase_start_date to today
+- **Clear:** Event date (no longer has event to prepare for)
+- **Keep:** All meal logs, weigh-ins, notes
+
+### Access Control Options
+1. **Trainer only:** Significant program decision, should be discussed
+2. **Client can request, trainer approves:** Client-initiated but controlled
+3. **Client can change freely:** More flexible but less controlled
+
+### Implementation Tasks
+1. Add program_type dropdown to client detail page (trainer can change)
+2. Decide: trainer-only, client can request, or client can change freely
+3. If client can request: Add UI for client to request program change
+4. Implement program change logic (reset phase to Phase 1, clear event_date, keep week)
+5. Update AI coach to recognize program type change and adjust recommendations
+6. Add notification to trainer when client requests program change
+7. Update client-facing UI to show program type

@@ -59,7 +59,7 @@ export default function ProfilePage() {
   }
 
   const PROGRAMS = [
-    { value: 'lose_body_fat', label: 'Lose Body Fat' },
+    { value: 'get_shredded', label: 'Get Shredded' },
     { value: 'muscle_gain', label: 'Gain Muscle' },
     { value: 'event_ready', label: 'Event Ready' },
     { value: 'general_health', label: 'General Health' },
@@ -71,7 +71,8 @@ export default function ProfilePage() {
       case 'muscle_gain': return 'Gain Muscle';
       case 'general_health': return 'General Health';
       case 'first_responder': return 'First Responder';
-      case 'lose_body_fat': return 'Lose Body Fat';
+      case 'get_shredded': return 'Get Shredded';
+      case 'lose_body_fat': return 'Get Shredded';
       default: return type;
     }
   }

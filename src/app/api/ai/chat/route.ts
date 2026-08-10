@@ -53,6 +53,9 @@ export async function POST(request: NextRequest) {
         return Math.max(1, diffDays + 1);
       })(),
       trainerNotes: client.notes,
+      // Phase 5 data
+      phase5Plan: client.phase5_plan ? JSON.parse(client.phase5_plan) : undefined,
+      phase5StartDate: client.phase5_start_date || undefined,
     };
 
     // Handle meal analysis request - use getCoachPrompt (same as chat!)

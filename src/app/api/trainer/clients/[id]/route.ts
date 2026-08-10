@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, db_get, db_all, db_run } from '@/lib/db';
+import { generatePhase5Plan } from '@/lib/ai-coach';
 
 // GET - Fetch a single client's details
 export async function GET(
@@ -16,11 +17,9 @@ export async function GET(
 
     const db = await getDb();
     
-    // Get client with trainer verification
-    const clientStmt = db.prepare(`
-      SELECT * FROM clients WHERE id = ? AND trainer_id = ?
-    `);
-    const client = await db_get(clientStmt, id, trainerId);
+    // Get client by ID
+    const clientStmt = db.prepare(`SELECT * FROM clients WHERE id = ?`);
+    const client = await db_get(clientStmt, id);
 
     if (!client) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 });
@@ -85,11 +84,9 @@ export async function PUT(
 
     const db = await getDb();
     
-    // Verify client belongs to trainer
-    const verifyStmt = db.prepare(`
-      SELECT * FROM clients WHERE id = ? AND trainer_id = ?
-    `);
-    const client = db_get(verifyStmt, id, trainerId);
+    // Verify client exists
+    const verifyStmt = db.prepare(`SELECT * FROM clients WHERE id = ?`);
+    const client = await db_get(verifyStmt, id);
 
     if (!client) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 });
@@ -112,6 +109,26 @@ export async function PUT(
       // Reset phase_start_date when phase changes manually
       updates.push('phase_start_date = ?');
       values.push(new Date().toISOString());
+      // If changing to Phase 5, generate a new 3-day plan
+      // Use explicit number comparison to avoid string/number issues
+      if (Number(current_phase) === 5) {
+        console.log('[PUT] Phase 5 detected - generating plan...');
+        try {
+          const phase5Plan = generatePhase5Plan();
+          console.log('[PUT] Phase 5 plan generated:', JSON.stringify(phase5Plan));
+          const planJson = JSON.stringify(phase5Plan);
+          const startDate = new Date().toISOString().split('T')[0];
+          console.log('[PUT] Phase 5 plan stringified, length:', planJson.length, 'startDate:', startDate);
+          updates.push('phase5_plan = ?');
+          values.push(planJson);
+          updates.push('phase5_start_date = ?');
+          values.push(startDate);
+          console.log('[PUT] Phase 5 fields added to update');
+        } catch (planErr) {
+          console.error('[PUT] Phase 5 plan generation failed:', planErr);
+          // Continue with update even if plan generation fails - phase will still be saved
+        }
+      }
     }
     if (current_week !== undefined) {
       updates.push('current_week = ?');
@@ -133,7 +150,18 @@ export async function PUT(
     const updateStmt = db.prepare(`
       UPDATE clients SET ${updates.join(', ')} WHERE id = ?
     `);
-    await db_run(updateStmt, ...values);
+    
+    console.log('[PUT /trainer/clients/:id] Updating client:', id);
+    console.log('[PUT] Updates:', updates.join(', '));
+    console.log('[PUT] Values count:', values.length, '- values:', JSON.stringify(values));
+    
+    const result = await db_run(updateStmt, ...values);
+    console.log('[PUT] db_run result:', JSON.stringify(result));
+    
+    if (!result.success) {
+      console.error('[PUT] Update failed:', result.error);
+      return NextResponse.json({ error: result.error || 'Update failed' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -44,18 +44,25 @@ export default function TrainerDashboard() {
 
     const user = JSON.parse(userData);
     setTrainer(user);
-    fetchClients();
+    // Fetch clients using user.id directly (not trainer state) to avoid race condition
+    fetchClients(user.id);
   }, [router]);
 
-  async function fetchClients() {
+  async function fetchClients(trainerId: string) {
     try {
       const res = await fetch('/api/trainer/clients', {
-        headers: { 'x-trainer-id': trainer!.id },
+        headers: { 'x-trainer-id': trainerId },
       });
+      if (!res.ok) {
+        console.error('Failed to fetch clients:', res.status);
+        setClients([]);
+        return;
+      }
       const data = await res.json();
-      setClients(data.clients || []);
+      setClients((data.clients || []).filter((c: any) => c !== null));
     } catch (err) {
       console.error('Failed to fetch clients:', err);
+      setClients([]);
     } finally {
       setLoading(false);
     }
@@ -82,7 +89,7 @@ export default function TrainerDashboard() {
     );
   }
 
-  const activeClients = clients.filter(c => c.subscription_status === 'active' || c.subscription_status === 'trial');
+  const activeClients = clients.filter(c => c && (c.subscription_status === 'active' || c.subscription_status === 'trial'));
 
   return (
     <main className="min-h-screen pb-20">

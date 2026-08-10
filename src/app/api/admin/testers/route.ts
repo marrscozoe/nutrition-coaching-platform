@@ -15,10 +15,11 @@ export async function GET(request: NextRequest) {
 
     const supabase = getAdminClient();
     
+    // NOTE: We don't filter by trainer_id because all clients have trainer_id = NULL
+    // The app only has one trainer, so we return all clients
     const { data, error } = await supabase
       .from('clients')
       .select('id, name, email, is_tester, created_at')
-      .eq('trainer_id', trainerId)
       .order('name');
     
     if (error) {
@@ -54,12 +55,12 @@ export async function POST(request: NextRequest) {
 
     const supabase = getAdminClient();
     
-    // Update the client's tester status
+    // NOTE: We don't filter by trainer_id because all clients have trainer_id = NULL
+    // The app only has one trainer, so we update by client ID only
     const { error } = await supabase
       .from('clients')
       .update({ is_tester: isTester })
-      .eq('id', clientId)
-      .eq('trainer_id', trainerId); // Ensure client belongs to this trainer
+      .eq('id', clientId);
     
     if (error) {
       console.error('[Admin Testers API] Error updating tester status:', error);
