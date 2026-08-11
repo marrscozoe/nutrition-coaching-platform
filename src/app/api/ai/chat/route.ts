@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     const lower = normalizedMessage.toLowerCase();
     
     // PORTION SIZES - simple response (no AI)
-    if (lower.includes('portion size')) {
+    if (lower.includes('portion size') || lower.includes('portion sizes')) {
       const protein = context.gender === 'male' ? '6oz' : '4oz';
       const starch = context.gender === 'male' ? '2 cups' : '1 cup';
       const veggies = context.gender === 'male' ? '2 cups' : '1-2 cups';
