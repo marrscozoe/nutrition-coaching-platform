@@ -138,21 +138,21 @@ export default function ClientDashboard() {
         return {
           canEat: [
             `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
-            'Fibrous vegetables: 2 cups broccoli, spinach, salad, peppers',
-            'Healthy fats: 2 tbsp olive oil or 1/2 avocado',
+            `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} broccoli, spinach, salad, peppers`,
+            `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil or 1/2 avocado`,
           ],
           cannotEat: [
             'NO starch — no bread, rice, pasta, potato, beans, corn, oatmeal, cereal',
           ],
           water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
-          exampleMeal: `${proteinOz} grilled chicken breast, 2 cups broccoli with 2 tablespoons olive oil, ${waterPerMeal} water`,
+          exampleMeal: `${proteinOz} grilled chicken breast, ${isFemale ? '1-2 cups' : '2 cups'} broccoli, ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, ${waterPerMeal} water`,
         };
       case 2:
         return {
           canEat: [
             `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
-            'Fibrous vegetables: 2 cups broccoli, spinach, salad, peppers',
-            'Healthy fats: 2 tbsp olive oil or 1/2 avocado',
+            `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} broccoli, spinach, salad, peppers`,
+            `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil or 1/2 avocado`,
             `Starch (Wed/Sat/Sun only, first 2 meals): oatmeal, rice, potato — ${isFemale ? '1 cup' : '2 cups'}`,
           ],
           cannotEat: [
@@ -160,7 +160,7 @@ export default function ClientDashboard() {
             'NO starch in dinner or snacks (first 2 meals only)',
           ],
           water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
-          exampleMeal: `3 eggs scrambled, ${isFemale ? '1' : '2'} cups oatmeal, 1 cup spinach, no additional fat, ${waterPerMeal} water`,
+          exampleMeal: `${isFemale ? '2 eggs' : '3 eggs'} scrambled, ${isFemale ? '1' : '2'} cups oatmeal, 1 cup spinach, no additional fat, ${waterPerMeal} water`,
         };
       case 3:
         return {
@@ -177,16 +177,16 @@ export default function ClientDashboard() {
         return {
           canEat: [
             `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
-            'Fibrous vegetables: 2 cups unlimited',
-            'Healthy fats: 2 tbsp olive oil or 1/2 avocado',
-            'Natural starch: rice, potato, oatmeal — every meal',
+            `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} unlimited`,
+            `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil or 1/2 avocado`,
+            `Natural starch: rice, potato, oatmeal — every meal — ${isFemale ? '1 cup' : '2 cups'}`,
           ],
           cannotEat: [
             'Limit processed starches (bread, chips, fries)',
             'If weight goes 5+ lbs over goal: back to Phase 1',
           ],
           water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
-          exampleMeal: `6oz grilled fish, 2 cups rice, 2 cups mixed vegetables, 2 tablespoons olive oil, ${waterPerMeal} water`,
+          exampleMeal: `${proteinOz} grilled fish, ${isFemale ? '1' : '2'} cups rice, ${isFemale ? '1-2 cups' : '2 cups'} mixed vegetables, ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, ${waterPerMeal} water`,
         };
       default:
         return {
