@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, db_all } from '@/lib/db';
+import { getDb, db_all, getAdminClient } from '@/lib/db';
 
 // GET - Fetch all clients for a trainer
 export async function GET(request: NextRequest) {
@@ -9,19 +9,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Trainer ID required' }, { status: 401 });
     }
 
-    const db = await getDb();
+    // Use admin client to bypass RLS (trainer API needs full access)
+    const supabase = getAdminClient();
     
-    const stmt = db.prepare(`
-      SELECT 
-        id, name, email, gender, program_type, starting_weight, current_weight,
-        goal_weight, event_date, current_phase, current_week, subscription_status,
-        waiver_signed, notes, lead_source, created_at, updated_at
-      FROM clients 
-      ORDER BY created_at DESC
-    `);
-    const clients = await db_all(stmt);
+    const { data: clients, error } = await supabase
+      .from('clients')
+      .select('id, name, email, gender, program_type, starting_weight, current_weight, goal_weight, event_date, current_phase, current_week, subscription_status, waiver_signed, notes, lead_source, created_at, updated_at')
+      .eq('trainer_id', trainerId)
+      .order('created_at', { ascending: false });
 
-    return NextResponse.json({ clients });
+    if (error) {
+      console.error('Get trainer clients error:', error);
+      return NextResponse.json({ error: 'Failed to fetch clients' }, { status: 500 });
+    }
+
+    return NextResponse.json({ clients: clients || [] });
   } catch (error) {
     console.error('Get trainer clients error:', error);
     return NextResponse.json({ error: 'Failed to fetch clients' }, { status: 500 });

@@ -15,11 +15,11 @@ export async function GET(request: NextRequest) {
 
     const supabase = getAdminClient();
     
-    // NOTE: We don't filter by trainer_id because all clients have trainer_id = NULL
-    // The app only has one trainer, so we return all clients
+    // Filter by trainer_id to only show clients belonging to this trainer
     const { data, error } = await supabase
       .from('clients')
       .select('id, name, email, is_tester, created_at')
+      .eq('trainer_id', trainerId)
       .order('name');
     
     if (error) {

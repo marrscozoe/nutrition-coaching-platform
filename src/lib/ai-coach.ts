@@ -511,17 +511,16 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
 
     return `You're in PHASE ${context.currentPhase}: ${phaseDescription}
 
-YOUR PORTIONS PER MEAL:
-• Protein: ${portions.protein} (${proteinExamples})
-• Veggies: ${portions.fibrousVegetables} (${veggieExamples})
-• Fat: ${portions.fat} (${fatExamples})
-• Water: ${context.gender === 'male' ? '128oz' : '80oz'} daily
-${context.currentPhase === 1 ? '• NO STARCH in Phase 1!' : ''}
+Portions per meal:
+Protein: ${portions.protein} (${proteinExamples})
+Veggies: ${portions.fibrousVegetables} (${veggieExamples})
+Fat: ${portions.fat} (${fatExamples})
+Water: ${context.gender === 'male' ? '128oz' : '80oz'} daily
+${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : ''}
 
-EXAMPLE MEAL:
-${mealExample}
+Example: ${mealExample}
 
-${context.eventDate ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing! 🔥` : 'Keep crushing it! 💪'}
+${context.eventDate ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
 
 Ask me anything about specific foods!`;
   }

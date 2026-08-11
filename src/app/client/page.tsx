@@ -153,7 +153,7 @@ export default function ClientDashboard() {
             `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
             'Fibrous vegetables: 2 cups broccoli, spinach, salad, peppers',
             'Healthy fats: 2 tbsp olive oil or 1/2 avocado',
-            'Starch (Wed/Sat/Sun only, first 2 meals): oatmeal, rice, potato — 1-2 cups',
+            `Starch (Wed/Sat/Sun only, first 2 meals): oatmeal, rice, potato — ${isFemale ? '1 cup' : '2 cups'}`,
           ],
           cannotEat: [
             'NO starch on Mon, Tue, Thu, Fri',
@@ -186,7 +186,7 @@ export default function ClientDashboard() {
             'If weight goes 5+ lbs over goal: back to Phase 1',
           ],
           water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
-          exampleMeal: `${proteinOz} grilled fish, 1 cup rice, 2 cups mixed vegetables, 2 tablespoons olive oil, ${waterPerMeal} water`,
+          exampleMeal: `6oz grilled fish, 2 cups rice, 2 cups mixed vegetables, 2 tablespoons olive oil, ${waterPerMeal} water`,
         };
       default:
         return {
