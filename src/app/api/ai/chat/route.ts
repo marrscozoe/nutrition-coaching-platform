@@ -144,9 +144,8 @@ export async function POST(request: NextRequest) {
         starchNote = 'Not allowed in Phase 1';
       } else if (context.currentPhase === 2) {
         starchNote = `${context.gender === 'male' ? starchMale : starchFemale} (allowed Wed/Sat/Sun only)`;
-      } else if (context.currentPhase === 3) {
-        starchNote = 'Check with your coach';
       } else {
+        // Phase 4, 5, 6 - all allow starch every meal
         starchNote = `${context.gender === 'male' ? starchMale : starchFemale} every meal`;
       }
       return NextResponse.json({
