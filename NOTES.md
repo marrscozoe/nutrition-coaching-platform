@@ -886,6 +886,32 @@ Loop: Phase 1 → Phase 2 → Phase 3 (check) → Phase 1 again OR Phase 4 → r
 - Harder to follow, but more aggressive fat loss
 - Use when client wants maximum results
 
+### Phase 6 — MUSCLE GAIN
+**Portions Per Meal:**
+- **Male:** Protein 6oz, Fibrous Veg 2 cups, Fat 3 tablespoons, Starch 3 cups
+- **Female:** Protein 4oz, Fibrous Veg 1-2 cups, Fat 2 tablespoons, Starch 2 cups
+
+**Supplements:**
+- Whey Protein: Men 40g × 2/day, Women 20g × 2/day
+- Creatine: Daily
+
+**Meal Timing:**
+- Biggest meal POST weight training (within 1 hour)
+- Starch/fruit 30 min BEFORE weight training
+
+**Weigh-in:**
+- Friday only
+- Goal: 1-2 lbs GAIN per week
+
+**Phase Transitions:**
+- NO automatic phase transitions — trainer-controlled only
+
+**Rules:**
+- Client starts at Phase 6 (not Phase 4)
+- Weight goal attained → Phase 4
+- -5 pounds from goal → back to Phase 6
+- Processed food = portion controlled (~1 meal per day max)
+
 ### Phase Progression:
 - **Phase 1:** Base phase — always start here
 - **Phase 2:** Add starch Wed/Sat/Sun — duration depends on weight loss

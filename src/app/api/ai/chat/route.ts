@@ -134,22 +134,37 @@ export async function POST(request: NextRequest) {
     
     // PORTION SIZES - simple response (no AI)
     if (lower.includes('portion size') || lower.includes('portion sizes')) {
-      const protein = context.gender === 'male' ? '6oz' : '4oz';
-      const veggies = context.gender === 'male' ? '2 cups' : '1-2 cups';
-      const fat = context.gender === 'male' ? '2 tbsp' : '1 tbsp';
-      const starchMale = '2 cups';
-      const starchFemale = '1 cup';
+      const isMale = context.gender === 'male';
+      
+      // Phase 6 has higher starch and fat
+      const isPhase6 = context.currentPhase === 6;
+      
+      const protein = isMale ? '6oz' : '4oz';
+      const veggies = isMale ? '2 cups' : '1-2 cups';
+      const fat = isPhase6 ? (isMale ? '3 tbsp' : '2 tbsp') : (isMale ? '2 tbsp' : '1 tbsp');
+      const starchMale = isPhase6 ? '3 cups' : '2 cups';
+      const starchFemale = isPhase6 ? '2 cups' : '1 cup';
+      
       let starchNote = '';
       if (context.currentPhase === 1) {
         starchNote = 'Not allowed in Phase 1';
       } else if (context.currentPhase === 2) {
-        starchNote = `${context.gender === 'male' ? starchMale : starchFemale} (allowed Wed/Sat/Sun only)`;
+        starchNote = `${isMale ? starchMale : starchFemale} (allowed Wed/Sat/Sun only)`;
       } else {
         // Phase 4, 5, 6 - all allow starch every meal
-        starchNote = `${context.gender === 'male' ? starchMale : starchFemale} every meal`;
+        starchNote = `${isMale ? starchMale : starchFemale} every meal`;
       }
+      
+      let response = `Your portions per meal:\nProtein: ${protein}\nStarch: ${starchNote}\nVegetables: ${veggies}\nHealthy fats: ${fat} or 1/2 avocado`;
+      
+      // Phase 6 specific supplements
+      if (isPhase6) {
+        const whey = isMale ? '40g × 2/day' : '20g × 2/day';
+        response += `\n\nSupplements:\nWhey protein: ${whey}\nCreatine: Daily`;
+      }
+      
       return NextResponse.json({
-        response: `Your portions per meal:\nProtein: ${protein}\nStarch: ${starchNote}\nVegetables: ${veggies}\nHealthy fats: ${fat} or 1/2 avocado`,
+        response,
         type: 'simple',
       });
     }
