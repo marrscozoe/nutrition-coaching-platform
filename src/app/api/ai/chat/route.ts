@@ -128,6 +128,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
+    // Intercept simple queries that don't need AI - return simple responses
+    const normalizedMessage = message.replace(/['\u2019]/g, "'");
+    const lower = normalizedMessage.toLowerCase();
+    
+    // PORTION SIZES - simple response (no AI)
+    if (lower.includes('portion size')) {
+      const protein = context.gender === 'male' ? '6oz' : '4oz';
+      const starch = context.gender === 'male' ? '2 cups' : '1 cup';
+      const veggies = context.gender === 'male' ? '2 cups' : '1-2 cups';
+      const fat = context.gender === 'male' ? '2 tbsp' : '1 tbsp';
+      return NextResponse.json({
+        response: `Your portions per meal:\nProtein: ${protein}\nStarch: ${starch}\nVegetables: ${veggies}\nHealthy fats: ${fat} or 1/2 avocado`,
+        type: 'simple',
+      });
+    }
+
     const coachPrompt = getCoachPrompt(context, message);
     const systemMessage: AIMessage = { role: 'system', content: coachPrompt };
     const result = await chatWithChatAI([systemMessage], message, preferredProvider);
@@ -297,6 +313,15 @@ Ask me anything about specific foods! 💪`;
       lower.includes('what can i') || lower.includes('what should i') || lower.includes('what am i')) {
     const fallback = await analyzeMealPortion(message, context);
     return fallback.advice;
+  }
+
+  // PORTION SIZES - simple response (no AI, no markdown)
+  if (lower.includes('portion size')) {
+    const protein = context.gender === 'male' ? '6oz' : '4oz';
+    const starch = context.gender === 'male' ? '2 cups' : '1 cup';
+    const veggies = context.gender === 'male' ? '2 cups' : '1-2 cups';
+    const fat = context.gender === 'male' ? '2 tbsp' : '1 tbsp';
+    return `Your portions per meal:\nProtein: ${protein}\nStarch: ${starch}\nVegetables: ${veggies}\nHealthy fats: ${fat} or 1/2 avocado`;
   }
 
   // PORTION / SIZE queries (only if NOT a phase question)
