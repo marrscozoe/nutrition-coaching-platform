@@ -135,11 +135,22 @@ export async function POST(request: NextRequest) {
     // PORTION SIZES - simple response (no AI)
     if (lower.includes('portion size') || lower.includes('portion sizes')) {
       const protein = context.gender === 'male' ? '6oz' : '4oz';
-      const starch = context.gender === 'male' ? '2 cups' : '1 cup';
       const veggies = context.gender === 'male' ? '2 cups' : '1-2 cups';
       const fat = context.gender === 'male' ? '2 tbsp' : '1 tbsp';
+      const starchMale = '2 cups';
+      const starchFemale = '1 cup';
+      let starchNote = '';
+      if (context.currentPhase === 1) {
+        starchNote = 'Not allowed in Phase 1';
+      } else if (context.currentPhase === 2) {
+        starchNote = `${context.gender === 'male' ? starchMale : starchFemale} (allowed Wed/Sat/Sun only)`;
+      } else if (context.currentPhase === 3) {
+        starchNote = 'Check with your coach';
+      } else {
+        starchNote = `${context.gender === 'male' ? starchMale : starchFemale} every meal`;
+      }
       return NextResponse.json({
-        response: `Your portions per meal:\nProtein: ${protein}\nStarch: ${starch}\nVegetables: ${veggies}\nHealthy fats: ${fat} or 1/2 avocado`,
+        response: `Your portions per meal:\nProtein: ${protein}\nStarch: ${starchNote}\nVegetables: ${veggies}\nHealthy fats: ${fat} or 1/2 avocado`,
         type: 'simple',
       });
     }
