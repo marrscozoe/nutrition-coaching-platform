@@ -160,7 +160,7 @@ export default function ClientDashboard() {
             'NO starch in dinner or snacks (first 2 meals only)',
           ],
           water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
-          exampleMeal: `3 eggs scrambled, 1 cup oatmeal, 1 cup spinach, 2 tablespoons olive oil, ${waterPerMeal} water`,
+          exampleMeal: `3 eggs scrambled, ${isFemale ? '1' : '2'} cups oatmeal, 1 cup spinach, no additional fat, ${waterPerMeal} water`,
         };
       case 3:
         return {
