@@ -491,12 +491,10 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
 
     const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - 14 days of lean protein, veggies, healthy fats only' :
                             context.currentPhase === 2 ? 'STARCH ONLY for BREAKFAST & LUNCH on Wed/Sat/Sun - dinner & snack NEVER get starch' :
-                            context.currentPhase === 3 ? 'EVALUATION CHECKPOINT - simple: at goal → Phase 4 (celebrate!) or not at goal → Phase 1 (keep working!)' :
                             context.currentPhase === 5 ? `AGGRESSIVE FAT LOSS - 3-day rotating plan${phase5PlanDesc}` :
                             'MAINTENANCE - starch every meal, weigh Fri only';
     const phaseNext = context.currentPhase === 1 ? 'Phase 2: Add starch Wed/Sat/Sun' :
-                      context.currentPhase === 2 ? 'Phase 3: Evaluation checkpoint' :
-                      context.currentPhase === 3 ? 'Phase 4 (at goal!) or Phase 1 (keep working!)' :
+                      context.currentPhase === 2 ? 'Phase 4 or back to Phase 1 (based on goal)' :
                       context.currentPhase === 5 ? 'Phase 5 rotates every 3 days! After day 3, new plan generated.' :
                       'You\'re done - maintenance!';
     
@@ -560,7 +558,7 @@ COACHING RULES:
 
 CLIENT CONTEXT:
 - Name: ${context.clientName || 'Client'}
-- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 3 = at goal? → Phase 4! Not yet? → Phase 1, Phase 4 = maintenance${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 3-day rotating plan${context.currentPhase === 5 && context.phase5Plan ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})
+- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 4 = maintenance${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 3-day rotating plan${context.currentPhase === 5 && context.phase5Plan ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})
 - Gender: ${context.gender} (${context.gender === 'male' ? 'MALE — use MALE portions only' : 'FEMALE — use FEMALE portions only'})
 - Goal: ${context.goalWeight}lbs, Started: ${context.startingWeight}lbs, Current: ${context.currentWeight}lbs
 ${context.eventDate ? `- Event in ${weeksUntilEvent} weeks` : ''}
@@ -568,7 +566,6 @@ ${context.eventDate ? `- Event in ${weeksUntilEvent} weeks` : ''}
 PHASE RULES (for YOUR reference only — give personalized advice for THIS client, not generic phase descriptions):
 - Phase 1: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, NO starch, NO dairy, NO sugar, ${context.gender === 'male' ? '128' : '80'}oz water
 - Phase 2: Same as Phase 1 + starch for BREAKFAST & LUNCH ONLY on Wed/Sat/Sun. Dinner and snack NEVER get starch in Phase 2!
-- Phase 3: EVALUATION CHECKPOINT — simple: at goal → Phase 4 (celebrate)! Not at goal → Phase 1 (keep working hard!)!
 - Phase 4: Add starch every meal, weigh Fri only
 
 CLIENT'S MESSAGE: "${message}"
@@ -793,13 +790,6 @@ export async function analyzeMealPortion(
         }
       }
     }
-  } else if (context.currentPhase === 3) {
-    // Phase 3: EVALUATION CHECKPOINT - NOT a diet phase!
-    // Phase transition happens AUTOMATICALLY based on weight:
-    //   - At goal weight → Phase 4 (celebrate!)
-    //   - Not at goal → Phase 1 (keep working!)
-    // NO food advice or warnings in Phase 3 - let the app handle the transition automatically
-    // Just pass through without any food-specific guidance
   } else if (context.currentPhase === 4) {
     // Phase 4: Maintenance - starch allowed every meal, dairy/sugar ALLOWED in controlled portions
     // If 5+ lbs over goal = back to Phase 1
@@ -1062,9 +1052,6 @@ export async function analyzeMealPortion(
         violationMessages.push(`💡 Add ${portions.fat} olive oil or ${portions.avocado} avocado. ${waterTrackingMessage}`);
       }
     }
-  } else if (context.currentPhase === 3) {
-    // Phase 3: NO food suggestions - evaluation happens automatically based on weight
-    // The app will transition to Phase 4 (at goal) or Phase 1 (not at goal)
   } else if (context.currentPhase === 5 && context.programType !== 'event_ready') {
     // Phase 5: Aggressive Fat Loss - follow the 3-day plan (NOT for Event Ready clients)
     const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
@@ -1170,8 +1157,6 @@ export function getPhaseAdvice(clientPhase: number): string {
       return 'Phase 1: No starch! Focus on lean protein, fibrous vegetables, and healthy fats.';
     case 2:
       return 'Phase 2: Add starch on Wed/Sat/Sun to first 2 meals only.';
-    case 3:
-      return 'Phase 3: Evaluation checkpoint - at goal? Celebrate → Phase 4! Not yet → Phase 1, keep going!';
     case 4:
       return 'Phase 4: Maintenance mode - add starch to every meal, weigh Fridays only.';
     case 5:

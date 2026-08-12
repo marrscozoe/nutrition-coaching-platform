@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
           if (currentPhase === 1 && programType === 'general_health' && goalWeight && weight <= goalWeight) {
             newPhase = 4;
             resetPhaseStart = true;
-          // Phase 2 → Phase 3: weight-based duration check
+          // Phase 2 → Phase 4 (goal) or Phase 1 (not at goal): weight-based duration check
           // If >2 lbs lost in Phase 2, need 14 days; otherwise 7 days
           if (currentPhase === 2) {
             const phase2StartWeight = updatedClient.phase2_start_weight;
@@ -92,17 +92,13 @@ export async function POST(request: NextRequest) {
             const weightLostInPhase2 = phase2StartWeight && currentWeight ? phase2StartWeight - currentWeight : 0;
             const phase2Duration = weightLostInPhase2 > 2 ? 14 : 7;
             if (daysInPhase >= phase2Duration) {
-              newPhase = 3;
+              if (goalWeight && weight <= goalWeight) {
+                newPhase = 4;
+              } else {
+                newPhase = 1;
+              }
               resetPhaseStart = true;
             }
-          } else if (currentPhase === 3 && goalWeight && weight <= goalWeight) {
-            // Phase 3 → Phase 4: at goal weight
-            newPhase = 4;
-            resetPhaseStart = true;
-          } else if (currentPhase === 3 && daysInPhase >= 14) {
-            // Phase 3 → Phase 1: 14+ days in Phase 3 but not at goal
-            newPhase = 1;
-            resetPhaseStart = true;
           } else if (currentPhase === 4 && goalWeight && weight > goalWeight + 5) {
             // Phase 4 → Phase 1: 5+ lbs above goal (Event Ready)
             newPhase = 1;
@@ -118,18 +114,10 @@ export async function POST(request: NextRequest) {
           }
 
           if (newPhase !== currentPhase) {
-            if (newPhase === 3) {
-              // Phase 2 → Phase 3: clear phase2_start_weight
-              await db_run(
-                `UPDATE clients SET current_phase = ?, phase_start_date = ?, phase2_start_weight = NULL, updated_at = ? WHERE id = ?`,
-                newPhase, resetPhaseStart ? now : phaseStartDate, now, clientId
-              );
-            } else {
-              await db_run(
-                `UPDATE clients SET current_phase = ?, phase_start_date = ?, updated_at = ? WHERE id = ?`,
-                newPhase, resetPhaseStart ? now : phaseStartDate, now, clientId
-              );
-            }
+            await db_run(
+              `UPDATE clients SET current_phase = ?, phase_start_date = ?, updated_at = ? WHERE id = ?`,
+              newPhase, resetPhaseStart ? now : phaseStartDate, now, clientId
+            );
           }
         }
       } catch (phaseErr) {

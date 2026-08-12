@@ -250,15 +250,6 @@ Stay focused! Keep it lean! 💪`;
 Your portion: ${starchPortion} per meal cooked
 
 Keep it clean! 💪`;
-      } else if (context.currentPhase === 3) {
-        return `Starchy carbohydrates (fresh or frozen, NO CANS):
-
-• ${STARCHY_CARBOHYDRATES.join('\n• ')}
-
-⚠️ PHASE 3 is a checkpoint - check with your coach!
-Your portion: ${starchPortion} per meal cooked
-
-Keep it lean! 💪`;
       } else {
         return `Starchy carbohydrates (fresh or frozen, NO CANS):
 
@@ -301,7 +292,6 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
     const portions = PORTION_SIZES[context.gender];
     const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - lean protein, veggies, healthy fats only' :
                             context.currentPhase === 2 ? 'Add starch (Wed, Sat, Sun) to first 2 meals' :
-                            context.currentPhase === 3 ? 'Check with coach for next steps' :
                             'Maintenance mode - add starch to every meal';
     
     const proteinExamples = context.gender === 'male' ? '6oz chicken/fish/egg/beef/pork' : '4oz chicken/fish/egg/beef/pork';

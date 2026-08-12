@@ -128,19 +128,24 @@ export async function POST(request: NextRequest) {
               .eq('id', clientId);
           }
         } else if (currentPhase === 2 && daysInPhase >= 7) {
-          // Phase 2 → Phase 3: weight-based duration
+          // Phase 2 → Phase 4 (goal) or Phase 1 (not at goal): weight-based duration
           // If >2 lbs lost in Phase 2, need 14 days; otherwise 7 days
           const { data: clientForPhase2 } = await supabase
             .from('clients')
-            .select('current_weight, phase2_start_weight')
+            .select('current_weight, phase2_start_weight, goal_weight')
             .eq('id', clientId)
             .single();
           const phase2StartWeight = clientForPhase2?.phase2_start_weight;
           const currentWeight = clientForPhase2?.current_weight;
+          const goalWeight = clientForPhase2?.goal_weight;
           const weightLostInPhase2 = phase2StartWeight && currentWeight ? phase2StartWeight - currentWeight : 0;
           const phase2Duration = weightLostInPhase2 > 2 ? 14 : 7;
           if (daysInPhase >= phase2Duration) {
-            newPhase = 3;
+            if (goalWeight && currentWeight && currentWeight <= goalWeight) {
+              newPhase = 4;
+            } else {
+              newPhase = 1;
+            }
             resetStreak = true;
           }
         }
@@ -174,29 +179,15 @@ export async function POST(request: NextRequest) {
 
         if (newPhase !== currentPhase) {
           // Advance phase and reset phase_start_date
-          if (newPhase === 3) {
-            // Phase 2 → Phase 3: clear phase2_start_weight
-            await supabase
-              .from('clients')
-              .update({
-                current_phase: newPhase,
-                phase_start_date: now,
-                good_meal_streak: resetStreak ? 0 : newStreak,
-                phase2_start_weight: null,
-                updated_at: now,
-              })
-              .eq('id', clientId);
-          } else {
-            await supabase
-              .from('clients')
-              .update({
-                current_phase: newPhase,
-                phase_start_date: now,
-                good_meal_streak: resetStreak ? 0 : newStreak,
-                updated_at: now,
-              })
-              .eq('id', clientId);
-          }
+          await supabase
+            .from('clients')
+            .update({
+              current_phase: newPhase,
+              phase_start_date: now,
+              good_meal_streak: resetStreak ? 0 : newStreak,
+              updated_at: now,
+            })
+            .eq('id', clientId);
         } else if (newStreak !== currentStreak) {
           // Just update streak
           await supabase
