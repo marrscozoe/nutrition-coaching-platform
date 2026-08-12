@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS clients (
   password_hash TEXT NOT NULL,
   name TEXT NOT NULL,
   gender TEXT DEFAULT 'male' CHECK (gender IN ('male', 'female')),
-  program_type TEXT DEFAULT 'general_health' CHECK (program_type IN ('event_ready', 'muscle_gain', 'general_health', 'first_responder')),
+  program_type TEXT DEFAULT 'general_health' CHECK (program_type IN ('event_ready', 'muscle_gain', 'general_health', 'get_shredded', 'lose_body_fat')),
   starting_weight REAL,
   current_weight REAL,
   goal_weight REAL,

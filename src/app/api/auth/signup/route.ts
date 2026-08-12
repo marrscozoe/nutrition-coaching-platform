@@ -108,6 +108,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Determine starting phase based on program type
+    const program = programType || 'general_health';
+    const startingPhase =
+      program === 'event_ready' ? 1
+      : program === 'get_shredded' ? 1
+      : program === 'general_health' ? 4
+      : program === 'muscle_gain' ? 6
+      : 1;
+
     // Create client
     const clientId = uuidv4();
     const now = new Date().toISOString();
@@ -120,13 +129,13 @@ export async function POST(request: NextRequest) {
       password_hash: passwordHash,
       name,
       gender: gender || 'male',
-      program_type: programType || 'general_health',
+      program_type: program,
       starting_weight: currentWeight || null,
       current_weight: currentWeight || null,
       goal_weight: goalWeight || null,
       goal_start_date: now,
       event_date: eventDate || null,
-      current_phase: 1,
+      current_phase: startingPhase,
       phase_start_date: now,
       current_week: 1,
       waiver_signed: waiver_accepted ? 1 : 0,

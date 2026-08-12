@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
+import { logout } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -14,6 +15,7 @@ interface ClientData {
   current_weight: number;
   goal_weight: number;
   starting_weight: number;
+  goal_start_date?: string;
   event_date?: string;
   program_type: string;
   gender: string;
@@ -34,10 +36,26 @@ export default function ClientDashboard() {
   const [recentMeals, setRecentMeals] = useState<MealLog[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Handle returning to the dashboard (e.g., after logging a meal)
+  // This catches cases where client-side navigation brings user back without pathname changing
   useEffect(() => {
-    // Check if user is logged in
-    const userData = localStorage.getItem('user');
-    const userType = localStorage.getItem('userType');
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        const userData = localStorage.getItem('client_user');
+        if (userData) {
+          const user = JSON.parse(userData);
+          fetchRecentMeals(user.id);
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    // Check if user is logged in (use separate client keys to avoid overwriting trainer session)
+    const userData = localStorage.getItem('client_user');
+    const userType = localStorage.getItem('client_user_type');
 
     if (!userData || userType !== 'client') {
       router.push('/');
@@ -75,8 +93,8 @@ export default function ClientDashboard() {
       if (res.ok) {
         const data = await res.json();
         setClient(data.user);
-        // Update localStorage with fresh data
-        localStorage.setItem('user', JSON.stringify(data.user));
+        // Update localStorage with fresh data (use client-specific key)
+        localStorage.setItem('client_user', JSON.stringify(data.user));
       }
     } catch (err) {
       console.error('Failed to fetch client data:', err);
@@ -84,7 +102,7 @@ export default function ClientDashboard() {
   }
 
   async function handleRefresh() {
-    const userData = localStorage.getItem('user');
+    const userData = localStorage.getItem('client_user');
     if (userData) {
       const user = JSON.parse(userData);
       await Promise.all([
@@ -96,11 +114,118 @@ export default function ClientDashboard() {
 
   function getPhaseAdvice(phase: number): string {
     switch (phase) {
-      case 1: return 'No starch — protein, veg, and healthy fats only';
+      case 1: return 'No starch — protein, fibrous vegetables, and healthy fats only';
       case 2: return 'Add starch Wed/Sat/Sun to first 2 meals';
       case 3: return 'Evaluation checkpoint — are you at goal?';
       case 4: return 'Maintenance — add starch to every meal';
       default: return 'Keep following your plan';
+    }
+  }
+
+  function getPhaseGuidance(phase: number, gender?: string): {
+    canEat: string[];
+    cannotEat: string[];
+    water: string;
+    exampleMeal: string;
+  } {
+    const isFemale = gender === 'female';
+    const proteinOz = isFemale ? '4oz' : '6oz';
+    const waterDaily = isFemale ? '80 oz' : '128 oz';
+    const waterPerMeal = isFemale ? '20 oz' : '32 oz';
+
+    switch (phase) {
+      case 1:
+        return {
+          canEat: [
+            `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
+            `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} broccoli, spinach, salad, peppers`,
+            `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil or 1/2 avocado`,
+          ],
+          cannotEat: [
+            'NO starch — no bread, rice, pasta, potato, beans, corn, oatmeal, cereal',
+          ],
+          water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
+          exampleMeal: `${proteinOz} grilled chicken breast, ${isFemale ? '1-2 cups' : '2 cups'} broccoli, ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, ${waterPerMeal} water`,
+        };
+      case 2:
+        return {
+          canEat: [
+            `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
+            `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} broccoli, spinach, salad, peppers`,
+            `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil or 1/2 avocado`,
+            `Starch (Wed/Sat/Sun only, first 2 meals): oatmeal, rice, potato — ${isFemale ? '1 cup' : '2 cups'}`,
+          ],
+          cannotEat: [
+            'NO starch on Mon, Tue, Thu, Fri',
+            'NO starch in dinner or snacks (first 2 meals only)',
+          ],
+          water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
+          exampleMeal: `${isFemale ? '2 eggs' : '3 eggs'} scrambled, ${isFemale ? '1' : '2'} cups oatmeal, 1 cup spinach, no additional fat, ${waterPerMeal} water`,
+        };
+      case 3:
+        return {
+          canEat: [
+            'Same as Phase 2 rules until decision made',
+          ],
+          cannotEat: [
+            'Check with your coach before adding starch',
+          ],
+          water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
+          exampleMeal: 'Check with your coach about starch and portions',
+        };
+      case 4:
+        return {
+          canEat: [
+            `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
+            `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} unlimited`,
+            `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil or 1/2 avocado`,
+            `Natural starch: rice, potato, oatmeal — every meal — ${isFemale ? '1 cup' : '2 cups'}`,
+          ],
+          cannotEat: [
+            'Limit processed starches (bread, chips, fries)',
+            'If weight goes 5+ lbs over goal: back to Phase 1',
+          ],
+          water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
+          exampleMeal: `${proteinOz} grilled fish, ${isFemale ? '1' : '2'} cups rice, ${isFemale ? '1-2 cups' : '2 cups'} mixed vegetables, ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, ${waterPerMeal} water`,
+        };
+      case 5:
+        return {
+          canEat: [
+            `Lean protein: ${isFemale ? '5oz' : '7oz'} chicken, beef, fish, eggs, turkey (extra protein for muscle sparing)`,
+            `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} broccoli, spinach, salad, peppers — unlimited`,
+            `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, 1/2 avocado`,
+          ],
+          cannotEat: [
+            'NO starch — no rice, potato, bread, pasta, oatmeal, beans, corn',
+            'NO sugar — no fruit, candy, soda, alcohol',
+            'NO processed foods — chips, fries, packaged snacks',
+          ],
+          water: `${isFemale ? '100 oz' : '160 oz'} water daily (extra hydration for aggressive fat loss)`,
+          exampleMeal: `${isFemale ? '5oz' : '7oz'} grilled chicken breast, ${isFemale ? '2 cups' : '3 cups'} mixed greens, ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, ${waterPerMeal} water`,
+        };
+      case 6:
+        return {
+          canEat: [
+            `High protein: ${isFemale ? '6oz' : '8oz'} chicken, beef, fish, eggs, turkey (more protein for muscle building)`,
+            `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} broccoli, spinach, salad, peppers`,
+            `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, 1/2 avocado, nuts`,
+            `Starch: rice, potato, oatmeal — post-workout only — ${isFemale ? '1 cup' : '2 cups'}`,
+          ],
+          cannotEat: [
+            'NO starch before workouts — only eat starch after training',
+            'Limit processed starches (bread, chips, fries)',
+            'If weight goes 5+ lbs over goal: back to Phase 4',
+          ],
+          water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
+          exampleMeal: `${isFemale ? '6oz' : '8oz'} grilled chicken, ${isFemale ? '1 cup' : '2 cups'} rice (post-workout), ${isFemale ? '1-2 cups' : '2 cups'} broccoli, ${waterPerMeal} water`,
+        };
+      default:
+        return {
+          canEat: [],
+          cannotEat: [],
+          water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
+          exampleMeal: '',
+        };
     }
   }
 
@@ -110,10 +235,25 @@ export default function ClientDashboard() {
     return weeks > 0 ? weeks : null;
   }
 
-  function handleLogout() {
-    localStorage.removeItem('user');
-    localStorage.removeItem('userType');
-    router.push('/');
+  function getCurrentWeek(startDate?: string): number {
+    // Defensive: if startDate is missing/invalid, try current_week from API first
+    if (!startDate || startDate === 'undefined' || startDate === 'null' || startDate === 'Invalid Date') {
+      // Fall back to current_week from client data if available, else default to 1
+      return (client as any)?.current_week || 1;
+    }
+    const start = new Date(startDate + 'T12:00:00');
+    // If date is still invalid, use current_week fallback
+    if (isNaN(start.getTime())) {
+      return (client as any)?.current_week || 1;
+    }
+    const now = new Date();
+    const diffMs = now.getTime() - start.getTime();
+    const diffDays = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
+    return Math.max(1, diffDays + 1);
+  }
+
+  async function handleLogout() {
+    await logout();
   }
 
   if (loading || !client) {
@@ -129,6 +269,7 @@ export default function ClientDashboard() {
     : 0;
 
   const weeksUntilEvent = getWeeksUntilEvent(client.event_date);
+  const currentWeek = getCurrentWeek(client.goal_start_date);
   const today = new Date().getDay();
   const isMonday = today === 1;
   const isFriday = today === 5;
@@ -169,10 +310,55 @@ export default function ClientDashboard() {
           </div>
           <div className="text-right">
             <p className="text-brand-cream/60 text-xs uppercase tracking-wider">Week</p>
-            <p className="text-2xl font-bold text-brand-cream">{client.current_week}</p>
+            <p className="text-2xl font-bold text-brand-cream">{currentWeek}</p>
           </div>
         </div>
         <p className="text-sm text-brand-cream/70">{getPhaseAdvice(client.current_phase)}</p>
+
+        {/* Phase Guidance - Can Eat / Cannot Eat */}
+        {(() => {
+          // Ensure phase is valid (default to phase 1 if invalid)
+          const phase = client.current_phase && client.current_phase >= 1 && client.current_phase <= 4 
+            ? client.current_phase 
+            : 1;
+          const guidance = getPhaseGuidance(phase, client.gender);
+          return (
+            <div className="mt-4 pt-4 border-t border-brand-cream/10">
+              {/* Can Eat */}
+              <div className="mb-3">
+                <p className="text-xs text-green-400 font-semibold mb-1">✓ CAN EAT:</p>
+                {guidance.canEat.map((item, i) => (
+                  <p key={i} className="text-xs text-brand-cream/70 pl-3">
+                    • {item}
+                  </p>
+                ))}
+              </div>
+              {/* Cannot Eat */}
+              <div className="mb-3">
+                <p className="text-xs text-red-400 font-semibold mb-1">✗ CANNOT EAT:</p>
+                {guidance.cannotEat.map((item, i) => (
+                  <p key={i} className="text-xs text-brand-cream/70 pl-3">
+                    • {item}
+                  </p>
+                ))}
+              </div>
+              {/* Water */}
+              <div className="mb-3">
+                <p className="text-xs text-blue-400 font-semibold mb-1">💧 WATER:</p>
+                <p className="text-xs text-brand-cream/70 pl-3">
+                  • {guidance.water}
+                </p>
+              </div>
+              {/* Example Meal */}
+              <div className="p-3 rounded-lg bg-brand-orange/10 border border-brand-orange/20">
+                <p className="text-xs text-brand-orange font-semibold mb-1">🍽️ EXAMPLE MEAL:</p>
+                <p className="text-xs text-brand-cream/70">
+                  {guidance.exampleMeal}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Weight Stats */}
@@ -210,7 +396,7 @@ export default function ClientDashboard() {
             className={`p-4 rounded-xl text-white text-center font-semibold transition-colors ${
               isMonday || isFriday
                 ? 'bg-green-500 hover:bg-green-600'
-                : 'bg-brand-charcoal/80 border border-brand-cream/20'
+                : 'bg-brand-orange hover:bg-brand-orange-dark'
             }`}
           >
             <span className="text-2xl mb-1 block">⚖️</span>

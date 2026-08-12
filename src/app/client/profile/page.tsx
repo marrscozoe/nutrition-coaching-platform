@@ -39,6 +39,7 @@ export default function ProfilePage() {
   const [selectedProgram, setSelectedProgram] = useState('general_health');
   const [showEventDateModal, setShowEventDateModal] = useState(false);
   const [editEventDate, setEditEventDate] = useState('');
+  const [showProgramInfo, setShowProgramInfo] = useState<string | null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('client_user');
@@ -65,13 +66,19 @@ export default function ProfilePage() {
     { value: 'general_health', label: 'General Health' },
   ];
 
+  const PROGRAM_DESCRIPTIONS: Record<string, string> = {
+    get_shredded: 'Intense program for serious fat loss. Structured nutrition reset for those ready to commit. Go from burning fat to peak definition.',
+    muscle_gain: 'Structured nutrition for building lean muscle. Increase portions strategically to fuel muscle growth while minimizing fat gain.',
+    event_ready: 'Perfect for weddings, reunions, beach trips, or any special event. Short-term fat loss to look your best on your big day.',
+    general_health: 'Maintenance-focused program for overall wellness. Learn to balance meals while keeping your weight stable. Great for long-term healthy habits.',
+  };
+
   function getProgramLabel(type: string): string {
     switch (type) {
       case 'event_ready': return 'Event Ready';
       case 'muscle_gain': return 'Gain Muscle';
       case 'general_health': return 'General Health';
-      case 'first_responder': return 'First Responder';
-      case 'get_shredded': return 'Get Shredded';
+case 'get_shredded': return 'Get Shredded';
       case 'lose_body_fat': return 'Get Shredded';
       default: return type;
     }
@@ -415,21 +422,38 @@ export default function ProfilePage() {
             </p>
             <div className="space-y-3">
               {PROGRAMS.map((program) => (
-                <button
-                  key={program.value}
-                  type="button"
-                  onClick={() => setSelectedProgram(program.value)}
-                  className={`w-full p-4 rounded-lg border text-left transition-colors ${
-                    selectedProgram === program.value
-                      ? 'border-brand-orange bg-brand-orange/10 text-brand-cream'
-                      : 'border-brand-cream/20 bg-brand-charcoal/60 text-brand-cream/80 hover:border-brand-cream/40'
-                  }`}
-                >
-                  <span className="font-medium">{program.label}</span>
-                  {selectedProgram === program.value && (
-                    <span className="float-right text-brand-orange">✓</span>
+                <div key={program.value} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProgram(program.value)}
+                    className={`w-full p-4 rounded-lg border text-left transition-colors ${
+                      selectedProgram === program.value
+                        ? 'border-brand-orange bg-brand-orange/10 text-brand-cream'
+                        : 'border-brand-cream/20 bg-brand-charcoal/60 text-brand-cream/80 hover:border-brand-cream/40'
+                    }`}
+                  >
+                    <span className="font-medium">{program.label}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowProgramInfo(showProgramInfo === program.value ? null : program.value);
+                      }}
+                      className="absolute right-10 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-brand-orange/20 text-brand-orange text-sm font-bold flex items-center justify-center hover:bg-brand-orange/30 active:bg-brand-orange/40 transition-colors"
+                      aria-label={`Info about ${program.label}`}
+                    >
+                      i
+                    </button>
+                    {selectedProgram === program.value && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-orange">✓</span>
+                    )}
+                  </button>
+                  {showProgramInfo === program.value && (
+                    <div className="mt-2 p-3 rounded-lg bg-brand-charcoal/90 border border-brand-orange/30 text-brand-cream/90 text-sm">
+                      {PROGRAM_DESCRIPTIONS[program.value]}
+                    </div>
                   )}
-                </button>
+                </div>
               ))}
             </div>
             {selectedProgram === 'event_ready' && !client.event_date && (

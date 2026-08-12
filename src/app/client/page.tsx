@@ -188,6 +188,37 @@ export default function ClientDashboard() {
           water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
           exampleMeal: `${proteinOz} grilled fish, ${isFemale ? '1' : '2'} cups rice, ${isFemale ? '1-2 cups' : '2 cups'} mixed vegetables, ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, ${waterPerMeal} water`,
         };
+      case 5:
+        return {
+          canEat: [
+            `Lean protein: ${isFemale ? '5oz' : '7oz'} chicken, beef, fish, eggs, turkey (extra protein for muscle sparing)`,
+            `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} broccoli, spinach, salad, peppers — unlimited`,
+            `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, 1/2 avocado`,
+          ],
+          cannotEat: [
+            'NO starch — no rice, potato, bread, pasta, oatmeal, beans, corn',
+            'NO sugar — no fruit, candy, soda, alcohol',
+            'NO processed foods — chips, fries, packaged snacks',
+          ],
+          water: `${isFemale ? '100 oz' : '160 oz'} water daily (extra hydration for aggressive fat loss)`,
+          exampleMeal: `${isFemale ? '5oz' : '7oz'} grilled chicken breast, ${isFemale ? '2 cups' : '3 cups'} mixed greens, ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, ${waterPerMeal} water`,
+        };
+      case 6:
+        return {
+          canEat: [
+            `High protein: ${isFemale ? '6oz' : '8oz'} chicken, beef, fish, eggs, turkey (more protein for muscle building)`,
+            `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} broccoli, spinach, salad, peppers`,
+            `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, 1/2 avocado, nuts`,
+            `Starch: rice, potato, oatmeal — post-workout only — ${isFemale ? '1 cup' : '2 cups'}`,
+          ],
+          cannotEat: [
+            'NO starch before workouts — only eat starch after training',
+            'Limit processed starches (bread, chips, fries)',
+            'If weight goes 5+ lbs over goal: back to Phase 4',
+          ],
+          water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
+          exampleMeal: `${isFemale ? '6oz' : '8oz'} grilled chicken, ${isFemale ? '1 cup' : '2 cups'} rice (post-workout), ${isFemale ? '1-2 cups' : '2 cups'} broccoli, ${waterPerMeal} water`,
+        };
       default:
         return {
           canEat: [],
@@ -287,7 +318,7 @@ export default function ClientDashboard() {
         {/* Phase Guidance - Can Eat / Cannot Eat */}
         {(() => {
           // Ensure phase is valid (default to phase 1 if invalid)
-          const phase = client.current_phase && client.current_phase >= 1 && client.current_phase <= 4 
+          const phase = client.current_phase && client.current_phase >= 1 && client.current_phase <= 6 
             ? client.current_phase 
             : 1;
           const guidance = getPhaseGuidance(phase, client.gender);

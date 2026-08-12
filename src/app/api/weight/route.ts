@@ -80,58 +80,78 @@ export async function POST(request: NextRequest) {
           let newPhase = currentPhase;
           let resetPhaseStart = false;
 
-          // GOAL ATTAINED - move to Phase 4 (applies to all programs except General Health which is already at 4)
-          if (goalWeight && weight <= goalWeight && currentPhase !== 4 && currentPhase !== 6) {
-            newPhase = 4;
-            resetPhaseStart = true;
+          // GOAL ATTAINED - check FIRST, before day-count (critical for get_shredded Phase 1 → Phase 4)
+          // For get_shredded/muscle_gain in Phase 1 or Phase 5/6: if at goal, go to Phase 4 regardless of days
+          if (goalWeight && currentPhase !== 4) {
+            const atGoal = (programType === 'muscle_gain')
+              ? (weight >= goalWeight)
+              : (weight <= goalWeight);
+            if (atGoal) {
+              newPhase = 4;
+              resetPhaseStart = true;
+            }
           }
-          // PHASE 1: 14 days max for ALL programs
-          else if (currentPhase === 1 && daysInPhase >= 14) {
-            // Forced transition after 14 days - even if at goal, must flow to next phase
+
+          // PHASE 1: 14 days max (except GENERAL_HEALTH which is 7 days)
+          // Only applies if NOT already moving to Phase 4 via goal check above
+          if (newPhase === currentPhase && currentPhase === 1 && daysInPhase >= 14 && programType !== 'general_health') {
             if (programType === 'event_ready') {
               newPhase = 2;
             } else if (programType === 'get_shredded') {
               newPhase = 5;
-            } else if (programType === 'general_health') {
-              newPhase = 4;
             }
             resetPhaseStart = true;
           }
           // PHASE 2: 7 days fixed (Event Ready)
-          else if (currentPhase === 2 && daysInPhase >= 7) {
+          else if (newPhase === currentPhase && currentPhase === 2 && daysInPhase >= 7) {
             newPhase = 1;
             resetPhaseStart = true;
           }
           // PHASE 5: 14 days fixed (Get Shredded)
-          else if (currentPhase === 5 && daysInPhase >= 14) {
+          // Only if NOT already moving to Phase 4 via goal check
+          else if (newPhase === currentPhase && currentPhase === 5 && daysInPhase >= 14) {
             newPhase = 1;
             resetPhaseStart = true;
           }
           // PHASE 4: 5+ lbs over goal - back to Phase 1 (NOT for muscle gain)
-          else if (currentPhase === 4 && goalWeight && weight > goalWeight + 5) {
+          else if (newPhase === currentPhase && currentPhase === 4 && goalWeight && weight > goalWeight + 5) {
             newPhase = 1;
             resetPhaseStart = true;
           }
-          // GENERAL HEALTH: Phase 1 max 7 days when triggered (not 14)
-          else if (currentPhase === 1 && programType === 'general_health' && daysInPhase >= 7) {
-            newPhase = 4;
-            resetPhaseStart = true;
-          }
-          // MUSCLE GAIN: Phase 6 → Phase 4 when goal attained
-          else if (currentPhase === 6 && goalWeight && weight >= goalWeight) {
+          // GENERAL_HEALTH: Phase 1 max 7 days (NOT 14)
+          // Only applies if not already transitioning via goal or day-count
+          if (newPhase === currentPhase && currentPhase === 1 && programType === 'general_health' && daysInPhase >= 7) {
             newPhase = 4;
             resetPhaseStart = true;
           }
           // MUSCLE GAIN: Phase 4 → Phase 6 when 5+ lbs under goal
-          else if (currentPhase === 4 && programType === 'muscle_gain' && goalWeight && weight < goalWeight - 5) {
+          else if (newPhase === currentPhase && currentPhase === 4 && programType === 'muscle_gain' && goalWeight && weight < goalWeight - 5) {
             newPhase = 6;
             resetPhaseStart = true;
           }
 
+          // Calculate current_week based on phase and days in phase
+          let newWeek = updatedClient.current_week || 1;
+          if (currentPhase === 1) {
+            newWeek = 1;
+          } else if (currentPhase === 2) {
+            newWeek = Math.min(2, Math.floor(daysInPhase / 7) + 1);
+          } else if (currentPhase === 5) {
+            newWeek = Math.min(3, Math.floor(daysInPhase / 14) + 1);
+          } else if (currentPhase === 4 || currentPhase === 6) {
+            newWeek = 4;
+          }
+
           if (newPhase !== currentPhase) {
             await db_run(
-              `UPDATE clients SET current_phase = ?, phase_start_date = ?, updated_at = ? WHERE id = ?`,
-              newPhase, resetPhaseStart ? now : phaseStartDate, now, clientId
+              `UPDATE clients SET current_phase = ?, phase_start_date = ?, current_week = ?, updated_at = ? WHERE id = ?`,
+              newPhase, resetPhaseStart ? now : phaseStartDate, newWeek, now, clientId
+            );
+          } else if (newWeek !== updatedClient.current_week) {
+            // Update week even if phase didn't change
+            await db_run(
+              `UPDATE clients SET current_week = ?, updated_at = ? WHERE id = ?`,
+              newWeek, now, clientId
             );
           }
         }
@@ -141,12 +161,19 @@ export async function POST(request: NextRequest) {
     }
 
     const startingWeight = client?.starting_weight || weight;
-    const weightLost = startingWeight - weight;
     const goalWeight = client?.goal_weight;
+    // For muscle_gain, positive = weight gained; for others, positive = weight lost
+    const isMuscleGain = client?.program_type === 'muscle_gain';
+    const weightChange = startingWeight - weight; // positive = lost, negative = gained
+    const weightLost = isMuscleGain ? -(weightChange) : weightChange;
 
     const milestones: string[] = [];
 
-    if (goalWeight && weight <= goalWeight) {
+    // Goal check: for muscle_gain, goal is HIGHER weight (weight >= goalWeight)
+    // For other programs, goal is LOWER weight (weight <= goalWeight)
+    const atGoal = isMuscleGain ? (weight >= goalWeight) : (weight <= goalWeight);
+
+    if (goalWeight && atGoal) {
       await db_run(
         `INSERT INTO milestones (id, client_id, milestone_type, achieved_at) VALUES (?, ?, 'goal', ?)`,
         uuidv4(), clientId, now

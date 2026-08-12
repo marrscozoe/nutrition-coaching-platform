@@ -138,9 +138,7 @@ export default function ClientDetailPage() {
       case 'event_ready': return 'Event Ready';
       case 'muscle_gain': return 'Muscle Gain';
       case 'general_health': return 'General Health';
-      case 'first_responder': return 'First Responder';
       case 'get_shredded': return 'Get Shredded';
-      case 'lose_body_fat': return 'Get Shredded';
       default: return type;
     }
   }
@@ -244,11 +242,20 @@ export default function ClientDetailPage() {
                 onChange={(e) => setCurrentPhase(parseInt(e.target.value))}
                 className="w-full px-3 py-2 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream focus:outline-none focus:border-brand-orange"
               >
-                {(client?.program_type === 'get_shredded' ? [1, 2, 3, 4, 5] : [1, 2, 4]).map((p) => (
-                  <option key={p} value={p}>
-                    {p === 5 ? 'Phase 5 — Aggressive Fat Loss' : `Phase ${p}`}
-                  </option>
-                ))}
+                {(() => {
+                  const phasesByProgram: Record<string, number[]> = {
+                    event_ready: [1, 2, 4],
+                    get_shredded: [1, 5, 4],
+                    general_health: [4, 1],
+                    muscle_gain: [6, 4],
+                  };
+                  const validPhases = phasesByProgram[client?.program_type || ''] || [1, 2, 4];
+                  return validPhases.map((p) => (
+                    <option key={p} value={p}>
+                      {p === 5 ? 'Phase 5 — Aggressive Fat Loss' : p === 6 ? 'Phase 6 — Muscle Gain' : `Phase ${p}`}
+                    </option>
+                  ));
+                })()}
               </select>
             </div>
             <div>
