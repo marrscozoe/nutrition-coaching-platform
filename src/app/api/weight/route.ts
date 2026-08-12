@@ -99,8 +99,16 @@ export async function POST(request: NextRequest) {
             newPhase = 1;
             resetPhaseStart = true;
           } else if (currentPhase === 4 && goalWeight && weight > goalWeight + 5) {
-            // Phase 4 → Phase 1: 5+ lbs above goal
+            // Phase 4 → Phase 1: 5+ lbs above goal (Event Ready)
             newPhase = 1;
+            resetPhaseStart = true;
+          } else if (currentPhase === 6 && goalWeight && weight >= goalWeight) {
+            // Phase 6 → Phase 4: Goal attained (Muscle Gain)
+            newPhase = 4;
+            resetPhaseStart = true;
+          } else if (currentPhase === 4 && updatedClient?.program_type === 'muscle_gain' && goalWeight && weight < goalWeight - 5) {
+            // Phase 4 → Phase 6: 5+ lbs under goal (Muscle Gain only)
+            newPhase = 6;
             resetPhaseStart = true;
           }
 
