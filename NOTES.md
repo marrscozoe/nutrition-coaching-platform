@@ -851,25 +851,16 @@ Duration: 1-2 weeks
 - 1 week if weight goes up, stays the same, or only loses 1 pound that week
 - 2 weeks if weight loss is more than 2 pounds in first week
 
-After Phase 2: evaluate at Phase 3 checkpoint
+### Phase Transitions (per program type)
 
-### Phase 3 — EVALUATION CHECKPOINT
-Are you at goal?
-- NO: Go back to Phase 1 and repeat the cycle
-- YES: Phase 4 (Maintenance)
-
-**"Goal" = whatever the client set at onboarding** (weight, body fat %, or event readiness)
-
-This is NOT a diet phase. It is a decision point.
-
-Loop: Phase 1 → Phase 2 → Phase 3 (check) → Phase 1 again OR Phase 4 → repeat until goal is attained
+See **Program Phase Flows** section below for the complete flow diagrams.
 
 ### Phase 4 — MAINTENANCE:
 - Add starch to **every meal** (same portion sizes as Phase 1)
 - **Weigh Friday only** (not Mon + Fri)
 - Client tries to eat mostly natural food
 - **If weight gains 5+ lbs above goal:** Client goes back to Phase 1
-- Less strict than Phase 1-3
+- Less strict than Phase 1-2
 - More relaxed monitoring
 - Trigger: 5+ lb weight gain = reset to Phase 1
 
@@ -882,7 +873,7 @@ Loop: Phase 1 → Phase 2 → Phase 3 (check) → Phase 1 again OR Phase 4 → r
   1. No starch
   2. Starch with first 2 meals
   3. Starch with all meals
-- Duration: 2 weeks, then evaluate (Phase 3 checkpoint)
+- Duration: 14 days fixed, then loops back to Phase 1 OR transitions to Phase 4 if goal attained
 - Harder to follow, but more aggressive fat loss
 - Use when client wants maximum results
 
@@ -912,15 +903,45 @@ Loop: Phase 1 → Phase 2 → Phase 3 (check) → Phase 1 again OR Phase 4 → r
 - -5 pounds from goal → back to Phase 6
 - Processed food = portion controlled (~1 meal per day max)
 
-### Phase Progression:
-- **Phase 1:** Base phase — always start here
-- **Phase 2:** Add starch Wed/Sat/Sun — duration depends on weight loss
-  - 1 week if: weight up / same / only -1 lb
-  - 2 weeks if: more than 2 lbs lost in first week
-- **After Phase 2:** Check — goal attained? → Phase 4. Not yet? → Phase 1
-- **Loop:** Phase 1 → Phase 2 → check → (Phase 1 or Phase 4) → repeat until goal
-- **Success:** Follow protocol + 14 days → advance to next phase
-- **Messed up:** Extend current phase 7 more days
+---
+
+## Program Phase Flows
+
+### ANTI-GAMING RULE
+**Phase 1 MAXES at 14 days for ALL programs.**
+Even if client changes goal weight to be "at goal", they still flow to next phase after 14 days.
+
+---
+
+### EVENT READY (event_ready)
+- Phase 1 (14d max) → Phase 2 (7d fixed) → Phase 1 (loop) OR Phase 4 (goal)
+- If weight > goal + 5 while in Phase 4: back to Phase 1
+- **Loop:** Phase 1 → Phase 2 → (Phase 1 or Phase 4) → repeat until goal attained
+
+---
+
+### GET SHREDDED (get_shredded)
+- Phase 1 (14d max) → Phase 5 (14d fixed) → Phase 1 (loop) OR Phase 4 (goal)
+- If weight > goal + 5 while in Phase 4: back to Phase 1
+- **Loop:** Phase 1 → Phase 5 → (Phase 1 or Phase 4) → repeat until goal attained
+
+---
+
+### GENERAL HEALTH (general_health)
+- Starts at Phase 4 (maintenance)
+- If weight > goal + 5: Phase 1 (7d max) → Phase 4
+- If goal attained: Phase 4
+- **Trigger back to Phase 1:** weight > goal + 5 lbs only
+- **NO automatic goal attainment → Phase 4 transition** (already at Phase 4)
+
+---
+
+### MUSCLE GAIN (muscle_gain)
+- Starts at Phase 6
+- Goal attained → Phase 4
+- Weight < goal - 5 while in Phase 4: back to Phase 6
+- **NO +5 rule** — only goal-based transitions
+- **Loop:** Phase 6 ↔ Phase 4 based on weight vs goal
 
 ---
 
