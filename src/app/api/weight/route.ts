@@ -78,7 +78,12 @@ export async function POST(request: NextRequest) {
 
           let newPhase = currentPhase;
           let resetPhaseStart = false;
+          const programType = updatedClient.program_type;
 
+          // General Health: Phase 1 → Phase 4 when goal attained
+          if (currentPhase === 1 && programType === 'general_health' && goalWeight && weight <= goalWeight) {
+            newPhase = 4;
+            resetPhaseStart = true;
           // Phase 2 → Phase 3: weight-based duration check
           // If >2 lbs lost in Phase 2, need 14 days; otherwise 7 days
           if (currentPhase === 2) {
