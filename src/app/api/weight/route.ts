@@ -75,40 +75,55 @@ export async function POST(request: NextRequest) {
           const goalWeight = updatedClient.goal_weight;
           const phaseStartDate = updatedClient.phase_start_date || now;
           const daysInPhase = Math.floor((new Date(now).getTime() - new Date(phaseStartDate).getTime()) / (1000 * 60 * 60 * 24));
+          const programType = updatedClient.program_type;
 
           let newPhase = currentPhase;
           let resetPhaseStart = false;
-          const programType = updatedClient.program_type;
 
-          // General Health: Phase 1 → Phase 4 when goal attained
-          if (currentPhase === 1 && programType === 'general_health' && goalWeight && weight <= goalWeight) {
+          // GOAL ATTAINED - move to Phase 4 (applies to all programs except General Health which is already at 4)
+          if (goalWeight && weight <= goalWeight && currentPhase !== 4 && currentPhase !== 6) {
             newPhase = 4;
             resetPhaseStart = true;
-          // Phase 2 → Phase 4 (goal) or Phase 1 (not at goal): weight-based duration check
-          // If >2 lbs lost in Phase 2, need 14 days; otherwise 7 days
-          if (currentPhase === 2) {
-            const phase2StartWeight = updatedClient.phase2_start_weight;
-            const currentWeight = updatedClient.current_weight;
-            const weightLostInPhase2 = phase2StartWeight && currentWeight ? phase2StartWeight - currentWeight : 0;
-            const phase2Duration = weightLostInPhase2 > 2 ? 14 : 7;
-            if (daysInPhase >= phase2Duration) {
-              if (goalWeight && weight <= goalWeight) {
-                newPhase = 4;
-              } else {
-                newPhase = 1;
-              }
-              resetPhaseStart = true;
+          }
+          // PHASE 1: 14 days max for ALL programs
+          else if (currentPhase === 1 && daysInPhase >= 14) {
+            // Forced transition after 14 days - even if at goal, must flow to next phase
+            if (programType === 'event_ready') {
+              newPhase = 2;
+            } else if (programType === 'get_shredded') {
+              newPhase = 5;
+            } else if (programType === 'general_health') {
+              newPhase = 4;
             }
-          } else if (currentPhase === 4 && goalWeight && weight > goalWeight + 5) {
-            // Phase 4 → Phase 1: 5+ lbs above goal (Event Ready)
+            resetPhaseStart = true;
+          }
+          // PHASE 2: 7 days fixed (Event Ready)
+          else if (currentPhase === 2 && daysInPhase >= 7) {
             newPhase = 1;
             resetPhaseStart = true;
-          } else if (currentPhase === 6 && goalWeight && weight >= goalWeight) {
-            // Phase 6 → Phase 4: Goal attained (Muscle Gain)
+          }
+          // PHASE 5: 14 days fixed (Get Shredded)
+          else if (currentPhase === 5 && daysInPhase >= 14) {
+            newPhase = 1;
+            resetPhaseStart = true;
+          }
+          // PHASE 4: 5+ lbs over goal - back to Phase 1 (NOT for muscle gain)
+          else if (currentPhase === 4 && goalWeight && weight > goalWeight + 5) {
+            newPhase = 1;
+            resetPhaseStart = true;
+          }
+          // GENERAL HEALTH: Phase 1 max 7 days when triggered (not 14)
+          else if (currentPhase === 1 && programType === 'general_health' && daysInPhase >= 7) {
             newPhase = 4;
             resetPhaseStart = true;
-          } else if (currentPhase === 4 && updatedClient?.program_type === 'muscle_gain' && goalWeight && weight < goalWeight - 5) {
-            // Phase 4 → Phase 6: 5+ lbs under goal (Muscle Gain only)
+          }
+          // MUSCLE GAIN: Phase 6 → Phase 4 when goal attained
+          else if (currentPhase === 6 && goalWeight && weight >= goalWeight) {
+            newPhase = 4;
+            resetPhaseStart = true;
+          }
+          // MUSCLE GAIN: Phase 4 → Phase 6 when 5+ lbs under goal
+          else if (currentPhase === 4 && programType === 'muscle_gain' && goalWeight && weight < goalWeight - 5) {
             newPhase = 6;
             resetPhaseStart = true;
           }
