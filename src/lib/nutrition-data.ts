@@ -365,7 +365,7 @@ export function getPhaseGuidance(
         canEat: [
           `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
           `Fibrous vegetables: ${vegPortion} broccoli, spinach, peppers, salad`,
-          `Healthy fats: ${fatPortion} olive oil, 1/2 avocado, nuts`,
+          `Healthy fats: ${fatPortion} olive oil, ${p.avocado} avocado, nuts`,
           `Starch: rice, potato, oatmeal — every meal — ${starchPortion}`,
           `Whey protein: ${isMale ? '40g' : '20g'} 1st thing AM & last thing PM (NOT with meals)`,
           `Creatine: Daily`,
