@@ -441,16 +441,20 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
       ? '6oz grilled salmon, 2 cups broccoli with olive oil, 1/2 avocado' 
       : '4oz grilled chicken, 1.5 cups spinach with olive oil, few almonds';
 
+    // IMPORTANT: The fat source must ALWAYS be specified. Never let AI drop "olive oil" from the response.
+    // Using explicit wording to prevent AI from rephrasing it away.
     return `You're in PHASE ${context.currentPhase}: ${phaseDescription}
 
 Portions per meal:
 Protein: ${portions.protein} (${proteinExamples})
 Veggies: ${portions.fibrousVegetables} (${veggieExamples})
-Fat: ${portions.fat} of olive oil (or avocado, almonds)
+Fat: ${portions.fat} of olive oil — this MUST be included (avocado or almonds are OK alternatives)
 Water: ${context.gender === 'male' ? '32oz' : '20oz'} per meal
 ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : ''}
 
 Example: ${mealExample}
+
+⚠️ IMPORTANT: When you respond about portions, ALWAYS specify "of olive oil" after the fat amount. Example: "3 tablespoons of olive oil" — NEVER just say "3 tablespoons" without the fat source!
 
 ${context.eventDate ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
 
