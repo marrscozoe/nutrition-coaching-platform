@@ -141,9 +141,17 @@ export function generateMealSuggestion(
   const veggiesChoice = pickRandom(FIBROUS_VEGETABLES, 2).join(' & ');
   const fatOptions = HEALTHY_FATS.filter(f => !f.includes('MCT'));
   const fatChoice = pickRandom(fatOptions, 1)[0];
-  const fatDisplay = fatChoice.includes('Avocado')
-    ? (isMale ? '1/2 avocado' : '1/4 avocado')
-    : portions.fat;
+  // Scale avocado amount proportionally based on fat portion
+  // 1/2 avocado = 2 tbsp fat equivalent (base reference)
+  // Phase 6 male: 3 tbsp fat → 3/4 avocado; Phase 6 female: 2 tbsp fat → 1/2 avocado
+  const getAvocadoDisplay = () => {
+    const tbspMatch = portions.fat.match(/(\d+)/);
+    const tbspCount = tbspMatch ? parseInt(tbspMatch[1]) : 2;
+    if (tbspCount <= 2) return isMale ? '1/2 avocado' : '1/4 avocado';
+    if (tbspCount === 3) return '3/4 avocado';
+    return '1/2 avocado';
+  };
+  const fatDisplay = fatChoice.includes('Avocado') ? getAvocadoDisplay() : portions.fat;
 
   let starchDisplay: string | undefined;
   let starchAllowed = false;
@@ -159,7 +167,11 @@ export function generateMealSuggestion(
   }
 
   if (starchAllowed) {
-    const starchChoice = pickRandom(STARCHY_CARBOHYDRATES, 1)[0];
+    // Phase 2: only oatmeal, rice, potato (per PHASES.md)
+    const limitedStarchList = currentPhase === 2
+      ? ['Oatmeal', 'Brown rice', 'Red potatoes', 'Sweet potatoes']
+      : STARCHY_CARBOHYDRATES;
+    const starchChoice = pickRandom(limitedStarchList, 1)[0];
     starchDisplay = `${portions.starch} ${starchChoice.toLowerCase()}`;
   }
 
@@ -353,7 +365,7 @@ export function getPhaseGuidance(
           `Whey protein: ${isMale ? '40g × 2/day' : '20g × 2/day'}`,
           'Creatine: Daily',
         ],
-        exampleMeal: `${proteinOz} grilled chicken, ${starchPortion} rice, ${vegPortion} broccoli, ${fatPortion} olive oil, ${isMale ? '40g' : '20g'} whey post-workout, water`,
+        exampleMeal: `${proteinOz} grilled chicken, ${starchPortion} rice, ${vegPortion} broccoli, ${fatPortion} olive oil, ${isMale ? '40g' : '20g'} whey post-workout, water`,  // fatPortion is 3 tbsp (M) / 2 tbsp (F) from getPortions
       };
     default:
       return {
