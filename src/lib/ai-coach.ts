@@ -446,7 +446,7 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
 Portions per meal:
 Protein: ${portions.protein} (${proteinExamples})
 Veggies: ${portions.fibrousVegetables} (${veggieExamples})
-Fat: ${portions.fat} (${fatExamples})
+Fat: ${portions.fat} olive oil (or ${fatExamples})
 Water: ${context.gender === 'male' ? '32oz' : '20oz'} per meal
 ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : ''}
 
