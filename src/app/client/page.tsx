@@ -191,7 +191,7 @@ export default function ClientDashboard() {
       case 5:
         return {
           canEat: [
-            `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey (extra protein for muscle sparing)`,
+            `Lean protein: ${isFemale ? '5oz' : '7oz'} chicken, beef, fish, eggs, turkey (extra protein for muscle sparing)`,
             `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} broccoli, spinach, salad, peppers — unlimited`,
             `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, 1/2 avocado`,
           ],
@@ -201,23 +201,24 @@ export default function ClientDashboard() {
             'NO processed foods — chips, fries, packaged snacks',
           ],
           water: `${isFemale ? '100 oz' : '160 oz'} water daily (extra hydration for aggressive fat loss)`,
-          exampleMeal: `${proteinOz} grilled chicken breast, ${isFemale ? '2 cups' : '3 cups'} mixed greens, ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, ${waterPerMeal} water`,
+          exampleMeal: `${isFemale ? '5oz' : '7oz'} grilled chicken breast, 2 cups mixed greens, ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, water`,
         };
       case 6:
         return {
           canEat: [
             `High protein: ${proteinOz} chicken, beef, fish, eggs, turkey (more protein for muscle building)`,
             `Fibrous vegetables: ${isFemale ? '1-2 cups' : '2 cups'} broccoli, spinach, salad, peppers`,
-            `Healthy fats: ${isFemale ? '1 tbsp' : '2 tbsp'} olive oil, 1/2 avocado, nuts`,
-            `Starch: rice, potato, oatmeal — post-workout only — ${isFemale ? '1 cup' : '2 cups'}`,
+            `Healthy fats: ${isFemale ? '2 tbsp' : '3 tbsp'} olive oil, 1/2 avocado, nuts (higher fat for muscle gain)`,
+            `Starch: rice, potato, oatmeal — every meal — ${isFemale ? '2 cups' : '3 cups'}`,
+            `Whey protein: 20g × 2/day (F) / 40g × 2/day (M)`,
+            `Creatine: Daily`,
           ],
           cannotEat: [
-            'NO starch before workouts — only eat starch after training',
             'Limit processed starches (bread, chips, fries)',
             'If weight goes 5+ lbs over goal: back to Phase 4',
           ],
           water: `${waterDaily} water daily (${waterPerMeal} per meal)`,
-          exampleMeal: `${proteinOz} grilled chicken, ${isFemale ? '1 cup' : '2 cups'} rice (post-workout), ${isFemale ? '1-2 cups' : '2 cups'} broccoli, ${waterPerMeal} water`,
+          exampleMeal: `${proteinOz} grilled chicken, ${isFemale ? '2 cups' : '3 cups'} rice, 2 cups broccoli, ${isFemale ? '2 tbsp' : '3 tbsp'} olive oil, 40g whey post-workout, ${waterPerMeal} water`,
         };
       default:
         return {
