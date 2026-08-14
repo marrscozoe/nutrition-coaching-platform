@@ -68,40 +68,76 @@ export function getPortions(gender: 'male' | 'female', phase: number): PortionSi
   // Defensive: ensure gender is valid
   const safeGender: 'male' | 'female' = (gender === 'male' || gender === 'female') ? gender : 'male';
   
-  const base = {
-    male: {
+  // Phase-specific portions from PHASES.md source of truth
+  if (phase === 5) {
+    // Phase 5: Aggressive Fat Loss - higher protein, higher water
+    if (gender === 'male') {
+      return {
+        protein: '7 ounces',
+        fibrousVegetables: '2 cups',
+        fat: '2 tablespoons',
+        avocado: '1/2',
+        starch: 'NONE',
+        water: '160 oz daily (40 oz per meal)',
+      };
+    } else {
+      return {
+        protein: '5 ounces',
+        fibrousVegetables: '1-2 cups',
+        fat: '1 tablespoon',
+        avocado: '1/4',
+        starch: 'NONE',
+        water: '100 oz daily (25 oz per meal)',
+      };
+    }
+  }
+
+  if (phase === 6) {
+    // Phase 6: Muscle Gain - higher fat and starch
+    if (gender === 'male') {
+      return {
+        protein: '6 ounces',
+        fibrousVegetables: '2 cups',
+        fat: '3 tablespoons',
+        avocado: '3/4',
+        starch: '3 cups',
+        water: '128 oz daily (32 oz per meal)',
+      };
+    } else {
+      return {
+        protein: '4 ounces',
+        fibrousVegetables: '1-2 cups',
+        fat: '2 tablespoons',
+        avocado: '1/2',
+        starch: '2 cups',
+        water: '80 oz daily (20 oz per meal)',
+      };
+    }
+  }
+
+  // Phase 1, 2, 4: base portions
+  // Phase 1: NO starch
+  // Phase 2: starch on Wed/Sat/Sun B/L only
+  // Phase 4: starch every meal
+  if (gender === 'male') {
+    return {
       protein: '6 ounces',
       fibrousVegetables: '2 cups',
       fat: '2 tablespoons',
       avocado: '1/2',
       starch: '2 cups',
       water: '128 oz daily (32 oz per meal)',
-    },
-    female: {
+    };
+  } else {
+    return {
       protein: '4 ounces',
       fibrousVegetables: '1-2 cups',
       fat: '1 tablespoon',
       avocado: '1/4',
       starch: '1 cup',
       water: '80 oz daily (20 oz per meal)',
-    },
-  };
-
-  const b = base[safeGender];
-
-  // Phase 6 has higher fat and starch
-  if (phase === 6) {
-    return {
-      protein: b.protein,
-      fibrousVegetables: b.fibrousVegetables,
-      fat: gender === 'male' ? '3 tablespoons' : '2 tablespoons',
-      avocado: b.avocado,
-      starch: gender === 'male' ? '3 cups' : '2 cups',
-      water: b.water,
     };
   }
-
-  return b;
 }
 
 // ============================================
