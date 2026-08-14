@@ -447,7 +447,7 @@ Portions per meal:
 Protein: ${portions.protein} (${proteinExamples})
 Veggies: ${portions.fibrousVegetables} (${veggieExamples})
 Fat: ${portions.fat} (${fatExamples})
-Water: ${context.gender === 'male' ? '128oz' : '80oz'} daily
+Water: ${context.gender === 'male' ? '32oz' : '20oz'} per meal
 ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : ''}
 
 Example: ${mealExample}
