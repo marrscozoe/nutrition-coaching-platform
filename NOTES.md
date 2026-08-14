@@ -764,58 +764,54 @@ Clients ask situational questions. System responds with appropriate phase recomm
 **This prevents bad advice based on miscategorized foods.**
 
 ### PROTEINS (Lean, Natural Sources)
-**All food should be NATURAL when dieting!**
+**All food should be NATURAL when dieting! Fresh or frozen, NO CANS**
 
-### PROTEINS (Lean, Natural Sources)
-- **Protein at EVERY meal** (3-4 meals per day)
-- Lean red meat — eat at least 2x per week (not limited to 2x — at LEAST 2x)
 - Chicken breast
-- Turkey breast
-- Pork loin
-- Whole eggs and egg whites
-- White fish
-- Tuna, salmon, other fish
-- Greek yogurt (plain only)
-- **Maintenance:** Dairy is OK (cheeses, milk)
+- White fish, Tuna, Salmon, Redfish
+- Whole eggs, Egg whites
+- Lean beef, Lean pork, Turkey breast
+- Shrimp
+- Plain non-fat Greek yogurt
+- Tilapia, Cod, Halibut, Trout, Catfish, Scallops, Crab, Lobster
+- Bison, Venison, Elk, Ostrich
+- Egg beaters, Liquid eggs
+- Protein powder, Whey protein
+- Bacon (nitrate-free, twice per week)
+- **NO cheese or dairy while dieting**
 
 ### FIBROUS VEGETABLES
-**Hardy/starchy vegetables as base:**
-- Asparagus
-- Broccoli
-- Green beans
-- Cauliflower
-- Onions
-- Mushrooms
-- Peppers
-- Carrots
-- Tomatoes (lightly used)
+**Fresh or frozen, NO CANS**
 
-**Mix in or use as side:**
-- Spinach
-- Kale
-- Dark lettuce
-- Leafy greens
+- Broccoli, Spinach, Asparagus, Zucchini
+- Green peppers, Bell peppers, Red peppers, Yellow peppers
+- Green lettuce (sparingly)
+- Mushrooms, Green beans, Cauliflower
+- Tomatoes, Cucumbers, Celery, Cabbage, Onions
+- Kale, Bok choy, Radishes, Turnips, Beets, Jicama
+- Artichoke, Brussels sprouts, Eggplant
+- Anaheim peppers, Poblano peppers, Jalapeño peppers, Serrano peppers
+- Celery root, Fennel, Leeks, Water chestnuts, Bean sprouts, Alfalfa sprouts
 
 ### STARCHY CARBOHYDRATES
-- Sweet potatoes
-- New potatoes / Red potatoes
-- Any type of beans
-- Legumes
-- Black eyed peas
-- Peas
-- Corn
-- Rice
-- Oatmeal
+**Fresh or frozen, NO CANS**
+
+- Red potatoes, New potatoes, Sweet potatoes, Yukon Gold, Russet, Fingerling, Purple
+- Brown rice, Wild rice, Jasmine rice, Basmati rice
+- Oatmeal, Steel cut oats
+- Barley, Bulgur, Buckwheat, Millet, Spelt
+- Peas, Corn, Beans, Legumes
+- Lentils, Cannellini beans, Navy beans, Lima beans, Butter beans
+- Berries, Cantaloupe, Black Eyed Peas, Grapefruit
+- Plantain, Parsnips, Acorn squash, Delicata squash
 
 ### HEALTHY FATS
-- Extra virgin olive oil
-- Coconut oil
-- Safflower oil
-- Avocado (1/4-1/2 per serving)
-- Heavy cream
-- Kerrygold butter
-- Mixed nuts
-- Egg yolks
+
+- Avocado (1/2 male, 1/4 female)
+- Olive oil
+- Almonds, Walnuts, Mixed nuts
+- Kerrygold gold butter
+- Safflower oil, Coconut oil
+- MCT oil (in coffee)
 
 ---
 

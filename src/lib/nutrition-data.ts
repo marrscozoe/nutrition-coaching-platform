@@ -11,14 +11,14 @@ export const LEAN_PROTEINS = [
   'Tilapia', 'Cod', 'Halibut', 'Trout', 'Catfish', 'Scallops', 'Crab', 'Lobster',
   'Bison', 'Venison', 'Elk', 'Ostrich',
   'Egg beaters', 'Liquid eggs',
-  'Protein powder (not vegetable protein powder)',
+  'Protein powder',
   'Whey protein',
   'Bacon (nitrate-free, twice per week)',
 ];
 // NO cheese or dairy while dieting
 
 export const STARCHY_CARBOHYDRATES = [
-  'Red potatoes', 'New potatoes', 'Sweet potatoes', 'Yukon Gold', 'Russet', 'Fingerling', 'Purple potatoes',
+  'Red potatoes', 'New potatoes', 'Sweet potatoes', 'Yukon Gold', 'Russet', 'Fingerling', 'Purple',
   'Brown rice', 'Wild rice', 'Jasmine rice', 'Basmati rice',
   'Oatmeal', 'Steel cut oats',
   'Barley', 'Bulgur', 'Buckwheat', 'Millet', 'Spelt',
@@ -31,7 +31,7 @@ export const STARCHY_CARBOHYDRATES = [
 
 export const FIBROUS_VEGETABLES = [
   'Broccoli', 'Spinach', 'Asparagus', 'Zucchini',
-  'Green peppers', 'Bell peppers', 'Red peppers', 'Yellow peppers',
+  'Peppers',
   'Green lettuce (sparingly)',
   'Mushrooms', 'Green beans', 'Cauliflower',
   'Tomatoes', 'Cucumbers', 'Celery', 'Cabbage', 'Onions',
