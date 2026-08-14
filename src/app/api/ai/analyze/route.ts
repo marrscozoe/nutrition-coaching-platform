@@ -7,6 +7,9 @@ import {
   analyzeImageWithPhotoAI,
   chatWithChatAI,
   AIMessage,
+  getTomorrowStarchMessage,
+  getTomorrowPhase,
+  Phase5Day,
 } from '@/lib/ai-coach';
 import { initializeCorrectionsCache } from '@/lib/food-corrections-cache';
 import { existsSync, unlinkSync, mkdirSync } from 'fs';
@@ -86,6 +89,8 @@ export async function POST(request: NextRequest) {
       weekNumber, 
       trainerNotes,
       mealType,
+      phase5Plan, // 14-day Phase 5 plan array
+      phase5StartDate, // YYYY-MM-DD when Phase 5 started
     } = body;
     
     // NOTE: Photo deletion is ALWAYS enforced server-side.
@@ -112,6 +117,8 @@ export async function POST(request: NextRequest) {
         weekNumber: weekNumber || 1,
         trainerNotes,
         mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
+        phase5Plan: phase5Plan as Phase5Day[] | undefined,
+        phase5StartDate,
       };
     } else {
       // Try to get from Redis
@@ -151,9 +158,28 @@ export async function POST(request: NextRequest) {
           weekNumber: weekNumber || 1,
           trainerNotes,
           mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
+          phase5Plan: phase5Plan as Phase5Day[] | undefined,
+          phase5StartDate,
         };
       }
     }
+
+    // Helper to get tomorrow's starch message (for after dinner)
+    const getAfterDinnerMessage = (): string => {
+      if (mealType !== 'dinner') return '';
+      
+      const tomorrowPhase = context.currentPhase === 5 
+        ? getTomorrowPhase(context.phase5Plan || [], context.phase5StartDate || '')
+        : (context.currentPhase as 1 | 2 | 4 | 6 | null);
+      
+      const isPhase5 = context.currentPhase === 5;
+      return getTomorrowStarchMessage(
+        tomorrowPhase as 1 | 2 | 4 | 6 | null,
+        isPhase5,
+        context.phase5Plan,
+        context.phase5StartDate
+      );
+    };
 
     // If photo provided, analyze with AI using fallback chain
     if (photoBase64) {
@@ -169,9 +195,13 @@ export async function POST(request: NextRequest) {
       if (visionResult.error && !visionResult.text) {
         // All providers failed - fallback to rule-based analysis
         const analysis = await analyzeMealPortion(foodDescription || 'Unknown meal', context, mealType);
+        const afterDinnerMsg = getAfterDinnerMessage();
+        const portionAdvice = afterDinnerMsg 
+          ? `${analysis.advice}\n\n${afterDinnerMsg}` 
+          : analysis.advice;
         return NextResponse.json({
           analysis: visionResult.error,
-          portionAdvice: analysis.advice,
+          portionAdvice,
           onPhase: analysis.onPhase,
           corrections: analysis.corrections,
           aiError: visionResult.error,
@@ -206,10 +236,15 @@ export async function POST(request: NextRequest) {
       
       // Get rule-based corrections for onPhase status
       const ruleBasedAnalysis = await analyzeMealPortion(visionResult.text, context, mealType);
+      const afterDinnerMsg = getAfterDinnerMessage();
+      let portionAdvice = chatResult.text || ruleBasedAnalysis.advice;
+      if (afterDinnerMsg) {
+        portionAdvice = `${portionAdvice}\n\n${afterDinnerMsg}`;
+      }
       
       return NextResponse.json({
         analysis: visionResult.text, // Vision AI's food identification
-        portionAdvice: chatResult.text || ruleBasedAnalysis.advice, // Chat AI's advice, fallback to rule-based
+        portionAdvice, // Chat AI's advice, fallback to rule-based
         onPhase: ruleBasedAnalysis.onPhase,
         corrections: ruleBasedAnalysis.corrections,
         provider: visionResult.provider,
@@ -226,9 +261,14 @@ export async function POST(request: NextRequest) {
     if (aiResult.text) {
       // AI succeeded - use AI response plus rule-based corrections for onPhase status
       const analysis = await analyzeMealPortion(foodDescription || '', context, mealType);
+      const afterDinnerMsg = getAfterDinnerMessage();
+      let portionAdvice = aiResult.text;
+      if (afterDinnerMsg) {
+        portionAdvice = `${portionAdvice}\n\n${afterDinnerMsg}`;
+      }
       return NextResponse.json({
         analysis: aiResult.text,
-        portionAdvice: aiResult.text,
+        portionAdvice,
         onPhase: analysis.onPhase,
         corrections: analysis.corrections,
         provider: aiResult.provider || 'ai',
@@ -237,9 +277,13 @@ export async function POST(request: NextRequest) {
 
     // AI failed - fallback to rule-based
     const analysis = await analyzeMealPortion(foodDescription || '', context, mealType);
+    const afterDinnerMsg = getAfterDinnerMessage();
+    const portionAdvice = afterDinnerMsg 
+      ? `${analysis.advice}\n\n${afterDinnerMsg}` 
+      : analysis.advice;
     return NextResponse.json({
-      analysis: analysis.advice,
-      portionAdvice: analysis.advice,
+      analysis: portionAdvice,
+      portionAdvice,
       onPhase: analysis.onPhase,
       corrections: analysis.corrections,
       provider: 'rule-based',

@@ -222,6 +222,121 @@ export default function LogMealPage() {
     }
   }
 
+  async function handleLogFood() {
+    if (!foodDescription && !photoBase64) {
+      setToast({ message: 'Please enter a food description or take a photo', type: 'error' });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // Step 1: Call analyze endpoint to get AI coaching advice
+      const analyzeRes = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-id': client!.id,
+        },
+        body: JSON.stringify({
+          foodDescription,
+          photoBase64,
+          mealDate: selectedDate,
+          gender: client?.gender,
+          currentPhase: client?.current_phase,
+          goalWeight: client?.goal_weight,
+          currentWeight: client?.current_weight,
+          startingWeight: client?.starting_weight,
+          programType: client?.program_type,
+          eventDate: client?.event_date,
+          weekNumber: client?.current_week,
+          trainerNotes: client?.notes,
+        }),
+      });
+
+      let analysisResult = null;
+      let portionAdvice = null;
+      let onPhase = true;
+      let messedUp = false;
+
+      if (analyzeRes.ok) {
+        const analyzeData = await analyzeRes.json();
+        analysisResult = analyzeData.analysis;
+        portionAdvice = analyzeData.portionAdvice;
+        onPhase = analyzeData.onPhase !== false;
+        messedUp = analyzeData.onPhase === false;
+      }
+
+      // Step 2: Save meal to database
+      const saveRes = await fetch('/api/meals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-id': client!.id,
+        },
+        body: JSON.stringify({
+          mealType,
+          mealDate: selectedDate,
+          foodDescription: foodDescription || 'Photo logged',
+          photoUrl: photoPreview,
+          analyzedText: analysisResult,
+          portionAdvice,
+          onPhase,
+          messedUp,
+        }),
+      });
+
+      const saveData = await saveRes.json();
+
+      if (!saveRes.ok) {
+        setToast({ message: saveData.error || 'Failed to log meal. Please try again.', type: 'error' });
+        return;
+      }
+
+      // Step 3: Prepare meal data for chat display
+      const mealPayload = {
+        id: saveData.mealId || `meal_${Date.now()}`,
+        mealType,
+        mealDate: selectedDate,
+        foodDescription: foodDescription || 'Photo logged',
+        photoUrl: photoPreview,
+        analyzedText: analysisResult,
+        portionAdvice,
+        onPhase,
+        messedUp,
+      };
+
+      // Store pending meal data in sessionStorage for chat page to display
+      sessionStorage.setItem('pending_meal_data', JSON.stringify(mealPayload));
+
+      // Clear form
+      setFoodDescription('');
+      setPhotoPreview(null);
+      setPhotoBase64(null);
+      setAnalysisResult(null);
+      setPortionAdvice(null);
+      setOnPhase(true);
+      setMessedUp(false);
+
+      // Show success and redirect to chat
+      setToast({ 
+        message: messedUp 
+          ? "Logged! Get back on track next meal! 💪" 
+          : "Great job logging! Keep it up! 👊", 
+        type: 'success' 
+      });
+      
+      // Small delay to let toast show before navigation
+      setTimeout(() => {
+        router.push('/client/chat');
+      }, 800);
+    } catch (err) {
+      console.error('Log food failed:', err);
+      setToast({ message: 'Network error. Please check your connection and try again.', type: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleSubmit() {
     if (!foodDescription && !photoPreview) {
       setToast({ message: 'Please enter a food description or take a photo', type: 'error' });
@@ -425,10 +540,10 @@ export default function LogMealPage() {
                   const day = String(target.getDate()).padStart(2, '0');
                   setSelectedDate(`${y}-${m}-${day}`);
                 }}
-                className={`py-2 rounded-lg text-xs font-semibold transition-colors ${
+                className={`py-2 rounded-lg text-xs font-semibold transition-colors ring-1 ${
                   selectedDayIndex === index
-                    ? 'bg-brand-orange text-white'
-                    : 'bg-brand-charcoal/80 text-brand-cream/60 hover:bg-brand-charcoal'
+                    ? 'bg-brand-orange text-white ring-brand-orange'
+                    : 'bg-brand-charcoal/80 text-brand-cream/60 hover:bg-brand-charcoal ring-transparent'
                 }`}
               >
                 {day}
@@ -503,91 +618,15 @@ export default function LogMealPage() {
           )}
         </div>
 
-        {/* Analyze Button */}
-        {(foodDescription || photoBase64) && !analysisResult && (
+        {/* Log Food Button - Simplified single step */}
+        {(foodDescription || photoBase64) && (
           <button
             type="button"
-            onClick={handleAnalyze}
+            onClick={handleLogFood}
             disabled={submitting}
             className="w-full py-4 rounded-xl bg-brand-orange text-white font-semibold hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
           >
-            {submitting ? 'Analyzing...' : '🔍 Get Portion Advice'}
-          </button>
-        )}
-
-        {/* Analysis Result */}
-        {analysisResult && (
-          <div className={`p-4 rounded-xl border ${
-            messedUp
-              ? 'bg-red-500/10 border-red-500/30'
-              : onPhase
-              ? 'bg-green-500/10 border-green-500/30'
-              : 'bg-brand-charcoal/80 border-brand-cream/10'
-          }`}>
-            <p className="text-sm text-brand-cream/80 mb-2">Coach says:</p>
-            <p className="text-brand-cream whitespace-pre-wrap">{analysisResult}</p>
-            
-            {portionAdvice && portionAdvice !== analysisResult && (
-              <div className="mt-3 pt-3 border-t border-brand-cream/10">
-                <p className="text-sm text-brand-cream/80 mb-1">Portion advice:</p>
-                <p className="text-brand-cream">{portionAdvice}</p>
-              </div>
-            )}
-
-            {!messedUp && !showMessedUpConfirm && (
-              <button
-                type="button"
-                onClick={() => setShowMessedUpConfirm(true)}
-                className="mt-3 text-sm text-red-400 hover:underline"
-              >
-                I messed up on this meal
-              </button>
-            )}
-
-            {showMessedUpConfirm && (
-              <div className="mt-3 p-3 bg-red-500/20 rounded-lg">
-                <p className="text-sm text-red-300 mb-2">Mark this as off-phase?</p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleMessedUpConfirm}
-                    className="flex-1 py-2 rounded-lg bg-red-500 text-white text-sm font-medium"
-                  >
-                    Yes, I messed up
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowMessedUpConfirm(false)}
-                    className="flex-1 py-2 rounded-lg bg-brand-charcoal/80 text-brand-cream text-sm font-medium"
-                  >
-                    No, on track
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* Report AI Mistake Button - Only visible to Allen + testers */}
-            {canSeeCorrection && (
-              <button
-                type="button"
-                onClick={handleOpenCorrectionDialog}
-                className="mt-3 text-sm text-brand-orange hover:underline"
-              >
-                🤖 Report AI Mistake
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Submit Button */}
-        {analysisResult && (
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="w-full py-4 rounded-xl bg-brand-orange text-white font-semibold hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
-          >
-            {submitting ? 'Logging...' : '✓ Log Meal'}
+            {submitting ? 'Logging...' : '🍽️ Log Food'}
           </button>
         )}
 
@@ -599,6 +638,12 @@ export default function LogMealPage() {
               ? 'No starch! Focus on lean protein, fibrous vegetables, and healthy fats.'
               : client.current_phase === 2
               ? 'Add starch on Wed/Sat/Sun to first 2 meals only.'
+              : client.current_phase === 4
+              ? 'Maintenance mode! Add starch to every meal. If you go 5+ lbs over goal, you will move back to Phase 1.'
+              : client.current_phase === 5
+              ? 'Rotating 14-day plan! Alternate between strict (no starch) and re-feed (add starch) days. Check your plan for daily details.'
+              : client.current_phase === 6
+              ? 'Muscle gain phase! Higher carbs and fats. Take whey protein post-workout and creatine daily. If you hit your goal weight, you will move to Phase 4.'
               : 'Keep following your plan and stay consistent!'}
           </p>
         </div>

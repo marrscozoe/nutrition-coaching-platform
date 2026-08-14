@@ -407,8 +407,8 @@ export default function ChatPage() {
       </header>
 
       {/* Quick Actions */}
-      <div className="px-4 py-2 pr-12 flex gap-2 overflow-x-auto bg-brand-charcoal/60 fixed top-[100px] left-0 right-0 z-40">
-        {['What can I eat?', 'Portion sizes?', 'Phase 1 tips?', 'Motivate me!'].map((q) => (
+      <div className="px-4 py-2 pr-12 flex gap-2 overflow-x-auto bg-brand-charcoal/60 fixed top-[calc(64px+env(safe-area-inset-top))] left-0 right-0 z-40 scrollbar-hide">
+        {['What can I eat?', 'Portion sizes?', 'Tips?', 'Motivate me!'].map((q) => (
           <button
             key={q}
             onClick={() => {
@@ -420,6 +420,8 @@ export default function ChatPage() {
             {q}
           </button>
         ))}
+        {/* Gradient fade scroll indicator */}
+        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-brand-charcoal/60 to-transparent pointer-events-none" />
       </div>
 
       {/* Messages */}

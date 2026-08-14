@@ -23,6 +23,7 @@ function OnboardingContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showProgramInfo, setShowProgramInfo] = useState<string | null>(null);
 
   // Form data
   const [name, setName] = useState(nameParam);
@@ -33,6 +34,20 @@ function OnboardingContent() {
   const [eventDate, setEventDate] = useState('');
   const [leadSource, setLeadSource] = useState('');
   const [waiverAccepted, setWaiverAccepted] = useState(false);
+
+  const PROGRAMS = [
+    { value: 'event_ready', label: '🎯 Event Ready' },
+    { value: 'get_shredded', label: '🔥 Get Shredded' },
+    { value: 'muscle_gain', label: '💪 Muscle Gain' },
+    { value: 'general_health', label: '🏥 General Health' },
+  ];
+
+  const PROGRAM_DESCRIPTIONS: Record<string, string> = {
+    get_shredded: 'Intense program for serious fat loss. Structured nutrition reset for those ready to commit. Go from burning fat to peak definition.',
+    muscle_gain: 'Structured nutrition for building lean muscle. Increase portions strategically to fuel muscle growth while minimizing fat gain.',
+    event_ready: 'Perfect for weddings, reunions, beach trips, or any special event. Short-term fat loss to look your best on your big day.',
+    general_health: 'Maintenance-focused program for overall wellness. Learn to balance meals while keeping your weight stable. Great for long-term healthy habits.',
+  };
 
   async function handleSignup() {
     if (!token) {
@@ -113,7 +128,11 @@ function OnboardingContent() {
           <div className={`h-2 flex-1 rounded ${step >= 2 ? 'bg-brand-orange' : 'bg-brand-cream/20'}`} />
           <div className={`h-2 flex-1 rounded ${step >= 3 ? 'bg-brand-orange' : 'bg-brand-cream/20'}`} />
         </div>
-        <p className="text-xs text-brand-cream/50 mt-2">Step {step} of 3</p>
+        <div className="flex justify-between mt-2">
+          <p className="text-xs text-brand-cream/50">1. Liability Waiver</p>
+          <p className="text-xs text-brand-cream/50">2. Your Info</p>
+          <p className="text-xs text-brand-cream/50">3. Review</p>
+        </div>
       </div>
 
       <div className="px-4 space-y-6">
@@ -207,23 +226,25 @@ function OnboardingContent() {
                 <button
                   type="button"
                   onClick={() => setGender('male')}
-                  className={`py-3 rounded-lg font-medium transition-colors ${
+                  className={`py-3 rounded-lg font-medium transition-colors relative ${
                     gender === 'male'
                       ? 'bg-brand-orange text-white'
                       : 'bg-brand-charcoal/80 text-brand-cream/60'
                   }`}
                 >
+                  {gender === 'male' && <span className="absolute right-3 top-1/2 -translate-y-1/2">✓</span>}
                   Male
                 </button>
                 <button
                   type="button"
                   onClick={() => setGender('female')}
-                  className={`py-3 rounded-lg font-medium transition-colors ${
+                  className={`py-3 rounded-lg font-medium transition-colors relative ${
                     gender === 'female'
                       ? 'bg-brand-orange text-white'
                       : 'bg-brand-charcoal/80 text-brand-cream/60'
                   }`}
                 >
+                  {gender === 'female' && <span className="absolute right-3 top-1/2 -translate-y-1/2">✓</span>}
                   Female
                 </button>
               </div>
@@ -231,16 +252,42 @@ function OnboardingContent() {
 
             <div>
               <label className="block text-sm text-brand-cream/80 mb-2">Program Type</label>
-              <select
-                value={programType}
-                onChange={(e) => setProgramType(e.target.value as 'event_ready' | 'get_shredded' | 'muscle_gain' | 'general_health')}
-                className="w-full px-4 py-3 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream focus:outline-none focus:border-brand-orange"
-              >
-                <option value="event_ready">🎯 Event Ready</option>
-                <option value="get_shredded">🔥 Get Shredded</option>
-                <option value="muscle_gain">💪 Muscle Gain</option>
-                <option value="general_health">🏥 General Health</option>
-              </select>
+              <div className="space-y-2">
+                {PROGRAMS.map((program) => (
+                  <div key={program.value} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setProgramType(program.value as any)}
+                      className={`w-full p-3 rounded-lg border text-left transition-colors ${
+                        programType === program.value
+                          ? 'border-brand-orange bg-brand-orange/10 text-brand-cream'
+                          : 'border-brand-cream/20 bg-brand-charcoal/60 text-brand-cream/80 hover:border-brand-cream/40'
+                      }`}
+                    >
+                      <span className="font-medium">{program.label}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowProgramInfo(showProgramInfo === program.value ? null : program.value);
+                        }}
+                        className="absolute right-10 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-brand-orange/20 text-brand-orange text-xs font-bold flex items-center justify-center hover:bg-brand-orange/30 active:bg-brand-orange/40 transition-colors cursor-pointer"
+                        aria-label={`Info about ${program.label}`}
+                      >
+                        i
+                      </button>
+                      {programType === program.value && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-orange">✓</span>
+                      )}
+                    </button>
+                    {showProgramInfo === program.value && (
+                      <div className="mt-1 p-2 rounded bg-brand-dark/50 border border-brand-orange/20 text-xs text-brand-cream/90">
+                        {PROGRAM_DESCRIPTIONS[program.value]}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -314,11 +361,11 @@ function OnboardingContent() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-brand-cream/60">Gender</span>
-                  <span className="text-brand-cream font-medium capitalize">{gender}</span>
+                  <span className="text-brand-cream font-medium">{gender === 'male' ? 'Male' : 'Female'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-brand-cream/60">Program</span>
-                  <span className="text-brand-cream font-medium capitalize">{programType.replace('_', ' ')}</span>
+                  <span className="text-brand-cream font-medium">{programType === 'event_ready' ? 'Event Ready' : programType === 'get_shredded' ? 'Get Shredded' : programType === 'muscle_gain' ? 'Muscle Gain' : 'General Health'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-brand-cream/60">Current Weight</span>

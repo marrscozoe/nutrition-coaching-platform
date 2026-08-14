@@ -125,6 +125,7 @@ export async function POST(request: NextRequest) {
     // Get client's trainer_id and name
     const client = await db_get('SELECT trainer_id, name FROM clients WHERE id = ?', clientId) as any;
 
+    // Save bug report to feedback table
     await db_run(
       `INSERT INTO feedback (id, client_id, trainer_id, message, status, created_at)
        VALUES (?, ?, ?, ?, 'pending', ?)`,
@@ -161,6 +162,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'pending';
 
+    // Fetch bug reports from feedback table
     const feedback = await db_all(
       `SELECT f.*, c.name as client_name
        FROM feedback f

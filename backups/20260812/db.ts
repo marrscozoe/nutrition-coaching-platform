@@ -214,9 +214,7 @@ export async function db_run(sql: string | PreparedStatement, ...params: any[]):
       console.log('[db_run] INSERT into table:', table);
       console.log('[db_run] INSERT obj:', JSON.stringify(obj));
       
-      // Use admin client for INSERT to bypass RLS
-      const insertClient = supabaseAdmin ?? getSupabaseClient();
-      const { error } = await insertClient.from(table).insert(obj);
+      const { error } = await getSupabaseClient().from(table).insert(obj);
       if (error) {
         console.error('[db_run] INSERT error:', error);
         console.error('[db_run] INSERT error details:', JSON.stringify(error));

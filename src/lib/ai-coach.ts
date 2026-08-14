@@ -4,6 +4,9 @@
 // Import corrections cache (server-only)
 import { initializeCorrectionsCache, getCorrection, getAllCorrections, isCacheLoaded } from './food-corrections-cache';
 
+// Import centralized nutrition data
+import { getPortions, isSnackAllowed, getWaterReminder } from './nutrition-data';
+
 // Initialize corrections cache on module load (server-only)
 if (typeof process !== 'undefined' && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   initializeCorrectionsCache().catch(console.error);
@@ -278,201 +281,124 @@ export interface CoachContext {
 
 export interface Phase5Day {
   day: number;
-  rule: 'no_starch' | 'starch_2meals' | 'starch_all';
+  phase: 1 | 2 | 4; // Full phase rules (P1, P2, or P4)
   label: string;
 }
 
-// Generate a random 3-day Phase 5 plan
+// Phase 5: 14-day plan with 3-day blocks
+// Each 3-day block randomly assigned to P1, P2, or P4 FULL rules
 export function generatePhase5Plan(): Phase5Day[] {
-  const options: Array<{ rule: Phase5Day['rule']; label: string }> = [
-    { rule: 'no_starch', label: 'No starch — lean protein, veggies, healthy fats only' },
-    { rule: 'starch_2meals', label: 'Starch allowed at breakfast & lunch only' },
-    { rule: 'starch_all', label: 'Starch allowed at every meal' },
-  ];
+  const phases: Array<1 | 2 | 4> = [1, 2, 4];
+  const phaseLabels: Record<1 | 2 | 4, string> = {
+    1: 'No starch — lean protein, veggies, healthy fats only',
+    2: 'Starch allowed at breakfast & lunch only',
+    4: 'Starch allowed at every meal',
+  };
   
-  // Pick 3 random options (can repeat)
+  // Generate 14-day plan with 3-day blocks
+  // Days 1-3, 4-6, 7-9, 10-12 = 4 full blocks of 3 days
+  // Days 13-14 = final partial block (2 days)
   const plan: Phase5Day[] = [];
-  for (let i = 1; i <= 3; i++) {
-    const randomIdx = Math.floor(Math.random() * options.length);
-    plan.push({ day: i, ...options[randomIdx] });
+  let dayNum = 1;
+  
+  // 4 complete 3-day blocks (days 1-12)
+  for (let block = 1; block <= 4; block++) {
+    // Pick random phase for this block
+    const randomPhase = phases[Math.floor(Math.random() * phases.length)];
+    const label = phaseLabels[randomPhase];
+    
+    // Each block is 3 days
+    for (let i = 0; i < 3; i++) {
+      plan.push({ day: dayNum++, phase: randomPhase, label });
+    }
   }
+  
+  // Final 2-day block (days 13-14)
+  const finalPhase = phases[Math.floor(Math.random() * phases.length)];
+  plan.push({ day: 13, phase: finalPhase, label: phaseLabels[finalPhase] });
+  plan.push({ day: 14, phase: finalPhase, label: phaseLabels[finalPhase] });
+  
   return plan;
 }
 
-// Get current day of Phase 5 plan (1, 2, or 3)
+// Get current day of Phase 5 plan (1-14)
 export function getPhase5DayNumber(phase5StartDate: string): number {
   if (!phase5StartDate) return 1;
   const start = new Date(phase5StartDate + 'T12:00:00');
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-  // Day 1 = start date, Day 2 = start + 1, Day 3 = start + 2
-  // After day 3 (diffDays >= 3), it will be a new plan
-  return Math.min(3, Math.max(1, diffDays + 1));
+  // Day 1 = start date
+  return Math.min(14, Math.max(1, diffDays + 1));
 }
 
-// Check if Phase 5 plan needs regeneration (after day 3)
+// Check if Phase 5 plan needs regeneration (after 14 days)
 export function isPhase5PlanExpired(phase5StartDate: string): boolean {
   if (!phase5StartDate) return true;
   const start = new Date(phase5StartDate + 'T12:00:00');
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-  return diffDays >= 3; // Needs new plan after 3 days
+  return diffDays >= 14; // Needs new plan after 14 days
 }
 
-export const PORTION_SIZES = {
-  male: {
-    protein: '6 ounces',
-    fibrousVegetables: '2 cups',
-    fat: '2 tablespoons',
-    avocado: '1/2',
-    starch: '2 cups',
-  },
-  female: {
-    protein: '4 ounces',
-    fibrousVegetables: '1-2 cups',
-    fat: '1 tablespoon',
-    avocado: '1/4',
-    starch: '1 cup',
-  },
-};
+// Get tomorrow's phase for Phase 5
+export function getTomorrowPhase(
+  phase5Plan: Phase5Day[],
+  phase5StartDate: string
+): 1 | 2 | 4 | null {
+  if (!phase5Plan || phase5Plan.length === 0) return null;
+  
+  const currentDay = getPhase5DayNumber(phase5StartDate);
+  const tomorrowDay = Math.min(14, currentDay + 1);
+  
+  const tomorrowEntry = phase5Plan.find(d => d.day === tomorrowDay);
+  return tomorrowEntry?.phase || null;
+}
 
-// Allen's approved natural starchy carbohydrates (fresh or frozen, NO CANS)
-export const STARCHY_CARBOHYDRATES = [
-  // Original
-  'Red potatoes',
-  'New potatoes',
-  'Sweet potatoes',
-  'Brown rice',
-  'Oatmeal',
-  'Barley',
-  'Peas',
-  'Corn',
-  'Beans',
-  'Legumes',
-  'Berries',
-  'Cantaloupe',
-  'Black Eyed Peas',
-  'Grapefruit',
-  // Added whole grains
-  'Bulgur',
-  'Steel cut oats',
-  'Wild rice',
-  'Buckwheat',
-  'Millet',
-  'Spelt',
-  // Added potatoes
-  'Yukon Gold potatoes',
-  'Russet potatoes',
-  'Fingerling potatoes',
-  'Purple potatoes',
-  // Added legumes
-  'Lentils',
-  'Cannellini beans',
-  'Navy beans',
-  'Lima beans',
-  'Butter beans',
-  // Added starchy vegetables
-  'Plantain',
-  'Parsnips',
-  'Acorn squash',
-  'Delicata squash',
-  // Added rice
-  'Jasmine rice',
-  'Basmati rice',
-];
+// Get simple starch message for tomorrow (NO phase names, NO jargon)
+export function getTomorrowStarchMessage(
+  tomorrowPhase: 1 | 2 | 4 | 6 | null,
+  isPhase5: boolean = false,
+  phase5Plan?: Phase5Day[],
+  phase5StartDate?: string
+): string {
+  // For Phase 5, look up tomorrow's actual phase from the plan
+  if (isPhase5 && phase5Plan && phase5StartDate) {
+    const actualTomorrowPhase = getTomorrowPhase(phase5Plan, phase5StartDate);
+    if (actualTomorrowPhase) {
+      tomorrowPhase = actualTomorrowPhase;
+    }
+  }
+  
+  if (tomorrowPhase === 1) {
+    return 'Tomorrow: no starches';
+  }
+  if (tomorrowPhase === 2) {
+    return 'Tomorrow: add starches to breakfast and lunch. No starch at dinner or snacks.';
+  }
+  if (tomorrowPhase === 4 || tomorrowPhase === 6) {
+    return tomorrowPhase === 6 
+      ? 'Tomorrow: add starches every meal. Remember your whey and creatine.'
+      : 'Tomorrow: add starches every meal';
+  }
+  return '';
+}
 
-// Allen's approved lean proteins (fresh or frozen, NO CANS)
-export const LEAN_PROTEINS = [
-  'Chicken breast',
-  'White fish',
-  'Tuna',
-  'Salmon',
-  'Redfish',
-  'Whole eggs',
-  'Egg whites',
-  'Lean beef',
-  'Lean pork',
-  'Turkey breast',
-  'Shrimp',
-  'Plain non-fat Greek yogurt',
-  // Added
-  'Tilapia',
-  'Cod',
-  'Halibut',
-  'Trout',
-  'Catfish',
-  'Scallops',
-  'Crab',
-  'Lobster',
-  'Bison',
-  'Venison',
-  'Elk',
-  'Ostrich',
-  'Egg beaters',
-  'Liquid eggs',
-  'Protein powder',
-  'Whey protein',
-  'Bacon (nitrate-free, twice per week)',
-];
+// Get current phase's starch rule description
+export function getPhase5CurrentRule(phase5Plan: Phase5Day[], phase5StartDate: string): string {
+  if (!phase5Plan || phase5Plan.length === 0) return '';
+  
+  const currentDay = getPhase5DayNumber(phase5StartDate);
+  const currentEntry = phase5Plan.find(d => d.day === currentDay);
+  return currentEntry?.label || '';
+}
 
-// No cheese or dairy while dieting
-
-// Allen's approved healthy fats
-export const HEALTHY_FATS = [
-  'Avocado (1/2 male, 1/4 female)',
-  'Olive oil',
-  'Almonds',
-  'Walnuts',
-  'Mixed nuts',
-  'Kerrygold gold butter',
-  'Safflower oil',
-  'Coconut oil',
-  'MCT oil (in coffee)',
-];
-
-// Allen's approved fibrous vegetables (fresh or frozen, NO CANS)
-export const FIBROUS_VEGETABLES = [
-  'Broccoli',
-  'Spinach',
-  'Asparagus',
-  'Zucchini',
-  'Green peppers',
-  'Green lettuce (sparingly)',
-  'Mushrooms',
-  'Green beans',
-  'Cauliflower',
-  'Tomatoes',
-  'Cucumbers',
-  'Celery',
-  'Cabbage',
-  'Onions',
-  // Added
-  'Kale',
-  'Bok choy',
-  'Radishes',
-  'Turnips',
-  'Beets',
-  'Jicama',
-  'Artichoke',
-  'Brussels sprouts',
-  'Eggplant',
-  'Bell peppers',
-  'Red peppers',
-  'Yellow peppers',
-  'Anaheim peppers',
-  'Poblano peppers',
-  'Jalapeño peppers',
-  'Serrano peppers',
-  'Celery root',
-  'Fennel',
-  'Leeks',
-  'Water chestnuts',
-  'Bean sprouts',
-  'Alfalfa sprouts',
-];
+// Food categories (LEAN_PROTEINS, STARCHY_CARBOHYDRATES, HEALTHY_FATS, FIBROUS_VEGETABLES)
+// and PORTION_SIZES have been moved to @/lib/nutrition-data.ts
+// Re-export them here for backward compatibility:
+export { LEAN_PROTEINS, STARCHY_CARBOHYDRATES, HEALTHY_FATS, FIBROUS_VEGETABLES } from './nutrition-data';
 
 export function getCoachPrompt(context: CoachContext, message: string): string {
-  const portions = PORTION_SIZES[context.gender];
+  const portions = getPortions(context.gender, context.currentPhase);
   const weeksUntilEvent = context.eventDate 
     ? Math.ceil((new Date(context.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000))
     : null;
@@ -486,16 +412,16 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
     if (context.currentPhase === 5 && context.phase5Plan && context.phase5Plan.length > 0) {
       const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
       const todayRule = context.phase5Plan.find(d => d.day === dayNum);
-      phase5PlanDesc = `\n• You're on DAY ${dayNum} of your Phase 5 plan: ${todayRule?.label || 'Unknown'}`;
+      phase5PlanDesc = `\n• You're on DAY ${dayNum} of your 14-day plan: ${todayRule?.label || 'Unknown'}`;
     }
 
     const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - 14 days of lean protein, veggies, healthy fats only' :
                             context.currentPhase === 2 ? 'STARCH ONLY for BREAKFAST & LUNCH on Wed/Sat/Sun - dinner & snack NEVER get starch' :
-                            context.currentPhase === 5 ? `AGGRESSIVE FAT LOSS - 3-day rotating plan${phase5PlanDesc}` :
+                            context.currentPhase === 5 ? `AGGRESSIVE FAT LOSS - 14-day rotating plan with 3-day blocks${phase5PlanDesc}` :
                             'MAINTENANCE - starch every meal, weigh Fri only';
     const phaseNext = context.currentPhase === 1 ? 'Phase 2: Add starch Wed/Sat/Sun' :
                       context.currentPhase === 2 ? 'Phase 4 or back to Phase 1 (based on goal)' :
-                      context.currentPhase === 5 ? 'Phase 5 rotates every 3 days! After day 3, new plan generated.' :
+                      context.currentPhase === 5 ? 'Phase 5 runs 14 days, then transition to maintenance.' :
                       'You\'re done - maintenance!';
     
     const proteinExamples = context.gender === 'male' 
@@ -558,7 +484,7 @@ COACHING RULES:
 
 CLIENT CONTEXT:
 - Name: ${context.clientName || 'Client'}
-- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 4 = maintenance${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 3-day rotating plan${context.currentPhase === 5 && context.phase5Plan ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})
+- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 4 = maintenance${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 14-day rotating plan (3-day blocks)${context.currentPhase === 5 && context.phase5Plan ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})
 - Gender: ${context.gender} (${context.gender === 'male' ? 'MALE — use MALE portions only' : 'FEMALE — use FEMALE portions only'})
 - Goal: ${context.goalWeight}lbs, Started: ${context.startingWeight}lbs, Current: ${context.currentWeight}lbs
 ${context.eventDate ? `- Event in ${weeksUntilEvent} weeks` : ''}
@@ -567,6 +493,7 @@ PHASE RULES (for YOUR reference only — give personalized advice for THIS clien
 - Phase 1: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, NO starch, NO dairy, NO sugar, ${context.gender === 'male' ? '128' : '80'}oz water
 - Phase 2: Same as Phase 1 + starch for BREAKFAST & LUNCH ONLY on Wed/Sat/Sun. Dinner and snack NEVER get starch in Phase 2!
 - Phase 4: Add starch every meal, weigh Fri only
+- Phase 5: 14-day plan with 3-day blocks rotating through strict/strict/lenient rules. Same portions as other phases.
 
 CLIENT'S MESSAGE: "${message}"
 
@@ -623,17 +550,48 @@ Give coaching feedback now:`;
 }
 
 export async function analyzeMealPortion(
-  foodDescription: string,
+  foodDescription: string | undefined | null,
   context: CoachContext,
   mealType?: string
 ): Promise<{ advice: string; onPhase: boolean; corrections: string[] }> {
+  // Defensive: ensure foodDescription is a valid non-empty string
+  if (!foodDescription || typeof foodDescription !== 'string' || foodDescription.trim().length === 0) {
+    return {
+      advice: 'Please describe what you are eating so I can give you portion advice.',
+      onPhase: false,
+      corrections: [],
+    };
+  }
+  
   // Ensure corrections cache is loaded before doing any correction lookups
   await ensureCacheLoaded();
-  const portions = PORTION_SIZES[context.gender];
+  const portions = getPortions(context.gender, context.currentPhase);
   const violationMessages: string[] = [];
   let onPhase = true;
+  const isSnack = mealType === 'snack';
   
   const foodLower = foodDescription.toLowerCase();
+  
+  // SNACK LOGIC: If it's a snack, skip food-group requirements but check if allowed
+  if (isSnack) {
+    // Check if snack is allowed for this phase
+    if (!isSnackAllowed(foodDescription, context.currentPhase)) {
+      const disallowedMsg = `⚠️ ${foodDescription} is not allowed in Phase ${context.currentPhase}!`;
+      const waterReminder = getWaterReminder(context.gender);
+      return {
+        advice: `${disallowedMsg} ${waterReminder}`,
+        onPhase: false,
+        corrections: [disallowedMsg, waterReminder],
+      };
+    }
+    // Snack is allowed - just add water reminder and return success
+    const waterReminder = getWaterReminder(context.gender);
+    return {
+      advice: `Looks good! ${waterReminder}`,
+      onPhase: true,
+      corrections: [waterReminder],
+    };
+  }
   
   // Comprehensive starch keywords list
   const starchKeywords = [
@@ -850,47 +808,50 @@ export async function analyzeMealPortion(
       violationMessages.push(`💡 Phase 4 - Starch allowed every meal. Keep portions in check: ${portions.protein} protein, ${portions.fibrousVegetables} veg. Natural starches preferred over processed.`);
     }
   } else if (context.currentPhase === 5 && context.programType !== 'event_ready') {
-    // Phase 5: Aggressive Fat Loss - 3-day rotating plan (NOT for Event Ready clients)
+    // Phase 5: Aggressive Fat Loss - 14-day plan with 3-day blocks of P1, P2, or P4 rules
     // Determine which day of the plan we're on
     const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
     const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
-    const rule = currentDayRule?.rule || 'no_starch';
+    const rulePhase = currentDayRule?.phase || 1; // Default to P1 rules (no starch)
     
-    // Phase 5 still has dairy and sugar restrictions (same as Phase 1)
-    if (dairyFound) {
-      violationMessages.push(`⚠️ Phase 5 - NO dairy! Skip the ${dairyFound} completely.`);
-      onPhase = false;
-    }
-    if (sugarFound) {
-      violationMessages.push(`⚠️ Phase 5 - NO sugar! Skip the ${sugarFound} completely.`);
-      onPhase = false;
-    }
+    // Phase 5 uses FULL phase rules from P1, P2, or P4 based on the plan
+    // Apply the appropriate phase's rules
     
-    // Apply the appropriate starch rule for today
-    if (starchFound) {
-      if (rule === 'no_starch') {
-        // Day 1 or whichever day is no_starch
-        violationMessages.push(`⚠️ Phase 5 Day ${dayNum} - NO starch! Skip the ${starchFound} completely.`);
+    // Dairy and sugar restrictions depend on the assigned phase
+    if (rulePhase === 1 || rulePhase === 2) {
+      // P1 and P2: no dairy, no sugar
+      if (dairyFound) {
+        violationMessages.push(`⚠️ Phase 5 Day ${dayNum} (strict phase) - NO dairy! Skip the ${dairyFound} completely.`);
         onPhase = false;
-      } else if (rule === 'starch_2meals') {
-        // Starch allowed at breakfast & lunch only
+      }
+      if (sugarFound) {
+        violationMessages.push(`⚠️ Phase 5 Day ${dayNum} (strict phase) - NO sugar! Skip the ${sugarFound} completely.`);
+        onPhase = false;
+      }
+    }
+    // Phase 4 (which is used in Phase 5 rotation): dairy and sugar allowed in controlled portions
+    
+    // Apply starch rules based on the assigned phase
+    if (starchFound) {
+      if (rulePhase === 1) {
+        // Phase 1 rules: NO starch at all
+        violationMessages.push(`⚠️ Phase 5 Day ${dayNum} (strict phase) - NO starch! Skip the ${starchFound} completely.`);
+        onPhase = false;
+      } else if (rulePhase === 2) {
+        // Phase 2 rules: starch at breakfast & lunch ONLY (not dinner or snacks)
         const isBreakfastOrLunch = mealType === 'breakfast' || mealType === 'lunch';
         const isDinnerOrSnack = mealType === 'dinner' || mealType === 'snack';
         
         if (isDinnerOrSnack) {
           violationMessages.push(`⚠️ Phase 5 Day ${dayNum} - starch allowed at breakfast & lunch ONLY. No starch at ${mealType}! Skip the ${starchFound}.`);
           onPhase = false;
-        } else if (isBreakfastOrLunch) {
-          // Starch allowed at breakfast/lunch - don't add violation
-        } else {
-          // No specific meal type
+        } else if (!isBreakfastOrLunch && mealType) {
           violationMessages.push(`⚠️ Phase 5 Day ${dayNum} - starch allowed at breakfast & lunch only. No ${starchFound} at dinner or snacks.`);
           onPhase = false;
         }
-      } else if (rule === 'starch_all') {
-        // Starch allowed at every meal - no violation
-        violationMessages.push(`💡 Phase 5 Day ${dayNum} - starch allowed every meal. Keep portions in check!`);
+        // If breakfast/lunch with no specific mealType, allow it
       }
+      // rulePhase === 4: starch allowed every meal - no violation needed
     }
   }
   
@@ -1053,13 +1014,13 @@ export async function analyzeMealPortion(
       }
     }
   } else if (context.currentPhase === 5 && context.programType !== 'event_ready') {
-    // Phase 5: Aggressive Fat Loss - follow the 3-day plan (NOT for Event Ready clients)
+    // Phase 5: Aggressive Fat Loss - 14-day plan with 3-day blocks of P1, P2, or P4 rules
     const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
     const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
-    const rule = currentDayRule?.rule || 'no_starch';
+    const rulePhase = currentDayRule?.phase || 1; // Default to P1 rules (no starch)
     
-    if (rule === 'no_starch' || rule === 'starch_2meals') {
-      // Strict phase - similar to Phase 1
+    if (rulePhase === 1 || rulePhase === 2) {
+      // Strict phases (P1 or P2): protein + veg + fat required
       if (!hasProtein && !hasVeg) {
         let suggestion = `💡 Add ${portions.protein} lean protein + ${portions.fibrousVegetables} fibrous vegetables`;
         if (!hasFat) suggestion += ` + ${portions.fat} olive oil or ${portions.avocado} avocado`;
@@ -1074,8 +1035,8 @@ export async function analyzeMealPortion(
           violationMessages.push(`💡 Add ${portions.fat} olive oil or ${portions.avocado} avocado for healthy fat. ${waterTrackingMessage}`);
         }
       }
-    } else if (rule === 'starch_all') {
-      // More lenient - similar to Phase 4
+    } else if (rulePhase === 4) {
+      // Phase 4 rules: more lenient - gentle suggestions
       if (!hasProtein) {
         violationMessages.push(`💡 Notice: Consider adding some lean protein to round out your meal.`);
       }
@@ -1118,10 +1079,14 @@ export async function analyzeMealPortion(
     };
   }
   
+  // Always include water reminder in the response
+  const waterReminder = getWaterReminder(context.gender);
+  const finalAdvice = violationMessages.length > 0 
+    ? violationMessages.join('\n') + '\n' + waterReminder
+    : 'Log your foods and get back on track next meal! ' + waterReminder;
+  
   return {
-    advice: violationMessages.length > 0 
-      ? violationMessages.join('\n')
-      : 'Log your foods and get back on track next meal!',
+    advice: finalAdvice,
     onPhase,
     corrections: violationMessages,
   };

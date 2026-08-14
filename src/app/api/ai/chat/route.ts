@@ -12,9 +12,7 @@ import {
   STARCHY_CARBOHYDRATES,
   FIBROUS_VEGETABLES,
   HEALTHY_FATS,
-  PORTION_SIZES
 } from '@/lib/ai-coach';
-import { generateMealSuggestion, formatMealSuggestion, getPortions } from '@/lib/nutrition-data';
 
 export async function POST(request: NextRequest) {
   try {
@@ -170,40 +168,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ============================================================
-    // RULE-BASED MEAL SUGGESTIONS — runs BEFORE AI call
-    // Portions from getPortions(), foods from Allen's food lists
-    // ============================================================
-    const normalizedMsg = message.replace(/['\u2019]/g, "'");
-    const lowerMsg = normalizedMsg.toLowerCase();
-    if (
-      lowerMsg.includes('what should my next meal') ||
-      lowerMsg.includes('what do i eat') ||
-      lowerMsg.includes('im hungry') ||
-      lowerMsg.includes("i'm hungry") ||
-      (lowerMsg.includes('im') && lowerMsg.includes('hungry')) ||
-      lowerMsg === 'next meal'
-    ) {
-      let mealType: 'breakfast' | 'lunch' | 'dinner' = 'lunch';
-      if (lowerMsg.includes('breakfast')) mealType = 'breakfast';
-      else if (lowerMsg.includes('dinner')) mealType = 'dinner';
-
-      const suggestion = generateMealSuggestion(
-        { gender: context.gender, currentPhase: context.currentPhase },
-        mealType
-      );
-
-      const tones = [
-        "That's your next meal. Eat it. 💪",
-        "Next meal sorted. Let's go! 🔥",
-        'Make it happen! 🙌',
-        "Go get 'em! 💪",
-      ];
-      const tone = tones[Math.floor(Math.random() * tones.length)];
-
+    // TIPS - simple generic response (no AI)
+    if (lower === 'tips?' || lower === 'tips') {
       return NextResponse.json({
-        response: formatMealSuggestion(suggestion) + ' ' + tone,
-        type: 'meal-suggestion',
+        response: `💡 Plan your meals ahead\n💡 Cook in bulk\n💡 Stay consistent\n💡 Keep going!`,
+        type: 'simple',
       });
     }
 
@@ -323,38 +292,83 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
     }
   }
 
-  // MEAL PLAN / WHAT TO EAT queries → give phase-appropriate meal suggestions
+  // MEAL PLAN / WHAT TO EAT queries → simple phase-appropriate response
   if (lower.includes('what can i eat') || lower.includes('what to eat') || lower.includes('what should i eat') ||
       lower.includes('meal plan') || lower.includes('example meal') || lower.includes('my plan') ||
       lower.includes('show me what') || lower.includes('give me a') || lower.includes('next meal')) {
-    const portions = PORTION_SIZES[context.gender];
-    const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - lean protein, veggies, healthy fats only' :
-                            context.currentPhase === 2 ? 'Add starch (Wed, Sat, Sun) to first 2 meals' :
-                            'Maintenance mode - add starch to every meal';
     
-    const proteinExamples = context.gender === 'male' ? '6oz chicken/fish/egg/beef/pork' : '4oz chicken/fish/egg/beef/pork';
-    const veggieExamples = 'broccoli, spinach, asparagus, zucchini, peppers, salad';
-    const fatExamples = 'olive oil, avocado, almonds, walnuts';
-    const starchNote = context.currentPhase === 1 ? '\n• NO STARCH in Phase 1!' :
-                       context.currentPhase === 2 ? '\n• Starch allowed on Wed, Sat, Sun only (first 2 meals)' :
-                       '\n• Starch allowed every meal in Phase 4';
+    // Build simple response per phase — NO example meals, NO confusing mixed messages
+    let response = `PHASE ${context.currentPhase} — `;
     
-    const mealExample = context.gender === 'male' 
-      ? `• ${portions.protein} chicken breast\n• 2 cups green beans\n• 2 tablespoons olive oil`
-      : `• ${portions.protein} chicken breast\n• 1-2 cups green beans\n• 1 tablespoon olive oil`;
-
-    return `You're in PHASE ${context.currentPhase}: ${phaseDescription}
-
-YOUR PORTIONS PER MEAL:
-• Protein: ${portions.protein} (${proteinExamples})
-• Veggies: ${portions.fibrousVegetables} (${veggieExamples})
-• Fat: ${portions.fat} (${fatExamples})${starchNote}
-• Water: ${context.gender === 'male' ? '128oz' : '80oz'} daily
-
-EXAMPLE MEAL:
-${mealExample}
-
-Ask me anything about specific foods! 💪`;
+    if (context.currentPhase === 1) {
+      response += `NO STARCH — stick to these:\n\n`;
+      response += `✅ PROTEINS:\n• ${LEAN_PROTEINS.join('\n• ')}\n\n`;
+      response += `✅ VEGGIES:\n• ${FIBROUS_VEGETABLES.join('\n• ')}\n\n`;
+      response += `✅ FATS:\n• ${HEALTHY_FATS.join('\n• ')}\n\n`;
+      response += `❌ NO STARCH`;
+      
+    } else if (context.currentPhase === 2) {
+      response += `Starch Wed/Sat/Sun breakfast & lunch ONLY\n\n`;
+      response += `✅ PROTEINS:\n• ${LEAN_PROTEINS.join('\n• ')}\n\n`;
+      response += `✅ VEGGIES:\n• ${FIBROUS_VEGETABLES.join('\n• ')}\n\n`;
+      response += `✅ FATS:\n• ${HEALTHY_FATS.join('\n• ')}\n\n`;
+      response += `✅ STARCHES (Wed/Sat/Sun breakfast & lunch ONLY):\n• ${STARCHY_CARBOHYDRATES.join('\n• ')}\n\n`;
+      response += `❌ No starch at dinner or snacks!`;
+      
+    } else if (context.currentPhase === 4) {
+      response += `Starch every meal\n\n`;
+      response += `✅ PROTEINS:\n• ${LEAN_PROTEINS.join('\n• ')}\n\n`;
+      response += `✅ VEGGIES:\n• ${FIBROUS_VEGETABLES.join('\n• ')}\n\n`;
+      response += `✅ FATS:\n• ${HEALTHY_FATS.join('\n• ')}\n\n`;
+      response += `✅ STARCHES (every meal):\n• ${STARCHY_CARBOHYDRATES.join('\n• ')}`;
+      
+    } else if (context.currentPhase === 5) {
+      // Phase 5: 14-day rotating plan — show current day's rule
+      const dayNum = context.phase5StartDate ? (() => {
+        const start = new Date(context.phase5StartDate + 'T12:00:00');
+        const now = new Date();
+        const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        return Math.min(14, Math.max(1, diffDays + 1));
+      })() : 1;
+      const todayRule = context.phase5Plan?.find(d => d.day === dayNum);
+      const rulePhase = todayRule?.phase || 1;
+      
+      response += `Day ${dayNum}/14 — `;
+      
+      if (rulePhase === 1) {
+        response += `NO STARCH today\n\n`;
+        response += `✅ PROTEINS:\n• ${LEAN_PROTEINS.join('\n• ')}\n\n`;
+        response += `✅ VEGGIES:\n• ${FIBROUS_VEGETABLES.join('\n• ')}\n\n`;
+        response += `✅ FATS:\n• ${HEALTHY_FATS.join('\n• ')}\n\n`;
+        response += `❌ NO STARCH today!`;
+      } else if (rulePhase === 2) {
+        response += `Starch breakfast & lunch ONLY today\n\n`;
+        response += `✅ PROTEINS:\n• ${LEAN_PROTEINS.join('\n• ')}\n\n`;
+        response += `✅ VEGGIES:\n• ${FIBROUS_VEGETABLES.join('\n• ')}\n\n`;
+        response += `✅ FATS:\n• ${HEALTHY_FATS.join('\n• ')}\n\n`;
+        response += `✅ STARCHES (breakfast & lunch ONLY today):\n• ${STARCHY_CARBOHYDRATES.join('\n• ')}\n\n`;
+        response += `❌ No starch at dinner or snacks today!`;
+      } else {
+        response += `Starch every meal today\n\n`;
+        response += `✅ PROTEINS:\n• ${LEAN_PROTEINS.join('\n• ')}\n\n`;
+        response += `✅ VEGGIES:\n• ${FIBROUS_VEGETABLES.join('\n• ')}\n\n`;
+        response += `✅ FATS:\n• ${HEALTHY_FATS.join('\n• ')}\n\n`;
+        response += `✅ STARCHES (every meal today):\n• ${STARCHY_CARBOHYDRATES.join('\n• ')}`;
+      }
+      
+    } else if (context.currentPhase === 6) {
+      response += `Starch every meal + supplements\n\n`;
+      response += `✅ PROTEINS:\n• ${LEAN_PROTEINS.join('\n• ')}\n\n`;
+      response += `✅ VEGGIES:\n• ${FIBROUS_VEGETABLES.join('\n• ')}\n\n`;
+      response += `✅ FATS:\n• ${HEALTHY_FATS.join('\n• ')}\n\n`;
+      response += `✅ STARCHES (every meal):\n• ${STARCHY_CARBOHYDRATES.join('\n• ')}\n\n`;
+      response += `💪 SUPPLEMENTS:\n`;
+      response += context.gender === 'male' 
+        ? `• Whey protein: 40g × 2/day\n• Creatine: Daily\n\n❌ No processed foods (dairy and natural sugar allowed — portion control)`
+        : `• Whey protein: 20g × 2/day\n• Creatine: Daily\n\n❌ No processed foods (dairy and natural sugar allowed — portion control)`;
+    }
+    
+    return response;
   }
 
   // MEAL / FOOD queries → use rule-based meal analyzer
