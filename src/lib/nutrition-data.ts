@@ -68,29 +68,9 @@ export function getPortions(gender: 'male' | 'female', phase: number): PortionSi
   // Defensive: ensure gender is valid
   const safeGender: 'male' | 'female' = (gender === 'male' || gender === 'female') ? gender : 'male';
   
-  // Phase-specific portions from PHASES.md source of truth
-  if (phase === 5) {
-    // Phase 5: Aggressive Fat Loss - higher protein, higher water
-    if (gender === 'male') {
-      return {
-        protein: '7 ounces',
-        fibrousVegetables: '2 cups',
-        fat: '2 tablespoons',
-        avocado: '1/2',
-        starch: 'NONE',
-        water: '160 oz daily (40 oz per meal)',
-      };
-    } else {
-      return {
-        protein: '5 ounces',
-        fibrousVegetables: '1-2 cups',
-        fat: '1 tablespoon',
-        avocado: '1/4',
-        starch: 'NONE',
-        water: '100 oz daily (25 oz per meal)',
-      };
-    }
-  }
+  // MEMORY.md is the source of truth
+  // All phases use same base protein/fat/water portions EXCEPT Phase 6 has higher fat/starch
+  // Phase 5 is same as other phases (6oz male / 4oz female protein)
 
   if (phase === 6) {
     // Phase 6: Muscle Gain - higher fat and starch
@@ -115,10 +95,11 @@ export function getPortions(gender: 'male' | 'female', phase: number): PortionSi
     }
   }
 
-  // Phase 1, 2, 4: base portions
+  // Phase 1, 2, 4, 5: base portions (MEMORY.md correct values)
   // Phase 1: NO starch
   // Phase 2: starch on Wed/Sat/Sun B/L only
   // Phase 4: starch every meal
+  // Phase 5: NO starch (same as Phase 1 for starch rules)
   if (gender === 'male') {
     return {
       protein: '6 ounces',
