@@ -323,38 +323,6 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
     }
   }
 
-  // ============================================================
-  // RULE-BASED MEAL SUGGESTIONS — runs BEFORE "what can I eat" block
-  // Returns exact portions from getPortions(), foods from Allen's lists
-  // ============================================================
-  if (
-    lower.includes('what should my next meal') ||
-    lower.includes('what do i eat') ||
-    lower.includes('im hungry') ||
-    lower.includes("i'm hungry") ||
-    (lower.includes('im') && lower.includes('hungry')) ||
-    lower === 'next meal'
-  ) {
-    let mealType: 'breakfast' | 'lunch' | 'dinner' = 'lunch';
-    if (lower.includes('breakfast')) mealType = 'breakfast';
-    else if (lower.includes('dinner')) mealType = 'dinner';
-    
-    const suggestion = generateMealSuggestion(
-      { gender: context.gender, currentPhase: context.currentPhase },
-      mealType
-    );
-    
-    const tones = [
-      "That's your next meal. Eat it. 💪",
-      "Next meal sorted. Let's go! 🔥",
-      'Make it happen! 🙌',
-      "Go get 'em! 💪",
-    ];
-    const tone = tones[Math.floor(Math.random() * tones.length)];
-    
-    return formatMealSuggestion(suggestion) + ' ' + tone;
-  }
-
   // MEAL PLAN / WHAT TO EAT queries → give phase-appropriate meal suggestions
   if (lower.includes('what can i eat') || lower.includes('what to eat') || lower.includes('what should i eat') ||
       lower.includes('meal plan') || lower.includes('example meal') || lower.includes('my plan') ||
