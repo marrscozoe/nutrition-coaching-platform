@@ -207,6 +207,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // RULE-BASED MEAL CHECK — intercept meal logs before AI
+    // Detect meal log patterns like "LUNCH — Fri, Aug 14, Chicken asparagus ✅ On Phase"
+    const mealLogPatterns = [
+      /^lunch\s*—/i,
+      /^breakfast\s*—/i,
+      /^dinner\s*—/i,
+      /^snack\s*—/i,
+      /—\s*\w+,?\s*\w+\s*\d+/i, // contains date pattern like "Fri, Aug 14"
+    ];
+    const isMealLog = mealLogPatterns.some(p => p.test(message)) || 
+      (lower.includes('on phase') && (lower.includes('chicken') || lower.includes('beef') || lower.includes('fish') || lower.includes('asparagus') || lower.includes('rice') || lower.includes('potato')));
+    
+    if (isMealLog) {
+      try {
+        // Extract food description - remove the meal prefix and date
+        let foodDescription = message
+          .replace(/^(lunch|breakfast|dinner|snack)\s*—\s*/i, '')
+          .replace(/\s*—\s*.*$/i, '') // remove everything after "—"
+          .replace(/\d{1,2}:\d{2}\s*(am|pm)?/i, '') // remove time
+          .replace(/✅|❌|✓|✗/g, '') // remove checkmarks
+          .replace(/on phase\s*\d*/i, '') // remove "on phase X"
+          .trim();
+        
+        if (foodDescription.length > 2) {
+          const analysis = await analyzeMealPortion(foodDescription, context);
+          return NextResponse.json({
+            response: analysis.advice,
+            type: 'meal_analysis',
+            corrections: analysis.corrections,
+          });
+        }
+      } catch (e) {
+        console.error('Meal check error:', e);
+        // Fall through to AI if rule-based fails
+      }
+    }
+
     const coachPrompt = getCoachPrompt(context, message);
     const systemMessage: AIMessage = { role: 'system', content: coachPrompt };
     const result = await chatWithChatAI([systemMessage], message, preferredProvider);
