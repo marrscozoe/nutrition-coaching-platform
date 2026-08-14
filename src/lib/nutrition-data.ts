@@ -2,68 +2,53 @@
 // ALL FOOD CATEGORIES (same for all phases)
 // ============================================
 
-// PROTEINS — from NOTES.md (source of truth)
-// All food should be NATURAL when dieting!
 export const LEAN_PROTEINS = [
   'Chicken breast',
-  'Turkey breast',
-  'Pork loin',
-  'Whole eggs',
-  'Egg whites',
-  'White fish',
-  'Tuna',
-  'Salmon',
-  'Other fish',
-  'Greek yogurt (plain only)',
-  'Lean red meat (at least 2x per week)',
+  'White fish', 'Tuna', 'Salmon', 'Redfish',
+  'Whole eggs', 'Egg whites',
+  'Lean beef', 'Lean pork', 'Turkey breast', 'Shrimp',
+  'Plain non-fat Greek yogurt',
+  'Tilapia', 'Cod', 'Halibut', 'Trout', 'Catfish', 'Scallops', 'Crab', 'Lobster',
+  'Bison', 'Venison', 'Elk', 'Ostrich',
+  'Egg beaters', 'Liquid eggs',
+  'Protein powder (not vegetable protein powder)',
+  'Whey protein',
+  'Bacon (nitrate-free, twice per week)',
 ];
 // NO cheese or dairy while dieting
 
-// STARCHY CARBOHYDRATES — from NOTES.md (source of truth)
 export const STARCHY_CARBOHYDRATES = [
-  'Sweet potatoes',
-  'New potatoes',
-  'Red potatoes',
-  'Any type of beans',
-  'Legumes',
-  'Black eyed peas',
-  'Peas',
-  'Corn',
-  'Rice',
-  'Oatmeal',
+  'Red potatoes', 'New potatoes', 'Sweet potatoes', 'Yukon Gold', 'Russet', 'Fingerling', 'Purple potatoes',
+  'Brown rice', 'Wild rice', 'Jasmine rice', 'Basmati rice',
+  'Oatmeal', 'Steel cut oats',
+  'Barley', 'Bulgur', 'Buckwheat', 'Millet', 'Spelt',
+  'Peas', 'Corn', 'Beans', 'Legumes',
+  'Lentils', 'Cannellini beans', 'Navy beans', 'Lima beans', 'Butter beans',
+  'Berries', 'Cantaloupe', 'Black Eyed Peas', 'Grapefruit',
+  'Plantain', 'Parsnips', 'Acorn squash', 'Delicata squash',
 ];
 // Fresh or frozen, NO CANS
 
-// FIBROUS VEGETABLES — from NOTES.md (source of truth)
 export const FIBROUS_VEGETABLES = [
-  // Hardy/starchy vegetables as base:
-  'Asparagus',
-  'Broccoli',
-  'Green beans',
-  'Cauliflower',
-  'Onions',
-  'Mushrooms',
-  'Peppers',
-  'Carrots',
-  'Tomatoes',
-  // Mix in or use as side:
-  'Spinach',
-  'Kale',
-  'Dark lettuce',
-  'Leafy greens',
+  'Broccoli', 'Spinach', 'Asparagus', 'Zucchini',
+  'Green peppers', 'Bell peppers', 'Red peppers', 'Yellow peppers',
+  'Green lettuce (sparingly)',
+  'Mushrooms', 'Green beans', 'Cauliflower',
+  'Tomatoes', 'Cucumbers', 'Celery', 'Cabbage', 'Onions',
+  'Kale', 'Bok choy', 'Radishes', 'Turnips', 'Beets', 'Jicama',
+  'Artichoke', 'Brussels sprouts', 'Eggplant',
+  'Anaheim peppers', 'Poblano peppers', 'Jalapeño peppers', 'Serrano peppers',
+  'Celery root', 'Fennel', 'Leeks', 'Water chestnuts', 'Bean sprouts', 'Alfalfa sprouts',
 ];
 // Fresh or frozen, NO CANS
 
-// HEALTHY FATS — from NOTES.md (source of truth)
 export const HEALTHY_FATS = [
-  'Extra virgin olive oil',
-  'Coconut oil',
-  'Safflower oil',
-  'Avocado',
-  'Heavy cream',
-  'Kerrygold butter',
-  'Mixed nuts',
-  'Egg yolks',
+  'Avocado (1/2 male, 1/4 female)',
+  'Olive oil',
+  'Almonds', 'Walnuts', 'Mixed nuts',
+  'Kerrygold gold butter',
+  'Safflower oil', 'Coconut oil',
+  'MCT oil (in coffee)',
 ];
 
 // ============================================
