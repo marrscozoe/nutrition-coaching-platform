@@ -142,13 +142,14 @@ export function generateMealSuggestion(
   const fatOptions = HEALTHY_FATS.filter(f => !f.includes('MCT'));
   const fatChoice = pickRandom(fatOptions, 1)[0];
   // Scale avocado amount proportionally based on fat portion
-  // 1/2 avocado = 2 tbsp fat equivalent (base reference)
-  // Phase 6 male: 3 tbsp fat → 3/4 avocado; Phase 6 female: 2 tbsp fat → 1/2 avocado
+  // 1 tbsp fat → 1/4 avocado; 2 tbsp fat → 1/2 avocado; 3 tbsp fat → 3/4 avocado
   const getAvocadoDisplay = () => {
     const tbspMatch = portions.fat.match(/(\d+)/);
-    const tbspCount = tbspMatch ? parseInt(tbspMatch[1]) : 2;
-    if (tbspCount <= 2) return isMale ? '1/2 avocado' : '1/4 avocado';
-    if (tbspCount === 3) return '3/4 avocado';
+    const fatTbsp = tbspMatch ? parseInt(tbspMatch[1]) : 2;
+    const avocadoFraction = fatTbsp / 4;
+    if (avocadoFraction === 0.25) return '1/4 avocado';
+    if (avocadoFraction === 0.5) return '1/2 avocado';
+    if (avocadoFraction === 0.75) return '3/4 avocado';
     return '1/2 avocado';
   };
   const fatDisplay = fatChoice.includes('Avocado') ? getAvocadoDisplay() : portions.fat;
