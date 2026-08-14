@@ -448,7 +448,7 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
 Portions per meal:
 Protein: ${portions.protein} (${proteinExamples})
 Veggies: ${portions.fibrousVegetables} (${veggieExamples})
-Fat: ${portions.fat} of olive oil — this MUST be included (avocado or almonds are OK alternatives)
+Fat: ${portions.fat} (OLIVE OIL is your #1 fat source — also: avocado or almonds)
 Water: ${context.gender === 'male' ? '32oz' : '20oz'} per meal
 ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : ''}
 
