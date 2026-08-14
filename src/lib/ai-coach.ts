@@ -496,7 +496,7 @@ When client describes a meal they ate or are eating, you MUST check ALL of these
    
 4. HEALTHY FAT — Is there fat? (olive oil, avocado, nuts, etc.)
    - Phase 1/2/4/5: Missing → tell them to add ${context.gender === 'male' ? '2 tbsp' : '1 tbsp'} fat
-   - Phase 6: Missing → tell them to add ${context.gender === 'male' ? '3 tbsp' : '2 tbsp'} fat (Phase 6 allows MORE fat)
+   - Phase 6: Missing → tell them to add ${context.gender === 'male' ? '3 tbsp' : '3 tbsp'} fat (Phase 6 allows MORE fat)
    
 5. WATER — Did they mention water?
    - Missing → tell them to drink ${context.gender === 'male' ? '32oz' : '20oz'} water with this meal
