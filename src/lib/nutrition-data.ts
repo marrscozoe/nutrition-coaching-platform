@@ -169,7 +169,7 @@ export function generateMealSuggestion(
     if (avocadoFraction === 0.75) return '3/4 avocado';
     return '1/2 avocado';
   };
-  const fatDisplay = fatChoice.includes('Avocado') ? getAvocadoDisplay() : portions.fat;
+  const fatDisplay = fatChoice.includes('Avocado') ? getAvocadoDisplay() : `${portions.fat} ${fatChoice}`;
 
   let starchDisplay: string | undefined;
   let starchAllowed = false;
