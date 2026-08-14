@@ -491,13 +491,15 @@ When client describes a meal they ate or are eating, you MUST check ALL of these
 3. STARCH — Is starch present? (rice, potato, beans, oatmeal, etc.)
    - Phase 1: NO starch allowed — if they have starch, tell them to drop it
    - Phase 2: Starch only allowed at breakfast/lunch on Wed/Sat/Sun — if they have starch at wrong meal/day, tell them
-   - Phase 4/5/6: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '2 cups' : '1 cup'}
+   - Phase 4/5: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '2 cups' : '1 cup'}
+   - Phase 6: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '3 cups' : '2 cups'} (Phase 6 allows MORE starch)
    
 4. HEALTHY FAT — Is there fat? (olive oil, avocado, nuts, etc.)
-   - Missing → tell them to add ${context.gender === 'male' ? '2 tbsp' : '1 tbsp'} fat
+   - Phase 1/2/4/5: Missing → tell them to add ${context.gender === 'male' ? '2 tbsp' : '1 tbsp'} fat
+   - Phase 6: Missing → tell them to add ${context.gender === 'male' ? '3 tbsp' : '2 tbsp'} fat (Phase 6 allows MORE fat)
    
 5. WATER — Did they mention water?
-   - Missing → remind them to drink ${context.gender === 'male' ? '128oz' : '80oz'} water today
+   - Missing → tell them how much water they need to drink for their remaining meals today (don't say the full daily amount)
 
 ⚠️ IMPORTANT: You MUST mention ALL missing categories, not just one! If protein AND fat are missing, mention BOTH. If starch AND water are missing, mention BOTH. Do not pick and choose!
 
