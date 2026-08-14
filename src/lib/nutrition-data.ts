@@ -167,11 +167,7 @@ export function generateMealSuggestion(
   }
 
   if (starchAllowed) {
-    // Phase 2: only oatmeal, rice, potato (per PHASES.md)
-    const limitedStarchList = currentPhase === 2
-      ? ['Oatmeal', 'Brown rice', 'Red potatoes', 'Sweet potatoes']
-      : STARCHY_CARBOHYDRATES;
-    const starchChoice = pickRandom(limitedStarchList, 1)[0];
+    const starchChoice = pickRandom(STARCHY_CARBOHYDRATES, 1)[0];
     starchDisplay = `${portions.starch} ${starchChoice.toLowerCase()}`;
   }
 
