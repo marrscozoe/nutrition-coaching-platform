@@ -367,7 +367,7 @@ export function getPhaseGuidance(
           `Fibrous vegetables: ${vegPortion} broccoli, spinach, peppers, salad`,
           `Healthy fats: ${fatPortion} olive oil, 1/2 avocado, nuts`,
           `Starch: rice, potato, oatmeal — every meal — ${starchPortion}`,
-          `Whey protein: ${isMale ? '40g × 2/day' : '20g × 2/day'}`,
+          `Whey protein: ${isMale ? '40g' : '20g'} 1st thing AM & last thing PM (NOT with meals)`,
           `Creatine: Daily`,
         ],
         cannotEat: [
@@ -376,10 +376,10 @@ export function getPhaseGuidance(
         ],
         water: p.water,
         supplements: [
-          `Whey protein: ${isMale ? '40g × 2/day' : '20g × 2/day'}`,
+          `Whey protein: ${isMale ? '40g' : '20g'} 1st thing AM & last thing PM`,
           'Creatine: Daily',
         ],
-        exampleMeal: `${proteinOz} grilled chicken, ${starchPortion} rice, ${vegPortion} broccoli, ${fatPortion} olive oil, ${isMale ? '40g' : '20g'} whey post-workout, water`,  // fatPortion is 3 tbsp (M) / 2 tbsp (F) from getPortions
+        exampleMeal: `${proteinOz} grilled chicken, ${starchPortion} rice, ${vegPortion} broccoli, ${fatPortion} olive oil, water`,
       };
     default:
       return {
