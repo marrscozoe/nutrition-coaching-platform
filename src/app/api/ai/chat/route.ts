@@ -13,6 +13,7 @@ import {
   FIBROUS_VEGETABLES,
   HEALTHY_FATS,
 } from '@/lib/ai-coach';
+import { generateMealSuggestion, formatMealSuggestion } from '@/lib/nutrition-data';
 
 export async function POST(request: NextRequest) {
   try {
@@ -174,6 +175,36 @@ export async function POST(request: NextRequest) {
         response: `💡 Plan your meals ahead\n💡 Cook in bulk\n💡 Stay consistent\n💡 Keep going!`,
         type: 'simple',
       });
+    }
+
+    // RULE-BASED MEAL SUGGESTION — intercept before AI
+    const mealQueryPatterns = [
+      'what should my next meal',
+      'what do i eat',
+      'im hungry',
+      "i'm hungry",
+      'next meal',
+      'what can i eat',
+      'what should i eat',
+      'example meal',
+      'meal suggestion',
+      'what to eat',
+    ];
+    if (mealQueryPatterns.some(p => lower.includes(p))) {
+      try {
+        const suggestion = generateMealSuggestion(
+          { gender: context.gender as 'male' | 'female', currentPhase: context.currentPhase },
+          'lunch'
+        );
+        const response = formatMealSuggestion(suggestion);
+        return NextResponse.json({
+          response,
+          type: 'meal-suggestion',
+        });
+      } catch (e) {
+        console.error('Meal suggestion error:', e);
+        // Fall through to AI if rule-based fails
+      }
     }
 
     const coachPrompt = getCoachPrompt(context, message);

@@ -105,6 +105,96 @@ export function getPortions(gender: 'male' | 'female', phase: number): PortionSi
 }
 
 // ============================================
+// RULE-BASED MEAL SUGGESTION ENGINE
+// ============================================
+
+function pickRandom<T>(arr: T[], count: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+function isPhase2AllowedDay(): boolean {
+  const day = new Date().getDay();
+  return day === 3 || day === 6 || day === 0;
+}
+
+export interface MealSuggestion {
+  meal: string;
+  veggies: string;
+  fat: string;
+  starch?: string;
+  message: string;
+}
+
+export function generateMealSuggestion(
+  context: { gender: 'male' | 'female'; currentPhase: number },
+  mealType: 'breakfast' | 'lunch' | 'dinner' = 'lunch'
+): MealSuggestion {
+  const { gender, currentPhase } = context;
+  const isMale = gender === 'male';
+  const portions = getPortions(gender, currentPhase);
+
+  const mainProteins = LEAN_PROTEINS.filter(
+    p => !p.includes('Whey') && !p.includes('Bacon') && !p.includes('Protein powder')
+  );
+  const proteinChoice = pickRandom(mainProteins, 1)[0];
+  const veggiesChoice = pickRandom(FIBROUS_VEGETABLES, 2).join(' & ');
+  const fatOptions = HEALTHY_FATS.filter(f => !f.includes('MCT'));
+  const fatChoice = pickRandom(fatOptions, 1)[0];
+  const fatDisplay = fatChoice.includes('Avocado')
+    ? (isMale ? '1/2 avocado' : '1/4 avocado')
+    : portions.fat;
+
+  let starchDisplay: string | undefined;
+  let starchAllowed = false;
+
+  if (currentPhase === 1) {
+    starchAllowed = false;
+  } else if (currentPhase === 2) {
+    const allowedDay = isPhase2AllowedDay();
+    const isFirstTwoMeals = mealType === 'breakfast' || mealType === 'lunch';
+    starchAllowed = allowedDay && isFirstTwoMeals;
+  } else if (currentPhase >= 4) {
+    starchAllowed = true;
+  }
+
+  if (starchAllowed) {
+    const starchChoice = pickRandom(STARCHY_CARBOHYDRATES, 1)[0];
+    starchDisplay = `${portions.starch} ${starchChoice.toLowerCase()}`;
+  }
+
+  let message = '';
+  if (currentPhase === 1) {
+    message = 'No starch in Phase 1 — stick to protein, veggies & fat! 💪';
+  } else if (currentPhase === 2 && !starchAllowed) {
+    message = 'No starch right now — save it for Wed/Sat/Sun breakfast or lunch!';
+  } else if (currentPhase === 2 && starchAllowed) {
+    message = `Starch allowed today! ${portions.starch} — eat up! 🔥`;
+  } else if (currentPhase === 4) {
+    message = "Every meal gets starch — you're in maintenance mode! 🎉";
+  } else if (currentPhase === 6) {
+    message = 'Higher carbs today — fuel up! 💪🔥';
+  }
+
+  return {
+    meal: `${portions.protein} ${proteinChoice.toLowerCase()}`,
+    veggies: `${portions.fibrousVegetables} ${veggiesChoice.toLowerCase()}`,
+    fat: fatDisplay,
+    starch: starchDisplay,
+    message,
+  };
+}
+
+export function formatMealSuggestion(suggestion: MealSuggestion): string {
+  let response = `${suggestion.meal}\n${suggestion.veggies}\n${suggestion.fat}`;
+  if (suggestion.starch) {
+    response += `\n${suggestion.starch}`;
+  }
+  response += `\n\n${suggestion.message}`;
+  return response;
+}
+
+// ============================================
 // PHASE 5 SUPPORT — shared with ai-coach.ts
 // ============================================
 
