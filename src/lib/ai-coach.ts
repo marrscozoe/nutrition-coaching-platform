@@ -499,7 +499,7 @@ When client describes a meal they ate or are eating, you MUST check ALL of these
    - Phase 6: Missing → tell them to add ${context.gender === 'male' ? '3 tbsp' : '2 tbsp'} fat (Phase 6 allows MORE fat)
    
 5. WATER — Did they mention water?
-   - Missing → tell them how much water they need to drink for their remaining meals today (don't say the full daily amount)
+   - Missing → tell them to drink ${context.gender === 'male' ? '32oz' : '20oz'} water with this meal
 
 ⚠️ IMPORTANT: You MUST mention ALL missing categories, not just one! If protein AND fat are missing, mention BOTH. If starch AND water are missing, mention BOTH. Do not pick and choose!
 
