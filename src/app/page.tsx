@@ -26,21 +26,21 @@ export default function HomePage() {
       }
       
       // Check trainer session first, then client session
-      const trainerUser = localStorage.getItem('trainer_user');
-      const trainerType = localStorage.getItem('trainer_user_type');
+      const trainerUser = sessionStorage.getItem('trainer_user');
+      const trainerType = sessionStorage.getItem('trainer_user_type');
       if (trainerUser && trainerType === 'trainer') {
         router.push('/trainer');
         return;
       }
       
-      const clientUser = localStorage.getItem('client_user');
-      const clientType = localStorage.getItem('client_user_type');
+      const clientUser = sessionStorage.getItem('client_user');
+      const clientType = sessionStorage.getItem('client_user_type');
       if (clientUser && clientType === 'client') {
         router.push('/client');
       }
     } catch (e) {
-      // If localStorage fails, just show login page
-      console.error('localStorage error:', e);
+      // If sessionStorage fails, just show login page
+      console.error('sessionStorage error:', e);
     }
   }, []); // Empty dependency - only run once on mount
 
@@ -54,18 +54,33 @@ export default function HomePage() {
     setError('');
     setLoading(true);
 
+    console.log('[Login] Form submitted:', { email, type: isTrainer ? 'trainer' : 'client' });
+
     try {
       if (isLogin) {
         // Login
+        console.log('[Login] Calling login API...');
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password, type: isTrainer ? 'trainer' : 'client' }),
         });
 
-        const data = await res.json();
+        console.log('[Login] Response status:', res.status);
+
+        let data;
+        try {
+          data = await res.json();
+          console.log('[Login] Response data:', JSON.stringify(data));
+        } catch (jsonError) {
+          console.error('[Login] Failed to parse JSON:', jsonError);
+          setError('Server returned invalid response. Please try again.');
+          setLoading(false);
+          return;
+        }
 
         if (!res.ok) {
+          console.log('[Login] Error from API:', data.error);
           setError(data.error || 'Login failed');
           setLoading(false);
           return;
@@ -73,14 +88,15 @@ export default function HomePage() {
 
         // Store user data in localStorage (use separate keys for each user type to prevent overwriting)
         if (data.userType === 'trainer') {
-          localStorage.setItem('trainer_user', JSON.stringify(data.user));
-          localStorage.setItem('trainer_user_type', 'trainer');
+          sessionStorage.setItem('trainer_user', JSON.stringify(data.user));
+          sessionStorage.setItem('trainer_user_type', 'trainer');
         } else {
-          localStorage.setItem('client_user', JSON.stringify(data.user));
-          localStorage.setItem('client_user_type', 'client');
+          sessionStorage.setItem('client_user', JSON.stringify(data.user));
+          sessionStorage.setItem('client_user_type', 'client');
         }
 
         // Redirect based on user type
+        console.log('[Login] Success, redirecting...');
         if (data.userType === 'trainer') {
           router.push('/trainer');
         } else {

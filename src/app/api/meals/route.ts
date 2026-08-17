@@ -106,46 +106,98 @@ export async function POST(request: NextRequest) {
         // Update streak: increment on good meal, reset to 0 on messed up
         const newStreak = (onPhase && !messedUp) ? currentStreak + 1 : 0;
 
-        // Check phase transitions
+        // Check phase transitions based on program_type
         let newPhase = currentPhase;
         let resetStreak = false;
+        const programType = client.program_type || 'get_shredded';
+        const goalWeight = client.goal_weight;
+        const currentWeight = client.current_weight;
 
-        // Phase 1 → Phase 2: 14+ days in phase (simple, no extension)
-        if (currentPhase === 1 && daysInPhase >= 14) {
-          // Phase 1 → Phase 2: 14+ days in phase
-          newPhase = 2;
-          resetStreak = true;
-          // Store current weight as phase2_start_weight for weight-based Phase 2 duration
-          const { data: clientForWeight } = await supabase
-            .from('clients')
-            .select('current_weight')
-            .eq('id', clientId)
-            .single();
-          if (clientForWeight?.current_weight) {
-            await supabase
-              .from('clients')
-              .update({ phase2_start_weight: clientForWeight.current_weight })
-              .eq('id', clientId);
+        // GET_SHREDDED: Phase 1 ↔ Phase 5 (14 days each)
+        if (programType === 'get_shredded' && newPhase === currentPhase) {
+          // Phase 1 → Phase 5: After 14 days
+          if (currentPhase === 1 && daysInPhase >= 14) {
+            newPhase = 5;
+            resetStreak = true;
           }
-        } else if (currentPhase === 2 && daysInPhase >= 7) {
-          // Phase 2 → Phase 4 (goal) or Phase 1 (not at goal): weight-based duration
-          // If >2 lbs lost in Phase 2, need 14 days; otherwise 7 days
-          const { data: clientForPhase2 } = await supabase
-            .from('clients')
-            .select('current_weight, phase2_start_weight, goal_weight')
-            .eq('id', clientId)
-            .single();
-          const phase2StartWeight = clientForPhase2?.phase2_start_weight;
-          const currentWeight = clientForPhase2?.current_weight;
-          const goalWeight = clientForPhase2?.goal_weight;
-          const weightLostInPhase2 = phase2StartWeight && currentWeight ? phase2StartWeight - currentWeight : 0;
-          const phase2Duration = weightLostInPhase2 > 2 ? 14 : 7;
-          if (daysInPhase >= phase2Duration) {
-            if (goalWeight && currentWeight && currentWeight <= goalWeight) {
-              newPhase = 4;
-            } else {
-              newPhase = 1;
+          // Phase 5 → Phase 1: After 14 days
+          else if (currentPhase === 5 && daysInPhase >= 14) {
+            newPhase = 1;
+            resetStreak = true;
+          }
+          // Phase 4: If 5+ lbs over goal → Phase 1
+          else if (currentPhase === 4 && goalWeight && currentWeight && currentWeight > goalWeight + 5) {
+            newPhase = 1;
+            resetStreak = true;
+          }
+        }
+        // EVENT_READY: Phase 1 → Phase 2 (14 days), Phase 2 → Phase 1 (7 days)
+        else if (programType === 'event_ready' && newPhase === currentPhase) {
+          // Phase 1 → Phase 2: After 14 days
+          if (currentPhase === 1 && daysInPhase >= 14) {
+            newPhase = 2;
+            resetStreak = true;
+            // Store current weight as phase2_start_weight for weight-based Phase 2 duration
+            if (currentWeight) {
+              await supabase
+                .from('clients')
+                .update({ phase2_start_weight: currentWeight })
+                .eq('id', clientId);
             }
+          }
+          // Phase 2 → Phase 1 or Phase 4 (goal): weight-based duration
+          else if (currentPhase === 2 && daysInPhase >= 7) {
+            const { data: clientForPhase2 } = await supabase
+              .from('clients')
+              .select('current_weight, phase2_start_weight, goal_weight')
+              .eq('id', clientId)
+              .single();
+            const phase2StartWeight = clientForPhase2?.phase2_start_weight;
+            const weightLostInPhase2 = phase2StartWeight && currentWeight ? phase2StartWeight - currentWeight : 0;
+            const phase2Duration = weightLostInPhase2 > 2 ? 14 : 7;
+            if (daysInPhase >= phase2Duration) {
+              if (goalWeight && currentWeight && currentWeight <= goalWeight) {
+                newPhase = 4;
+              } else {
+                newPhase = 1;
+              }
+              resetStreak = true;
+            }
+          }
+          // Phase 4: If 5+ lbs over goal → Phase 1
+          else if (currentPhase === 4 && goalWeight && currentWeight && currentWeight > goalWeight + 5) {
+            newPhase = 1;
+            resetStreak = true;
+          }
+        }
+        // GENERAL_HEALTH: Phase 4 ↔ Phase 1 (4+ lbs gain triggers Phase 1, 7 days returns to Phase 4)
+        else if (programType === 'general_health' && newPhase === currentPhase) {
+          // Phase 4 → Phase 1: If client GAINS 4+ lbs over goal
+          if (currentPhase === 4 && goalWeight && currentWeight && currentWeight > goalWeight + 4) {
+            newPhase = 1;
+            resetStreak = true;
+          }
+          // Phase 1 → Phase 4: After 7 days
+          else if (currentPhase === 1 && daysInPhase >= 7) {
+            newPhase = 4;
+            resetStreak = true;
+          }
+        }
+        // MUSCLE_GAIN: Phase 6 ↔ Phase 4 (at goal = Phase 4, 5+ lbs below = Phase 6)
+        else if (programType === 'muscle_gain' && newPhase === currentPhase) {
+          // At goal → Phase 4
+          if (goalWeight && currentWeight && currentWeight >= goalWeight) {
+            newPhase = 4;
+            resetStreak = true;
+          }
+          // Weight drops 5+ lbs below goal → Phase 6
+          else if (currentPhase === 4 && goalWeight && currentWeight && currentWeight < goalWeight - 5) {
+            newPhase = 6;
+            resetStreak = true;
+          }
+          // At goal again → Phase 4 (from Phase 6)
+          else if (currentPhase === 6 && goalWeight && currentWeight && currentWeight >= goalWeight) {
+            newPhase = 4;
             resetStreak = true;
           }
         }

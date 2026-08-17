@@ -38,8 +38,8 @@ export default function ClientSettingsPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
-    const userData = localStorage.getItem('client_user');
-    const userType = localStorage.getItem('client_user_type');
+    const userData = sessionStorage.getItem('client_user');
+    const userType = sessionStorage.getItem('client_user_type');
 
     if (!userData || userType !== 'client') {
       router.push('/');

@@ -43,8 +43,8 @@ export default function ProfilePage() {
   const [showProgramInfo, setShowProgramInfo] = useState<string | null>(null);
 
   useEffect(() => {
-    const userData = localStorage.getItem('client_user');
-    const userType = localStorage.getItem('client_user_type');
+    const userData = sessionStorage.getItem('client_user');
+    const userType = sessionStorage.getItem('client_user_type');
 
     if (!userData || userType !== 'client') {
       router.push('/');
@@ -256,7 +256,7 @@ case 'get_shredded': return 'Get Shredded';
                 onClick={async () => {
                   if (!editGoalWeight) return;
                   try {
-                    const user = JSON.parse(localStorage.getItem('client_user') || '{}');
+                    const user = JSON.parse(sessionStorage.getItem('client_user') || '{}');
                     const res = await fetch('/api/client/update-goal', {
                       method: 'POST',
                       headers: { 'x-client-id': user.id, 'Content-Type': 'application/json' },
@@ -270,7 +270,7 @@ case 'get_shredded': return 'Get Shredded';
                       if (fresh.ok) {
                         const data = await fresh.json();
                         setClient(data.user);
-                        localStorage.setItem('client_user', JSON.stringify(data.user));
+                        sessionStorage.setItem('client_user', JSON.stringify(data.user));
                       }
                       setToast({ message: 'Goal updated! Week counter reset.', type: 'success' });
                     }
@@ -394,13 +394,13 @@ case 'get_shredded': return 'Get Shredded';
                       }),
                     });
                     if (res.ok) {
-                      // Update local state and localStorage
+                      // Update local state and sessionStorage
                       const updatedClient = {
                         ...client!,
                         starting_weight: parseFloat(editStartingWeight)
                       };
                       setClient(updatedClient);
-                      localStorage.setItem('client_user', JSON.stringify(updatedClient));
+                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
                       setShowEditWeight(false);
                     } else {
                       setToast({ message: 'Failed to update weight. Please try again.', type: 'error' });
@@ -475,7 +475,7 @@ case 'get_shredded': return 'Get Shredded';
                         current_weight: parseFloat(editCurrentWeight)
                       };
                       setClient(updatedClient);
-                      localStorage.setItem('client_user', JSON.stringify(updatedClient));
+                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
                       setShowEditCurrentWeightModal(false);
                       setToast({ message: 'Current weight updated!', type: 'success' });
                     } else {
@@ -583,7 +583,7 @@ case 'get_shredded': return 'Get Shredded';
                         event_date: selectedProgram === 'event_ready' ? (editEventDate || client.event_date) : client.event_date,
                       };
                       setClient(updatedClient);
-                      localStorage.setItem('client_user', JSON.stringify(updatedClient));
+                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
                       setShowEditProgram(false);
                       setToast({ message: 'Program updated successfully!', type: 'success' });
                     } else {
@@ -658,7 +658,7 @@ case 'get_shredded': return 'Get Shredded';
                         event_date: editEventDate,
                       };
                       setClient(updatedClient);
-                      localStorage.setItem('client_user', JSON.stringify(updatedClient));
+                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
                       setShowEventDateModal(false);
                       setToast({ message: 'Event date set successfully!', type: 'success' });
                     } else {

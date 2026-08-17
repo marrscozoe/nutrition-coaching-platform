@@ -111,8 +111,8 @@ export default function WeightPage() {
   // Response (no longer used - redirects to chat now)
 
   useEffect(() => {
-    const userData = localStorage.getItem('client_user');
-    const userType = localStorage.getItem('client_user_type');
+    const userData = sessionStorage.getItem('client_user');
+    const userType = sessionStorage.getItem('client_user_type');
 
     if (!userData || userType !== 'client') {
       router.push('/');
@@ -205,10 +205,10 @@ export default function WeightPage() {
         // Refresh history
         fetchWeightHistory(client.id);
 
-        // Update local client state and localStorage
+        // Update local client state and sessionStorage
         const updatedClient = { ...client, current_weight: parseFloat(weight) };
         setClient(updatedClient);
-        localStorage.setItem('client_user', JSON.stringify(updatedClient));
+        sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
 
         // Redirect to chat for AI weight commentary
         router.push('/client/chat');

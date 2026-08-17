@@ -35,9 +35,9 @@ export default function TrainerSignupPage() {
         return;
       }
 
-      // Clear any existing localStorage (e.g., old client session) and redirect to login
-      localStorage.removeItem('user');
-      localStorage.removeItem('userType');
+      // Clear any existing sessionStorage (e.g., old client session) and redirect to login
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('userType');
       setSuccessMessage('Account created! Please sign in.');
       setTimeout(() => window.location.href = '/', 1500);
     } catch (err) {

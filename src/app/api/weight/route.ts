@@ -80,9 +80,8 @@ export async function POST(request: NextRequest) {
           let newPhase = currentPhase;
           let resetPhaseStart = false;
 
-          // GOAL ATTAINED - check FIRST, before day-count (critical for get_shredded Phase 1 → Phase 4)
-          // For get_shredded/muscle_gain in Phase 1 or Phase 5/6: if at goal, go to Phase 4 regardless of days
-          if (goalWeight && currentPhase !== 4) {
+          // GOAL ATTAINED - check FIRST (except for muscle_gain which has its own logic)
+          if (goalWeight && currentPhase !== 4 && currentPhase !== 6) {
             const atGoal = (programType === 'muscle_gain')
               ? (weight >= goalWeight)
               : (weight <= goalWeight);
@@ -92,43 +91,77 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // PHASE 1: 14 days max (except GENERAL_HEALTH which is 7 days)
-          // Only applies if NOT already moving to Phase 4 via goal check above
-          if (newPhase === currentPhase && currentPhase === 1 && daysInPhase >= 14 && programType === 'get_shredded') {
-            // get_shredded: Phase 1 → Phase 5 (rotating plan)
-            newPhase = 5;
-            resetPhaseStart = true;
-          } else if (newPhase === currentPhase && currentPhase === 1 && daysInPhase >= 14 && programType === 'event_ready') {
-            // event_ready: Phase 1 → Phase 2
-            newPhase = 2;
-            resetPhaseStart = true;
+          // ===== PROGRAM-SPECIFIC PHASE TRANSITIONS =====
+
+          // GET_SHREDDED: Phase 1 ↔ Phase 5 (14 days each), Phase 4 when 5+ lbs over goal
+          if (programType === 'get_shredded' && newPhase === currentPhase) {
+            // Phase 1 → Phase 5: After 14 days
+            if (currentPhase === 1 && daysInPhase >= 14) {
+              newPhase = 5;
+              resetPhaseStart = true;
+            }
+            // Phase 5 → Phase 1: After 14 days
+            else if (currentPhase === 5 && daysInPhase >= 14) {
+              newPhase = 1;
+              resetPhaseStart = true;
+            }
+            // Phase 4: If 5+ lbs over goal → Phase 1
+            else if (currentPhase === 4 && goalWeight && weight > goalWeight + 5) {
+              newPhase = 1;
+              resetPhaseStart = true;
+            }
           }
-          // PHASE 2: 7 days fixed (Event Ready)
-          else if (newPhase === currentPhase && currentPhase === 2 && daysInPhase >= 7) {
-            newPhase = 1;
-            resetPhaseStart = true;
+
+          // EVENT_READY: Phase 1 → Phase 2 (14 days), Phase 2 → Phase 1 (7 days), Phase 4 when 5+ lbs over goal
+          else if (programType === 'event_ready' && newPhase === currentPhase) {
+            // Phase 1 → Phase 2: After 14 days
+            if (currentPhase === 1 && daysInPhase >= 14) {
+              newPhase = 2;
+              resetPhaseStart = true;
+            }
+            // Phase 2 → Phase 1: After 7 days
+            else if (currentPhase === 2 && daysInPhase >= 7) {
+              newPhase = 1;
+              resetPhaseStart = true;
+            }
+            // Phase 4: If 5+ lbs over goal → Phase 1
+            else if (currentPhase === 4 && goalWeight && weight > goalWeight + 5) {
+              newPhase = 1;
+              resetPhaseStart = true;
+            }
           }
-          // PHASE 5: 14 days fixed (Get Shredded)
-          // Only if NOT already moving to Phase 4 via goal check
-          else if (newPhase === currentPhase && currentPhase === 5 && daysInPhase >= 14) {
-            newPhase = 1;
-            resetPhaseStart = true;
+
+          // GENERAL_HEALTH: Phase 4 ↔ Phase 1 (4+ lbs gain triggers Phase 1, 7 days returns to Phase 4)
+          else if (programType === 'general_health' && newPhase === currentPhase) {
+            // Phase 4 → Phase 1: If client GAINS 4+ lbs over goal
+            if (currentPhase === 4 && goalWeight && weight > goalWeight + 4) {
+              newPhase = 1;
+              resetPhaseStart = true;
+            }
+            // Phase 1 → Phase 4: After 7 days
+            else if (currentPhase === 1 && daysInPhase >= 7) {
+              newPhase = 4;
+              resetPhaseStart = true;
+            }
           }
-          // PHASE 4: 5+ lbs over goal - back to Phase 1 (NOT for muscle gain)
-          else if (newPhase === currentPhase && currentPhase === 4 && goalWeight && weight > goalWeight + 5) {
-            newPhase = 1;
-            resetPhaseStart = true;
-          }
-          // GENERAL_HEALTH: Phase 1 max 7 days (NOT 14)
-          // Only applies if not already transitioning via goal or day-count
-          if (newPhase === currentPhase && currentPhase === 1 && programType === 'general_health' && daysInPhase >= 7) {
-            newPhase = 4;
-            resetPhaseStart = true;
-          }
-          // MUSCLE GAIN: Phase 4 → Phase 6 when 5+ lbs under goal
-          else if (newPhase === currentPhase && currentPhase === 4 && programType === 'muscle_gain' && goalWeight && weight < goalWeight - 5) {
-            newPhase = 6;
-            resetPhaseStart = true;
+
+          // MUSCLE_GAIN: Phase 6 ↔ Phase 4 (at goal = Phase 4, 5+ lbs below = Phase 6)
+          else if (programType === 'muscle_gain' && newPhase === currentPhase) {
+            // At goal → Phase 4
+            if (goalWeight && weight >= goalWeight) {
+              newPhase = 4;
+              resetPhaseStart = true;
+            }
+            // Weight drops 5+ lbs below goal → Phase 6
+            else if (currentPhase === 4 && goalWeight && weight < goalWeight - 5) {
+              newPhase = 6;
+              resetPhaseStart = true;
+            }
+            // At goal again → Phase 4 (from Phase 6)
+            else if (currentPhase === 6 && goalWeight && weight >= goalWeight) {
+              newPhase = 4;
+              resetPhaseStart = true;
+            }
           }
 
           // Calculate current_week based on phase and days in phase
