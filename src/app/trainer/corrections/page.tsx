@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getTrainerUser } from '@/lib/auth';
 
 interface Correction {
   id: string;
@@ -36,15 +37,12 @@ export default function TrainerCorrectionsPage() {
   const [tab, setTab] = useState<'pending' | 'approved' | 'all'>('pending');
 
   useEffect(() => {
-    const userData = localStorage.getItem('trainer_user');
-    const userType = localStorage.getItem('trainer_user_type');
-
-    if (!userData || userType !== 'trainer') {
+    const user = getTrainerUser();
+    if (!user) {
       router.push('/?login=trainer');
       return;
     }
 
-    const user = JSON.parse(userData);
     setTrainer(user);
     fetchCorrections(user.id);
   }, [router]);

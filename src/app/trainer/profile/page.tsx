@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { logout } from '@/lib/auth';
+import { logout, getTrainerUser } from '@/lib/auth';
 
 interface TrainerData {
   id: string;
@@ -20,16 +20,13 @@ export default function TrainerProfilePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const userData = localStorage.getItem('trainer_user');
-    const userType = localStorage.getItem('trainer_user_type');
-
-    if (!userData || userType !== 'trainer') {
+    const user = getTrainerUser();
+    if (!user) {
       router.push('/?login=trainer');
       return;
     }
 
     try {
-      const user = JSON.parse(userData);
       setTrainer(user);
     } catch (e) {
       router.push('/?login=trainer');

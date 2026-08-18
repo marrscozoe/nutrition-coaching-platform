@@ -11,6 +11,8 @@ function LoadingFallback() {
   );
 }
 
+import { setClientUser } from '@/lib/auth';
+
 function OnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -94,16 +96,8 @@ function OnboardingContent() {
         name: nameParam,
         trainer_id: trainerId || null,
       };
-      // Clear only client session data (preserve trainer session if one exists in same browser tab)
-      // This prevents the bug where a trainer would be logged out when a client signs up in the same browser
-      localStorage.removeItem('client_user');
-      localStorage.removeItem('client_user_type');
-      localStorage.removeItem('user'); // Legacy cleanup
-      localStorage.removeItem('userType'); // Legacy cleanup
-      // Do NOT clear trainer_user/trainer_user_type - preserve trainer session
-      // Set client session using dedicated keys (separate from trainer keys)
-      localStorage.setItem('client_user', JSON.stringify(clientData));
-      localStorage.setItem('client_user_type', 'client');
+      // Use namespaced storage keys by client_id for session isolation
+      setClientUser(clientData);
 
       setSuccessMessage('Account created! Redirecting to your dashboard...');
       setTimeout(() => router.push('/client'), 2000);

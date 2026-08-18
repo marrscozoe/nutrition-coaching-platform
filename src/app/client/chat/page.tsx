@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getClientUser } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -60,15 +61,12 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const userData = localStorage.getItem('client_user');
-    const userType = localStorage.getItem('client_user_type');
-
-    if (!userData || userType !== 'client') {
+    const user = getClientUser();
+    if (!user) {
       router.push('/');
       return;
     }
 
-    const user = JSON.parse(userData);
     setClient(user);
 
     // Load chat history from localStorage (use client-specific key to prevent cross-contamination)

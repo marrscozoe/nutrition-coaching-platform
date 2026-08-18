@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { setClientUser, setTrainerUser, getClientUser, getTrainerUser } from '@/lib/auth';
 
 export default function HomePage() {
   const router = useRouter();
@@ -25,17 +26,15 @@ export default function HomePage() {
         return;
       }
       
-      // Check trainer session first, then client session
-      const trainerUser = localStorage.getItem('trainer_user');
-      const trainerType = localStorage.getItem('trainer_user_type');
-      if (trainerUser && trainerType === 'trainer') {
+      // Check trainer session first (namespaced), then client session (namespaced)
+      const trainer = getTrainerUser();
+      if (trainer) {
         router.push('/trainer');
         return;
       }
       
-      const clientUser = localStorage.getItem('client_user');
-      const clientType = localStorage.getItem('client_user_type');
-      if (clientUser && clientType === 'client') {
+      const client = getClientUser();
+      if (client) {
         router.push('/client');
       }
     } catch (e) {
@@ -86,13 +85,11 @@ export default function HomePage() {
           return;
         }
 
-        // Store user data in localStorage (use separate keys for each user type to prevent overwriting)
+        // Store user data in localStorage (use namespaced keys by user ID for session isolation)
         if (data.userType === 'trainer') {
-          localStorage.setItem('trainer_user', JSON.stringify(data.user));
-          localStorage.setItem('trainer_user_type', 'trainer');
+          setTrainerUser(data.user);
         } else {
-          localStorage.setItem('client_user', JSON.stringify(data.user));
-          localStorage.setItem('client_user_type', 'client');
+          setClientUser(data.user);
         }
 
         // Redirect based on user type

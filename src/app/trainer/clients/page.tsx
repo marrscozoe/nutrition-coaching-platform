@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getTrainerUser } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -26,15 +27,12 @@ export default function TrainerClientsPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'trial'>('all');
 
   useEffect(() => {
-    const userData = localStorage.getItem('trainer_user');
-    const userType = localStorage.getItem('trainer_user_type');
-
-    if (!userData || userType !== 'trainer') {
+    const user = getTrainerUser();
+    if (!user) {
       router.push('/?login=trainer');
       return;
     }
 
-    const user = JSON.parse(userData);
     fetchClients(user.id);
   }, [router]);
 

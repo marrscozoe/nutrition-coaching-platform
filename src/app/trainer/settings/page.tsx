@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getTrainerUser, setTrainerUser, logout } from '@/lib/auth';
 
 interface TrainerData {
   id: string;
@@ -41,15 +42,12 @@ export default function TrainerSettingsPage() {
   const [loadingClients, setLoadingClients] = useState(false);
 
   useEffect(() => {
-    const userData = localStorage.getItem('trainer_user');
-    const userType = localStorage.getItem('trainer_user_type');
-
-    if (!userData || userType !== 'trainer') {
+    const user = getTrainerUser();
+    if (!user) {
       router.push('/?login=trainer');
       return;
     }
 
-    const user = JSON.parse(userData);
     setTrainer(user);
     setName(user.name || '');
     setBusinessName(user.business_name || '');
@@ -155,7 +153,7 @@ export default function TrainerSettingsPage() {
       brand_color: brandColor,
     };
     setTrainer(updated as any);
-    localStorage.setItem('trainer_user', JSON.stringify(updated));
+    setTrainerUser(updated);
 
     setSaving(false);
     setSaved(true);
@@ -364,12 +362,8 @@ export default function TrainerSettingsPage() {
         <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
           <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wider mb-4">Account</h2>
           <button
-            onClick={() => {
-              localStorage.removeItem('trainer_user');
-              localStorage.removeItem('trainer_user_type');
-              localStorage.removeItem('user'); // Legacy cleanup
-              localStorage.removeItem('userType'); // Legacy cleanup
-              router.push('/');
+            onClick={async () => {
+              await logout();
             }}
             className="w-full py-3 rounded-xl bg-red-500/20 text-red-400 font-medium hover:bg-red-500/30 transition-colors"
           >

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Toast from '@/components/Toast';
+import { getClientUser } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -56,15 +57,12 @@ export default function LogMealPage() {
   const [submittingCorrection, setSubmittingCorrection] = useState(false);
 
   useEffect(() => {
-    const userData = localStorage.getItem('client_user');
-    const userType = localStorage.getItem('client_user_type');
-
-    if (!userData || userType !== 'client') {
+    const user = getClientUser();
+    if (!user) {
       router.push('/');
       return;
     }
 
-    const user = JSON.parse(userData);
     setClient(user);
     setLoading(false);
     
