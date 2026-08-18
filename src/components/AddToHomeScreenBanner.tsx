@@ -10,15 +10,23 @@ export default function AddToHomeScreenBanner() {
     // Check if already dismissed or if already installed
     const dismissed = localStorage.getItem('pwa-install-dismissed');
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    
+
     if (dismissed || isStandalone) return;
-    
+
     // Show banner after a short delay
     const timer = setTimeout(() => {
       setShowBanner(true);
     }, 3000);
-    
-    return () => clearTimeout(timer);
+
+    // Auto-dismiss after 15 seconds so it never permanently blocks UI
+    const autoDismissTimer = setTimeout(() => {
+      handleDismiss();
+    }, 15000);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(autoDismissTimer);
+    };
   }, []);
 
   function handleDismiss() {
@@ -30,7 +38,8 @@ export default function AddToHomeScreenBanner() {
   if (!showBanner) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-50 animate-slide-up">
+    // pointer-events-none ensures this banner never blocks clicks on underlying UI
+    <div className="fixed bottom-20 left-4 right-4 z-40 animate-slide-up pointer-events-none">
       <div className="bg-brand-charcoal/95 backdrop-blur-sm border border-brand-orange/30 rounded-2xl p-4 shadow-2xl">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-brand-orange/20 flex items-center justify-center flex-shrink-0">
@@ -44,9 +53,10 @@ export default function AddToHomeScreenBanner() {
               Tap the share button → "Add to Home Screen" for the best experience!
             </p>
           </div>
+          {/* Only the dismiss button receives pointer events */}
           <button
             onClick={handleDismiss}
-            className="text-brand-cream/40 hover:text-brand-cream/80 flex-shrink-0 p-1"
+            className="text-brand-cream/40 hover:text-brand-cream/80 flex-shrink-0 p-1 pointer-events-auto"
             aria-label="Dismiss"
           >
             ✕

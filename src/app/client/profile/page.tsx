@@ -42,6 +42,21 @@ export default function ProfilePage() {
   const [editEventDate, setEditEventDate] = useState('');
   const [showProgramInfo, setShowProgramInfo] = useState<string | null>(null);
 
+  async function fetchClientData(clientId: string) {
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { 'x-client-id': clientId },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClient(data.user);
+        sessionStorage.setItem('client_user', JSON.stringify(data.user));
+      }
+    } catch (err) {
+      console.error('Failed to fetch client data:', err);
+    }
+  }
+
   useEffect(() => {
     const userData = sessionStorage.getItem('client_user');
     const userType = sessionStorage.getItem('client_user_type');
@@ -53,6 +68,9 @@ export default function ProfilePage() {
 
     const user = JSON.parse(userData);
     setClient(user);
+
+    // Fetch fresh data from server to ensure phase and weights are current
+    fetchClientData(user.id);
     setLoading(false);
   }, [router]);
 
@@ -91,6 +109,13 @@ case 'get_shredded': return 'Get Shredded';
         <div className="text-brand-orange text-xl">Loading...</div>
       </div>
     );
+  }
+
+  // Refresh handler for pull-to-refresh or manual refresh
+  async function handleRefresh() {
+    if (client) {
+      await fetchClientData(client.id);
+    }
   }
 
   const weightLost = client.starting_weight && client.current_weight

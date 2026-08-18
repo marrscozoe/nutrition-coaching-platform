@@ -121,6 +121,8 @@ export default function WeightPage() {
 
     const user = JSON.parse(userData);
     setClient(user);
+    // Fetch fresh client data from server to ensure current_weight is accurate
+    fetchClientData(user.id);
     fetchWeightHistory(user.id);
     setLoading(false);
   }, [router]);
@@ -138,15 +140,36 @@ export default function WeightPage() {
     }
   }
 
+  async function fetchClientData(clientId: string) {
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { 'x-client-id': clientId },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClient(data.user);
+        sessionStorage.setItem('client_user', JSON.stringify(data.user));
+        return data.user;
+      }
+    } catch (err) {
+      console.error('Failed to fetch client data:', err);
+    }
+    return null;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!weight || !client) return;
 
     setSubmitting(true);
 
+    // Fetch fresh client data to ensure prevWeight is accurate (not stale from sessionStorage)
+    const freshClient = await fetchClientData(client.id);
+    const currentWeightForCalc = freshClient?.current_weight || client.current_weight || client.starting_weight;
+
     // Capture the previous weight BEFORE the API call updates the database
     // This is critical for the chat AI to correctly interpret the weight change
-    const prevWeight = client.current_weight || client.starting_weight;
+    const prevWeight = currentWeightForCalc;
 
     try {
       const res = await fetch('/api/weight', {
@@ -394,7 +417,6 @@ export default function WeightPage() {
                       <p className="text-brand-cream font-semibold">{w.weight} lbs</p>
                       <p className="text-xs text-brand-cream/50">
                         {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                        {w.weigh_day && ` • ${w.weigh_day}`}
                       </p>
                     </div>
                     {w.pant_size && (

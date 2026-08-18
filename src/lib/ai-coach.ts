@@ -414,6 +414,12 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
   const lowerMessage = message.toLowerCase();
   const asksAboutPlan = lowerMessage.includes('what can i eat') || lowerMessage.includes('my plan') || lowerMessage.includes('show me') || lowerMessage.includes('what am i') || lowerMessage.includes('meal example') || lowerMessage.includes('example meal') || lowerMessage.includes('phase') || lowerMessage.includes('portion') || lowerMessage.includes('categories') || lowerMessage.includes('what to eat') || lowerMessage.includes('swap') || lowerMessage.includes('exchange');
 
+  // Build dynamic food examples from the actual food lists
+  const proteinList = LEAN_PROTEINS.slice(0, 8).join(', ');
+  const veggieList = FIBROUS_VEGETABLES.slice(0, 10).join(', ');
+  const starchList = STARCHY_CARBOHYDRATES.slice(0, 8).join(', ');
+  const fatList = HEALTHY_FATS.slice(0, 6).join(', ');
+
   if (asksAboutPlan) {
     // Build Phase 5 plan description if applicable
     let phase5PlanDesc = '';
@@ -433,10 +439,8 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
                       'You\'re done - maintenance!';
     
     const proteinExamples = context.gender === 'male' 
-      ? '6oz protein per meal (2-3 whole eggs)' 
-      : '4oz protein per meal (1-2 whole eggs)';
-    const veggieExamples = 'broccoli, spinach, asparagus, zucchini, peppers, salad';
-    const fatExamples = 'olive oil, avocado, almonds';
+      ? '6oz protein per meal' 
+      : '4oz protein per meal';
     const mealExample = context.gender === 'male' 
       ? '6oz grilled salmon, 2 cups broccoli with olive oil, 1/2 avocado' 
       : '4oz grilled chicken, 1.5 cups spinach with olive oil, few almonds';
@@ -447,10 +451,15 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
 
 Portions per meal:
 Protein: ${portions.protein} (${proteinExamples})
-Veggies: ${portions.fibrousVegetables} (${veggieExamples})
-Fat: ${portions.fat} (${fatExamples})
+Veggies: ${portions.fibrousVegetables} (${veggieList})
+Fat: ${portions.fat} (${fatList})
+Starch: ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : context.currentPhase === 2 ? 'Only on Wed/Sat/Sun breakfast & lunch' : 'Every meal'}
 Water: ${context.gender === 'male' ? '32oz' : '20oz'} per meal
-${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : ''}
+
+LEAN PROTEINS: ${proteinList}
+FIBROUS VEGETABLES: ${veggieList}
+HEALTHY FATS: ${fatList}
+${context.currentPhase !== 1 ? `STARCHY CARBOHYDRATES: ${starchList}` : ''}
 
 Example: ${mealExample}
 
@@ -460,6 +469,12 @@ ${context.eventDate ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Kee
 
 Ask me anything about specific foods!`;
   }
+
+  // Build dynamic food lists for the evaluation protocol
+  const evalProteinExamples = LEAN_PROTEINS.slice(0, 6).join(', ');
+  const evalVegExamples = FIBROUS_VEGETABLES.slice(0, 8).join(', ');
+  const evalStarchExamples = STARCHY_CARBOHYDRATES.slice(0, 6).join(', ');
+  const evalFatExamples = HEALTHY_FATS.slice(0, 5).join(', ');
 
   return `You are ALLEN'S AI NUTRITION COACH. You act exactly like Allen would in a text conversation with a client.
 
@@ -486,19 +501,19 @@ ALLEN'S COACHING STYLE:
 ⚠️ MEAL EVALUATION PROTOCOL — ALWAYS FOLLOW THIS EXACT ORDER ⚠️
 When client describes a meal they ate or are eating, you MUST check ALL of these in order:
 
-1. PROTEIN — Is there lean protein? (chicken, beef, fish, eggs, etc.)
+1. PROTEIN — Is there lean protein? (${evalProteinExamples})
    - Missing → tell them to add ${context.gender === 'male' ? '6oz' : '4oz'} protein
    
-2. VEGETABLES — Are there fibrous vegetables? (broccoli, asparagus, peppers, spinach, etc.)
+2. VEGETABLES — Are there fibrous vegetables? (${evalVegExamples})
    - Missing → tell them to add ${context.gender === 'male' ? '2 cups' : '1-2 cups'} veggies
    
-3. STARCH — Is starch present? (rice, potato, beans, oatmeal, etc.)
+3. STARCH — Is starch present? (${evalStarchExamples})
    - Phase 1: NO starch allowed — if they have starch, tell them to drop it
    - Phase 2: Starch only allowed at breakfast/lunch on Wed/Sat/Sun — if they have starch at wrong meal/day, tell them
    - Phase 4/5: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '2 cups' : '1 cup'}
    - Phase 6: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '3 cups' : '2 cups'} (Phase 6 allows MORE starch)
    
-4. HEALTHY FAT — Is there fat? (olive oil, avocado, nuts, etc.)
+4. HEALTHY FAT — Is there fat? (${evalFatExamples})
    - Phase 1/2/4/5: Missing → tell them to add ${context.gender === 'male' ? '2 tbsp' : '1 tbsp'} fat
    - Phase 6: Missing → tell them to add ${context.gender === 'male' ? '3 tbsp' : '3 tbsp'} fat (Phase 6 allows MORE fat)
    
