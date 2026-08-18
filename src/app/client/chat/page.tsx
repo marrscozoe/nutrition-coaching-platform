@@ -94,6 +94,43 @@ export default function ChatPage() {
       }]);
     }
 
+    // Fetch past meals from database and add to chat history
+    async function loadPastMeals() {
+      try {
+        const res = await fetch(`/api/meals?limit=20`, {
+          headers: { 'x-client-id': user.id },
+        });
+        const data = await res.json();
+        const meals = data.meals || [];
+        
+        // Convert past meals to chat messages and add to history
+        const pastMessages: ChatMessage[] = meals.map((meal: any) => [
+          {
+            id: `meal-${meal.id}-user`,
+            role: 'user' as const,
+            content: meal.food_description || 'Logged a meal',
+            timestamp: new Date(meal.logged_at),
+            isMealLog: true,
+          },
+          {
+            id: `meal-${meal.id}-coach`,
+            role: 'coach' as const,
+            content: meal.portion_advice || (meal.on_phase ? "Nice! You're on track! 💪" : "Keep pushing! You've got this! 💪"),
+            timestamp: new Date(new Date(meal.logged_at).getTime() + 1000),
+          }
+        ]).flat();
+        
+        if (pastMessages.length > 0) {
+          // Add to beginning of chat history (oldest first)
+          setMessages(prev => [...pastMessages, ...prev]);
+        }
+      } catch (err) {
+        console.error('Failed to load past meals:', err);
+      }
+    }
+
+    loadPastMeals();
+
     setLoading(false);
   }, [router]);
 
