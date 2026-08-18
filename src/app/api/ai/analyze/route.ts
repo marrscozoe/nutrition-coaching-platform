@@ -10,6 +10,8 @@ import {
   getTomorrowStarchMessage,
   getTomorrowPhase,
   Phase5Day,
+  extractMealData,
+  getMealEvaluationPrompt,
 } from '@/lib/ai-coach';
 import { initializeCorrectionsCache } from '@/lib/food-corrections-cache';
 import { existsSync, unlinkSync, mkdirSync } from 'fs';
@@ -197,8 +199,8 @@ export async function POST(request: NextRequest) {
         const analysis = await analyzeMealPortion(foodDescription || 'Unknown meal', context, mealType);
         const afterDinnerMsg = getAfterDinnerMessage();
         const portionAdvice = afterDinnerMsg 
-          ? `${analysis.advice}\n\n${afterDinnerMsg}` 
-          : analysis.advice;
+          ? `${analysis.portionAdvice}\n\n${afterDinnerMsg}` 
+          : analysis.portionAdvice;
         return NextResponse.json({
           analysis: visionResult.error,
           portionAdvice,
@@ -227,40 +229,62 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Use getCoachPrompt for photo analysis - same prompt as chat!
-      // Format as a meal description for the coach to evaluate
-      const mealMessage = `I'm eating ${visionResult.text}`;
-      const coachPrompt = getCoachPrompt(context, mealMessage);
-      const systemMessage: AIMessage = { role: 'system', content: coachPrompt };
-      const chatResult = await chatWithChatAI([systemMessage], mealMessage);
+      // HYBRID FLOW: Gemini Flash → extractMealData → analyzeMealPortion → getMealEvaluationPrompt → MiniMax
+      const identifiedFood = visionResult.text;
+      const evalContext: CoachContext = {
+        ...context,
+        mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
+      };
       
-      // Get rule-based corrections for onPhase status
-      const ruleBasedAnalysis = await analyzeMealPortion(visionResult.text, context, mealType);
+      // Step 1: extractMealData
+      const mealDataStructured = extractMealData(identifiedFood, evalContext);
+      
+      // Step 2: analyzeMealPortion
+      const analysis = await analyzeMealPortion(identifiedFood, evalContext, mealType);
+      
+      // Step 3: getMealEvaluationPrompt
+      const evalPrompt = getMealEvaluationPrompt(mealDataStructured, analysis, evalContext);
+      
+      // Step 4: Send to MiniMax
+      const systemMessage: AIMessage = { role: 'system', content: evalPrompt };
+      const chatResult = await chatWithChatAI([systemMessage], `My meal: ${identifiedFood}`);
+      
       const afterDinnerMsg = getAfterDinnerMessage();
-      let portionAdvice = chatResult.text || ruleBasedAnalysis.advice;
+      let portionAdvice = chatResult.text || analysis.portionAdvice;
       if (afterDinnerMsg) {
         portionAdvice = `${portionAdvice}\n\n${afterDinnerMsg}`;
       }
       
       return NextResponse.json({
-        analysis: visionResult.text, // Vision AI's food identification
-        portionAdvice, // Chat AI's advice, fallback to rule-based
-        onPhase: ruleBasedAnalysis.onPhase,
-        corrections: ruleBasedAnalysis.corrections,
+        analysis: visionResult.text, // Vision AI's food identification (for reference)
+        portionAdvice, // Chat AI's coaching advice
+        onPhase: analysis.onPhase,
+        corrections: analysis.corrections,
         provider: visionResult.provider,
         photoDeleted: true,
       });
     }
 
-    // Text-based analysis - use getCoachPrompt (same as chat!)
-    const mealMessage = `I'm eating ${foodDescription || ''}`;
-    const coachPrompt = getCoachPrompt(context, mealMessage);
-    const systemMessage: AIMessage = { role: 'system', content: coachPrompt };
-    const aiResult = await chatWithChatAI([systemMessage], mealMessage);
+    // Text-based analysis - HYBRID FLOW
+    const evalContext: CoachContext = {
+      ...context,
+      mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
+    };
+    
+    // Step 1: extractMealData
+    const mealDataStructured = extractMealData(foodDescription || '', evalContext);
+    
+    // Step 2: analyzeMealPortion
+    const analysis = await analyzeMealPortion(foodDescription || '', evalContext, mealType);
+    
+    // Step 3: getMealEvaluationPrompt
+    const evalPrompt = getMealEvaluationPrompt(mealDataStructured, analysis, evalContext);
+    
+    // Step 4: Send to MiniMax
+    const systemMessage: AIMessage = { role: 'system', content: evalPrompt };
+    const aiResult = await chatWithChatAI([systemMessage], `My meal: ${foodDescription || ''}`);
 
     if (aiResult.text) {
-      // AI succeeded - use AI response plus rule-based corrections for onPhase status
-      const analysis = await analyzeMealPortion(foodDescription || '', context, mealType);
       const afterDinnerMsg = getAfterDinnerMessage();
       let portionAdvice = aiResult.text;
       if (afterDinnerMsg) {
@@ -276,11 +300,10 @@ export async function POST(request: NextRequest) {
     }
 
     // AI failed - fallback to rule-based
-    const analysis = await analyzeMealPortion(foodDescription || '', context, mealType);
     const afterDinnerMsg = getAfterDinnerMessage();
     const portionAdvice = afterDinnerMsg 
-      ? `${analysis.advice}\n\n${afterDinnerMsg}` 
-      : analysis.advice;
+      ? `${analysis.portionAdvice}\n\n${afterDinnerMsg}` 
+      : analysis.portionAdvice;
     return NextResponse.json({
       analysis: portionAdvice,
       portionAdvice,

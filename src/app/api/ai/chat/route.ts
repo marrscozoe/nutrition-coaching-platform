@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/db';
-import { 
+import {
   chatWithChatAI, 
   CoachContext, 
   AIMessage, 
@@ -8,6 +8,8 @@ import {
   getWeightAnalysisPrompt,
   analyzeMealPortion, 
   getWeightResponse,
+  extractMealData,
+  getMealEvaluationPrompt,
   LEAN_PROTEINS,
   STARCHY_CARBOHYDRATES,
   FIBROUS_VEGETABLES,
@@ -58,20 +60,32 @@ export async function POST(request: NextRequest) {
       phase5StartDate: client.phase5_start_date || undefined,
     };
 
-    // Handle meal analysis request - use getCoachPrompt (same as chat!)
+    // Handle meal analysis request - HYBRID FLOW (code + AI)
     if (mealData) {
       const foodDescription = mealData.foodDescription || mealData.description || '';
-      const mealMessage = `I'm eating ${foodDescription}`;
-      const coachPrompt = getCoachPrompt(context, mealMessage);
+      const mealContext: CoachContext = {
+        ...context,
+        mealType: mealData.mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
+        mealDate: mealData.mealDate || undefined,
+      };
 
-      const systemMessage: AIMessage = { role: 'system', content: coachPrompt };
-      const result = await chatWithChatAI([systemMessage], mealMessage, preferredProvider);
+      // Step 1: extractMealData - parse meal into structured data
+      const mealDataStructured = extractMealData(foodDescription, mealContext);
+
+      // Step 2: analyzeMealPortion - phase rule enforcement
+      const analysis = await analyzeMealPortion(foodDescription, mealContext, mealData.mealType);
+
+      // Step 3: getMealEvaluationPrompt - generate MiniMax prompt
+      const evalPrompt = getMealEvaluationPrompt(mealDataStructured, analysis, mealContext);
+
+      // Step 4: Send to MiniMax with structured prompt
+      const systemMessage: AIMessage = { role: 'system', content: evalPrompt };
+      const result = await chatWithChatAI([systemMessage], `My meal: ${foodDescription}`, preferredProvider);
 
       if (result.error || !result.text) {
         // Fallback to rule-based response
-        const fallback = await analyzeMealPortion(foodDescription, context, mealData.mealType);
         return NextResponse.json({
-          response: fallback.advice,
+          response: analysis.portionAdvice,
           type: 'meal_analysis',
           provider: result.provider || 'fallback',
         });
@@ -233,7 +247,7 @@ export async function POST(request: NextRequest) {
         if (foodDescription.length > 2) {
           const analysis = await analyzeMealPortion(foodDescription, context);
           return NextResponse.json({
-            response: analysis.advice,
+            response: analysis.portionAdvice,
             type: 'meal_analysis',
             corrections: analysis.corrections,
           });
@@ -447,7 +461,7 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
       lower.includes('fat') || lower.includes('starch') ||
       lower.includes('what can i') || lower.includes('what should i') || lower.includes('what am i')) {
     const fallback = await analyzeMealPortion(message, context);
-    return fallback.advice;
+    return fallback.portionAdvice;
   }
 
   // PORTION SIZES - simple response (no AI, no markdown)

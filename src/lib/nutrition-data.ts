@@ -51,6 +51,14 @@ export const HEALTHY_FATS = [
   'MCT oil (in coffee)',
 ];
 
+export const SUPPLEMENTS = [
+  'Whey protein',
+  'Creatine',
+  'Protein drink',
+  'Meal replacement',
+  'Vitamin',
+];
+
 // ============================================
 // PORTION SIZES — by gender AND phase
 // ============================================

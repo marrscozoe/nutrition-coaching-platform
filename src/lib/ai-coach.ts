@@ -13,6 +13,7 @@ import {
   FIBROUS_VEGETABLES,
   STARCHY_CARBOHYDRATES,
   HEALTHY_FATS,
+  SUPPLEMENTS,
 } from './nutrition-data';
 
 // Initialize corrections cache on module load (server-only)
@@ -602,367 +603,6 @@ ${isMaintained ? `- MAINTAINED: Acknowledge it positively. "Holding steady! Cons
 
 Give coaching feedback now:`;
 }
-
-export async function analyzeMealPortion(
-  foodDescription: string | undefined | null,
-  context: CoachContext,
-  mealType?: string
-): Promise<{ advice: string; onPhase: boolean; corrections: string[] }> {
-  // Defensive: ensure foodDescription is a valid non-empty string
-  if (!foodDescription || typeof foodDescription !== 'string' || foodDescription.trim().length === 0) {
-    return {
-      advice: 'Please describe what you are eating so I can give you portion advice.',
-      onPhase: false,
-      corrections: [],
-    };
-  }
-
-  // Ensure corrections cache is loaded before doing any correction lookups
-  await ensureCacheLoaded();
-
-  const portions = getPortions(context.gender, context.currentPhase);
-  const isSnack = mealType === 'snack';
-  const foodLower = foodDescription.toLowerCase();
-
-  // =============================================
-  // SNACK LOGIC
-  // =============================================
-  if (isSnack) {
-    const snackCheck = isSnackAllowed(foodDescription, context.currentPhase);
-    if (!snackCheck.allowed) {
-      const disallowedMsg = `⚠️ ${foodDescription} is not allowed in Phase ${context.currentPhase}!`;
-      const waterReminder = getWaterReminder(context.gender);
-      return {
-        advice: `${disallowedMsg} ${waterReminder}`,
-        onPhase: false,
-        corrections: [disallowedMsg, waterReminder],
-      };
-    }
-    const waterReminder = getWaterReminder(context.gender);
-    return {
-      advice: `Looks good! ${waterReminder}`,
-      onPhase: true,
-      corrections: [waterReminder],
-    };
-  }
-
-  // =============================================
-  // MATCH FOODS TO CATEGORIES using food lists
-  // =============================================
-  let hasProtein = false;
-  let hasVeg = false;
-  let hasStarch = false;
-  let hasFat = false;
-
-  // Check corrections cache for full food description first
-  const fullCorrection = getCorrection(foodDescription.toLowerCase().trim());
-  if (fullCorrection) {
-    if (fullCorrection.correctCategory === 'protein') hasProtein = true;
-    else if (fullCorrection.correctCategory === 'vegetable') hasVeg = true;
-    else if (fullCorrection.correctCategory === 'starch') hasStarch = true;
-    else if (fullCorrection.correctCategory === 'fat') hasFat = true;
-  } else {
-    // Check each word in the food description for corrections
-    const words = foodDescription.toLowerCase().split(/[\s,]+/).filter(w => w.length > 2);
-    for (const word of words) {
-      const wordCorrection = getCorrection(word);
-      if (wordCorrection) {
-        if (wordCorrection.correctCategory === 'protein') hasProtein = true;
-        else if (wordCorrection.correctCategory === 'vegetable') hasVeg = true;
-        else if (wordCorrection.correctCategory === 'starch') hasStarch = true;
-        else if (wordCorrection.correctCategory === 'fat') hasFat = true;
-      }
-    }
-
-    // Also match against food lists using substring matching
-    // Check protein foods
-    for (const protein of LEAN_PROTEINS) {
-      if (foodLower.includes(protein.toLowerCase())) {
-        hasProtein = true;
-        break;
-      }
-    }
-    // Check vegetable foods
-    for (const veg of FIBROUS_VEGETABLES) {
-      if (foodLower.includes(veg.toLowerCase())) {
-        hasVeg = true;
-        break;
-      }
-    }
-    // Check starch foods
-    for (const starch of STARCHY_CARBOHYDRATES) {
-      if (foodLower.includes(starch.toLowerCase())) {
-        hasStarch = true;
-        break;
-      }
-    }
-    // Check fat foods
-    for (const fat of HEALTHY_FATS) {
-      if (foodLower.includes(fat.toLowerCase())) {
-        hasFat = true;
-        break;
-      }
-    }
-  }
-
-  // =============================================
-  // EXTRACT PORTIONS FROM DESCRIPTION
-  // =============================================
-  // Patterns: "6oz chicken", "1 cup rice", "2 tbsp olive oil"
-  const portionPatterns: { pattern: RegExp; unit: string; category: string }[] = [
-    { pattern: /(\d+(?:\.\d+)?)\s*(?:oz|ounceounces?)/i, unit: 'oz', category: 'protein' },
-    { pattern: /(\d+(?:\.\d+)?)\s*(?:cups?|c)/i, unit: 'cup', category: 'veg' },
-    { pattern: /(\d+(?:\.\d+)?)\s*(?:tbsp|tablespoons?)/i, unit: 'tbsp', category: 'fat' },
-  ];
-
-  const extractedPortions: { amount: number; unit: string; category: string }[] = [];
-  for (const { pattern, unit, category } of portionPatterns) {
-    const match = foodDescription.match(pattern);
-    if (match) {
-      extractedPortions.push({ amount: parseFloat(match[1]), unit, category });
-    }
-  }
-
-  // =============================================
-  // WATER TRACKING (preserved from original)
-  // =============================================
-  const waterKeywords = ['water', 'h2o', 'drank', 'drinking', 'hydrate', 'hydration', 'sparkling water', 'mineral water', 'soda water', 'glass of water', 'bottle of water', 'cup of water'];
-  const hasWater = waterKeywords.some(w => foodLower.includes(w));
-  const coffeeKeywords = ['coffee', 'cafe', 'espresso', 'latte', 'cappuccino', 'mocha', 'americano'];
-  const hasCoffee = coffeeKeywords.some(c => foodLower.includes(c));
-
-  let loggedWaterOz = 0;
-  if (hasWater) {
-    const waterAmountMatch = foodDescription.match(/(\d+)\s*(?:oz|ounces?|oz\.)/i);
-    if (waterAmountMatch) {
-      loggedWaterOz = parseInt(waterAmountMatch[1], 10);
-    }
-  }
-
-  const baseWaterOz = context.gender === 'male' ? 128 : 80;
-  const todayCoffee = context.todayCoffeeIntake || 0;
-  const todayWater = context.todayWaterIntake || 0;
-  const mealsLogged = context.mealsLoggedToday || 0;
-  const totalWaterNeeded = baseWaterOz + todayCoffee;
-  const effectiveTodayWater = todayWater + loggedWaterOz;
-  const remainingMeals = Math.max(1, 3 - mealsLogged);
-  const remainingWater = Math.max(0, totalWaterNeeded - effectiveTodayWater);
-  const waterPerMeal = remainingMeals > 0 ? Math.round((remainingWater / remainingMeals) * 10) / 10 : 0;
-
-  let waterTrackingMessage = '';
-  if (hasWater) {
-    if (loggedWaterOz > 0) {
-      if (waterPerMeal > 0) {
-        waterTrackingMessage = `💧 Water tracked: ${loggedWaterOz}oz logged. You need ${waterPerMeal}oz water per remaining meal today.`;
-      } else {
-        waterTrackingMessage = `💧 Great job staying hydrated! ${loggedWaterOz}oz logged - you're on track with water today!`;
-      }
-    } else {
-      if (waterPerMeal > 0) {
-        waterTrackingMessage = `💧 Water tracked. You need ${waterPerMeal}oz water per remaining meal today.`;
-      } else {
-        waterTrackingMessage = `💧 Great job staying hydrated! You're on track with water today.`;
-      }
-    }
-  } else if (hasCoffee) {
-    const coffeeOz = 8;
-    const adjustedTotal = totalWaterNeeded + coffeeOz;
-    const newRemaining = Math.max(0, adjustedTotal - todayWater);
-    const newWaterPerMeal = Math.round((newRemaining / remainingMeals) * 10) / 10;
-    waterTrackingMessage = `☕ Coffee counts toward fluids, but you still need water. You need ${newWaterPerMeal}oz water per remaining meal (includes coffee adjustment).`;
-  } else {
-    if (todayWater > 0) {
-      const shortFall = Math.round((totalWaterNeeded - todayWater) * 10) / 10;
-      waterTrackingMessage = `💧 You're ${shortFall}oz short on water today. You need ${waterPerMeal}oz water per remaining meal.`;
-    } else {
-      waterTrackingMessage = `💧 You need ${waterPerMeal}oz water per meal. Aim for ${totalWaterNeeded}oz total daily (${baseWaterOz}oz base + ${todayCoffee}oz coffee adjustment).`;
-    }
-  }
-
-  // =============================================
-  // PHASE-BASED STARCH RULES
-  // =============================================
-  const corrections: string[] = [];
-  let onPhase = true;
-  const phase = context.currentPhase;
-
-  // Phase 1: NO starch
-  if (phase === 1) {
-    if (hasStarch) {
-      corrections.push(`⚠️ Phase 1 - NO starch! Skip the starch completely.`);
-      onPhase = false;
-    }
-  }
-  // Phase 2: Starch allowed Wed/Sat/Sun breakfast/lunch ONLY
-  else if (phase === 2 && hasStarch) {
-    const isBreakfastOrLunch = mealType === 'breakfast' || mealType === 'lunch';
-    const isDinnerOrSnack = mealType === 'dinner' || mealType === 'snack';
-
-    if (isDinnerOrSnack) {
-      corrections.push(`⚠️ Phase 2 - NO starch for ${mealType}! Only breakfast and lunch get starch in Phase 2. Skip the starch.`);
-      onPhase = false;
-    } else if (context.mealDate) {
-      const mealDateObj = new Date(context.mealDate + 'T12:00:00');
-      const dayOfWeek = mealDateObj.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-      const allowedDays = [0, 3, 6]; // Sun (0), Wed (3), Sat (6)
-
-      if (!allowedDays.includes(dayOfWeek)) {
-        corrections.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. No starch today. Remove it or swap for extra veg.`);
-        onPhase = false;
-      } else if ((context.mealsLoggedToday || 0) >= 2) {
-        corrections.push(`⚠️ Phase 2 - starch only in first 2 meals. You've had ${context.mealsLoggedToday} meals today. Skip the starch.`);
-        onPhase = false;
-      }
-      // If meal 1 or 2 on allowed day, starch is ALLOWED
-    } else {
-      // No mealDate - be conservative
-      corrections.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. Check if today is an allowed day before eating starch.`);
-      onPhase = false;
-    }
-  }
-  // Phase 5: Uses 3-day rotating rules (P1, P2, or P4)
-  else if (phase === 5 && context.programType !== 'event_ready' && hasStarch) {
-    const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
-    const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
-    const rulePhase = currentDayRule?.phase || 1;
-
-    if (rulePhase === 1) {
-      corrections.push(`⚠️ Phase 5 Day ${dayNum} (strict phase) - NO starch! Skip the starch completely.`);
-      onPhase = false;
-    } else if (rulePhase === 2) {
-      const isBreakfastOrLunch = mealType === 'breakfast' || mealType === 'lunch';
-      const isDinnerOrSnack = mealType === 'dinner' || mealType === 'snack';
-
-      if (isDinnerOrSnack) {
-        corrections.push(`⚠️ Phase 5 Day ${dayNum} - starch allowed at breakfast & lunch ONLY. No starch at ${mealType}! Skip the starch.`);
-        onPhase = false;
-      }
-      // rulePhase === 4: starch allowed every meal
-    }
-  }
-  // Phase 4 and Phase 6: starch allowed every meal - no violation
-
-  // =============================================
-  // CHECK MISSING CATEGORIES & PORTION VALIDATION
-  // =============================================
-
-  // --- Phase 6: Higher portions, starch allowed every meal ---
-  if (phase === 6) {
-    const isMale = context.gender === 'male';
-    const proteinTarget = isMale ? '6oz' : '4oz';
-    const vegTarget = isMale ? '2 cups' : '1-2 cups';
-    const fatTarget = isMale ? '3 tbsp' : '2 tbsp';
-    const starchTarget = isMale ? '3 cups' : '2 cups';
-
-    // Check portion amounts if given
-    for (const { amount, unit, category } of extractedPortions) {
-      if (category === 'protein' && unit === 'oz') {
-        const targetOz = isMale ? 6 : 4;
-        if (amount !== targetOz) {
-          corrections.push(`Protein portion: you had ${amount}oz — correct amount is ${proteinTarget} for Phase 6.`);
-          onPhase = false;
-        }
-      }
-    }
-
-    // Check protein
-    if (!hasProtein) {
-      corrections.push(`💡 Add ${proteinTarget} lean protein. ${waterTrackingMessage}`);
-    }
-    // Check veg
-    if (!hasVeg) {
-      corrections.push(`💡 Add ${vegTarget} fibrous vegetables. ${waterTrackingMessage}`);
-    }
-    // Check fat (Phase 6 has higher fat: 3 tbsp M / 2 tbsp F)
-    if (!hasFat) {
-      corrections.push(`💡 Add ${fatTarget} olive oil or healthy fat for Phase 6. ${waterTrackingMessage}`);
-    }
-    // Phase 6: starch is allowed every meal (no violation check needed, just gentle notice if missing)
-    if (!hasStarch) {
-      corrections.push(`💡 Notice: Starch is allowed every meal in Phase 6 — add ${starchTarget} if you'd like.`);
-    }
-  }
-
-  // --- Phase 1, 2, and Phase 5 (rulePhase 1 or 2): strict checks ---
-  else if (phase === 1 || phase === 2 || (phase === 5 && context.programType !== 'event_ready')) {
-    // Determine the effective rule phase
-    let rulePhase = phase;
-    if (phase === 5) {
-      const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
-      const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
-      rulePhase = currentDayRule?.phase || 1;
-    }
-
-    const isStrictPhase = rulePhase === 1 || rulePhase === 2;
-
-    if (isStrictPhase) {
-      // Check portion amounts if given
-      for (const { amount, unit, category } of extractedPortions) {
-        if (category === 'protein' && unit === 'oz') {
-          const targetOz = context.gender === 'male' ? 6 : 4;
-          if (amount !== targetOz) {
-            corrections.push(`Protein portion: you had ${amount}oz — correct amount is ${portions.protein} for this phase.`);
-            onPhase = false;
-          }
-        }
-        // Add more portion checks as needed
-      }
-
-      if (!hasProtein) {
-        corrections.push(`💡 Add ${portions.protein} lean protein. ${waterTrackingMessage}`);
-      }
-      if (!hasVeg) {
-        corrections.push(`💡 Add ${portions.fibrousVegetables} fibrous vegetables. ${waterTrackingMessage}`);
-      }
-      if (!hasFat) {
-        corrections.push(`💡 Add ${portions.fat} olive oil or ${portions.avocado} avocado for healthy fat. ${waterTrackingMessage}`);
-      }
-    } else {
-      // Phase 5 with rulePhase === 4: lenient notices (same as Phase 4)
-      if (!hasProtein) corrections.push(`💡 Notice: Consider adding some lean protein to round out your meal.`);
-      if (!hasVeg) corrections.push(`💡 Notice: Adding some fibrous vegetables would be great for your meal.`);
-      if (!hasFat) corrections.push(`💡 Notice: Don't forget healthy fat like olive oil, avocado, or nuts. Stay hydrated with water too!`);
-    }
-  }
-
-  // --- Phase 4: Gentle notices only ---
-  else if (phase === 4) {
-    if (!hasProtein) corrections.push(`💡 Notice: Consider adding some lean protein to round out your meal.`);
-    if (!hasVeg) corrections.push(`💡 Notice: Adding some fibrous vegetables would be great for your meal.`);
-    if (!hasFat) corrections.push(`💡 Notice: Don't forget healthy fat like olive oil, avocado, or nuts. Stay hydrated with water too!`);
-  }
-
-  // =============================================
-  // BUILD RESPONSE
-  // =============================================
-  if (corrections.length === 0) {
-    // All checks passed
-    if (phase === 4) {
-      return {
-        advice: waterPerMeal > 0
-          ? `🎉 You're at goal and maintaining! Keep eating healthy. ${waterTrackingMessage} You've got this! 💪`
-          : `🎉 You're at goal and maintaining! Keep eating healthy. Great job staying hydrated! 💪`,
-        onPhase: true,
-        corrections: waterPerMeal > 0 ? [waterTrackingMessage] : [],
-      };
-    }
-    return {
-      advice: waterPerMeal > 0
-        ? `Looks good! ${waterTrackingMessage} You've got this! 👊`
-        : `Looks good! Great job staying hydrated! 👊`,
-      onPhase: true,
-      corrections: waterPerMeal > 0 ? [waterTrackingMessage] : [],
-    };
-  }
-
-  // Had corrections or violations
-  const waterReminder = getWaterReminder(context.gender);
-  return {
-    advice: corrections.join('\n') + '\n' + waterReminder,
-    onPhase,
-    corrections,
-  };
-}
 export function getWeightResponse(
   currentWeight: number,
   previousWeight: number,
@@ -994,10 +634,715 @@ export function getPhaseAdvice(clientPhase: number): string {
     case 2:
       return 'Phase 2: Add starch on Wed/Sat/Sun to first 2 meals only.';
     case 4:
-      return 'Phase 4: Maintenance mode - add starch to every meal, weigh Fridays only.';
+      return 'Phase 4: Maintenance mode — add starch to every meal, weigh Fridays only.';
     case 5:
       return 'Phase 5: Aggressive Fat Loss - 3-day rotating plan. Plan regenerates every 3 days.';
     default:
       return 'Keep following your plan!';
   }
+}
+
+// ============================================
+// MEAL EVALUATION: extractMealData()
+// ============================================
+
+export interface RecognizedItem {
+  item: string;
+  category: 'protein' | 'vegetable' | 'starch' | 'fat' | 'supplement';
+}
+
+export interface PhaseContext {
+  phase: number;
+  gender: 'male' | 'female';
+  programType: string;
+  isSnack: boolean;
+  mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  mealDate?: string; // YYYY-MM-DD for Phase 2 day checking
+}
+
+export interface MealData {
+  recognizedItems: RecognizedItem[];
+  unrecognizedItems: string[];
+  phaseContext: PhaseContext;
+  missingCategories: string[];
+  disallowedItems: string[];
+  phaseRules: {
+    starchAllowed: boolean;
+    starchDays?: number[]; // Phase 2: [0, 3, 6] = Sun, Wed, Sat
+    starchMealTypes?: string[]; // Phase 2: ['breakfast', 'lunch']
+  };
+}
+
+/**
+ * Split meal description into individual food items.
+ * Handles commas, "and", and various separators.
+ */
+function splitIntoFoodItems(foodDescription: string): string[] {
+  // Split on common separators: commas, "and", newlines, semicolons
+  const items = foodDescription
+    .split(/[,\n;]+|\band\b/i)
+    .map(item => item.trim())
+    .filter(item => item.length > 0);
+  return items;
+}
+
+/**
+ * Extract structured meal data from a meal description.
+ * Uses substring matching (case-insensitive) against food categories.
+ */
+export function extractMealData(
+  foodDescription: string,
+  context: CoachContext
+): MealData {
+  const phase = context.currentPhase;
+  const foodLower = foodDescription.toLowerCase();
+  const isSnack = context.mealType === 'snack';
+
+  // Split into individual food items for detailed matching
+  const foodItems = splitIntoFoodItems(foodDescription);
+
+  const recognizedItems: RecognizedItem[] = [];
+  const unrecognizedItems: string[] = [];
+
+  // Track which categories are recognized
+  let hasProtein = false;
+  let hasVeg = false;
+  let hasStarch = false;
+  let hasFat = false;
+  let hasSupplement = false;
+
+  // For each food item, find which category it matches
+  for (const item of foodItems) {
+    const itemLower = item.toLowerCase();
+    let found = false;
+
+    // Check each category using substring matching (case-insensitive)
+    // Check protein
+    if (!hasProtein) {
+      for (const protein of LEAN_PROTEINS) {
+        if (itemLower.includes(protein.toLowerCase())) {
+          recognizedItems.push({ item, category: 'protein' });
+          hasProtein = true;
+          found = true;
+          break;
+        }
+      }
+    }
+
+    // Check vegetable
+    if (!found && !hasVeg) {
+      for (const veg of FIBROUS_VEGETABLES) {
+        if (itemLower.includes(veg.toLowerCase())) {
+          recognizedItems.push({ item, category: 'vegetable' });
+          hasVeg = true;
+          found = true;
+          break;
+        }
+      }
+    }
+
+    // Check starch
+    if (!found && !hasStarch) {
+      for (const starch of STARCHY_CARBOHYDRATES) {
+        if (itemLower.includes(starch.toLowerCase())) {
+          recognizedItems.push({ item, category: 'starch' });
+          hasStarch = true;
+          found = true;
+          break;
+        }
+      }
+    }
+
+    // Check fat
+    if (!found && !hasFat) {
+      for (const fat of HEALTHY_FATS) {
+        if (itemLower.includes(fat.toLowerCase())) {
+          recognizedItems.push({ item, category: 'fat' });
+          hasFat = true;
+          found = true;
+          break;
+        }
+      }
+    }
+
+    // Check supplements
+    if (!found && !hasSupplement) {
+      for (const supp of SUPPLEMENTS) {
+        if (itemLower.includes(supp.toLowerCase())) {
+          recognizedItems.push({ item, category: 'supplement' });
+          hasSupplement = true;
+          found = true;
+          break;
+        }
+      }
+    }
+
+    // If not found in any category, add to unrecognized
+    if (!found) {
+      unrecognizedItems.push(item);
+    }
+  }
+
+  // Also check for unrecognized items by looking for any unmatched
+  // food-related words in the description
+  // Water check (separate from food categories)
+  const waterKeywords = ['water', 'h2o', 'sparkling water', 'mineral water', 'soda water'];
+  const hasWater = waterKeywords.some(w => foodLower.includes(w));
+
+  // Determine missing categories
+  const missingCategories: string[] = [];
+  if (!hasProtein) missingCategories.push('protein');
+  if (!hasVeg) missingCategories.push('vegetable');
+  if (!hasFat) missingCategories.push('fat');
+
+  // Determine disallowed items based on phase rules
+  const disallowedItems: string[] = [];
+  let starchAllowed = false;
+
+  // Phase 1: no starch allowed
+  if (phase === 1) {
+    if (hasStarch) {
+      disallowedItems.push(...recognizedItems.filter(i => i.category === 'starch').map(i => i.item));
+    }
+    starchAllowed = false;
+  }
+  // Phase 2: starch Wed/Sat/Sun breakfast/lunch only
+  else if (phase === 2) {
+    starchAllowed = true; // Will be checked at analyze time with mealDate
+  }
+  // Phase 4, 6: starch allowed every meal
+  else if (phase === 4 || phase === 6) {
+    starchAllowed = true;
+  }
+  // Phase 5: depends on rotating sub-phase
+  else if (phase === 5) {
+    const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
+    const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
+    const rulePhase = currentDayRule?.phase || 1;
+
+    if (rulePhase === 1) {
+      if (hasStarch) {
+        disallowedItems.push(...recognizedItems.filter(i => i.category === 'starch').map(i => i.item));
+      }
+      starchAllowed = false;
+    } else if (rulePhase === 2) {
+      starchAllowed = true; // Checked at analyze time
+    } else {
+      starchAllowed = true;
+    }
+  }
+
+  // Determine missing categories for starch
+  if (!hasStarch && !isSnack) {
+    // Starch might be missing (except for Phase 1 and Phase 5 strict days)
+    if (phase !== 1 && !(phase === 5)) {
+      // Missing starch is not a "missing category" warning - it's optional notice
+      // Only add to missing if it was expected but not present
+    }
+  }
+
+  // Phase rules object
+  const phaseRules: MealData['phaseRules'] = {
+    starchAllowed,
+  };
+
+  if (phase === 2) {
+    phaseRules.starchDays = [0, 3, 6]; // Sun, Wed, Sat
+    phaseRules.starchMealTypes = ['breakfast', 'lunch'];
+  }
+
+  const phaseContext: PhaseContext = {
+    phase,
+    gender: context.gender,
+    programType: context.programType,
+    isSnack,
+    mealType: context.mealType,
+    mealDate: context.mealDate,
+  };
+
+  return {
+    recognizedItems,
+    unrecognizedItems,
+    phaseContext,
+    missingCategories,
+    disallowedItems,
+    phaseRules,
+  };
+}
+
+// ============================================
+// MEAL EVALUATION: Modified analyzeMealPortion()
+// ============================================
+
+/**
+ * Modified analyzeMealPortion returns structured data with all fields
+ * as described in the SPEC.
+ */
+export async function analyzeMealPortion(
+  foodDescription: string | undefined | null,
+  context: CoachContext,
+  mealType?: string
+): Promise<{
+  hasProtein: boolean;
+  hasVeg: boolean;
+  hasStarch: boolean;
+  hasFat: boolean;
+  hasWater: boolean;
+  hasSupplement: boolean;
+  unrecognizedItems: string[];
+  missingCategories: string[];
+  disallowedItems: string[];
+  portionAdvice: string;
+  onPhase: boolean;
+  corrections: string[];
+}> {
+  // Defensive: ensure foodDescription is a valid non-empty string
+  if (!foodDescription || typeof foodDescription !== 'string' || foodDescription.trim().length === 0) {
+    return {
+      hasProtein: false,
+      hasVeg: false,
+      hasStarch: false,
+      hasFat: false,
+      hasWater: false,
+      hasSupplement: false,
+      unrecognizedItems: [],
+      missingCategories: [],
+      disallowedItems: [],
+      portionAdvice: 'Please describe what you are eating so I can give you portion advice.',
+      onPhase: false,
+      corrections: [],
+    };
+  }
+
+  // Ensure corrections cache is loaded
+  await ensureCacheLoaded();
+
+  const portions = getPortions(context.gender, context.currentPhase);
+  const isSnack = mealType === 'snack' || context.mealType === 'snack';
+  const foodLower = foodDescription.toLowerCase();
+  const phase = context.currentPhase;
+
+  // =============================================
+  // SNACK LOGIC
+  // =============================================
+  if (isSnack) {
+    const snackCheck = isSnackAllowed(foodDescription, context.currentPhase);
+    if (!snackCheck.allowed) {
+      const disallowedMsg = `⚠️ ${foodDescription} is not allowed in Phase ${context.currentPhase}!`;
+      const waterReminder = getWaterReminder(context.gender);
+      return {
+        hasProtein: false,
+        hasVeg: false,
+        hasStarch: false,
+        hasFat: false,
+        hasWater: false,
+        hasSupplement: false,
+        unrecognizedItems: [foodDescription],
+        missingCategories: [],
+        disallowedItems: [foodDescription],
+        portionAdvice: `${disallowedMsg} ${waterReminder}`,
+        onPhase: false,
+        corrections: [disallowedMsg, waterReminder],
+      };
+    }
+    // Snacks: partial is fine, just check for violations
+    // Run basic food matching to detect any disallowed items
+    let hasProtein = false;
+    let hasVeg = false;
+    let hasStarch = false;
+    let hasFat = false;
+    let hasSupplement = false;
+    const unrecognizedItems: string[] = [];
+    const disallowedItems: string[] = [];
+
+    for (const protein of LEAN_PROTEINS) {
+      if (foodLower.includes(protein.toLowerCase())) { hasProtein = true; break; }
+    }
+    for (const veg of FIBROUS_VEGETABLES) {
+      if (foodLower.includes(veg.toLowerCase())) { hasVeg = true; break; }
+    }
+    for (const starch of STARCHY_CARBOHYDRATES) {
+      if (foodLower.includes(starch.toLowerCase())) { hasStarch = true; break; }
+    }
+    for (const fat of HEALTHY_FATS) {
+      if (foodLower.includes(fat.toLowerCase())) { hasFat = true; break; }
+    }
+    for (const supp of SUPPLEMENTS) {
+      if (foodLower.includes(supp.toLowerCase())) { hasSupplement = true; break; }
+    }
+
+    const waterReminder = getWaterReminder(context.gender);
+    return {
+      hasProtein,
+      hasVeg,
+      hasStarch,
+      hasFat,
+      hasWater: false,
+      hasSupplement,
+      unrecognizedItems,
+      missingCategories: [],
+      disallowedItems,
+      portionAdvice: `Looks good! ${waterReminder}`,
+      onPhase: true,
+      corrections: [waterReminder],
+    };
+  }
+
+  // =============================================
+  // MATCH FOODS TO CATEGORIES
+  // =============================================
+  let hasProtein = false;
+  let hasVeg = false;
+  let hasStarch = false;
+  let hasFat = false;
+  let hasSupplement = false;
+  const unrecognizedItems: string[] = [];
+
+  // Check corrections cache for full food description first
+  const fullCorrection = getCorrection(foodDescription.toLowerCase().trim());
+  if (fullCorrection) {
+    if (fullCorrection.correctCategory === 'protein') hasProtein = true;
+    else if (fullCorrection.correctCategory === 'vegetable') hasVeg = true;
+    else if (fullCorrection.correctCategory === 'starch') hasStarch = true;
+    else if (fullCorrection.correctCategory === 'fat') hasFat = true;
+  } else {
+    // Check each word in the food description for corrections
+    const words = foodDescription.toLowerCase().split(/[\s,]+/).filter(w => w.length > 2);
+    for (const word of words) {
+      const wordCorrection = getCorrection(word);
+      if (wordCorrection) {
+        if (wordCorrection.correctCategory === 'protein') hasProtein = true;
+        else if (wordCorrection.correctCategory === 'vegetable') hasVeg = true;
+        else if (wordCorrection.correctCategory === 'starch') hasStarch = true;
+        else if (wordCorrection.correctCategory === 'fat') hasFat = true;
+      }
+    }
+
+    // Match against food lists using substring matching
+    for (const protein of LEAN_PROTEINS) {
+      if (foodLower.includes(protein.toLowerCase())) { hasProtein = true; break; }
+    }
+    for (const veg of FIBROUS_VEGETABLES) {
+      if (foodLower.includes(veg.toLowerCase())) { hasVeg = true; break; }
+    }
+    for (const starch of STARCHY_CARBOHYDRATES) {
+      if (foodLower.includes(starch.toLowerCase())) { hasStarch = true; break; }
+    }
+    for (const fat of HEALTHY_FATS) {
+      if (foodLower.includes(fat.toLowerCase())) { hasFat = true; break; }
+    }
+    for (const supp of SUPPLEMENTS) {
+      if (foodLower.includes(supp.toLowerCase())) { hasSupplement = true; break; }
+    }
+  }
+
+  // Build unrecognized items list
+  const foodItems = splitIntoFoodItems(foodDescription);
+  for (const item of foodItems) {
+    const itemLower = item.toLowerCase();
+    let found = false;
+    for (const protein of LEAN_PROTEINS) { if (itemLower.includes(protein.toLowerCase())) { found = true; break; } }
+    if (!found) for (const veg of FIBROUS_VEGETABLES) { if (itemLower.includes(veg.toLowerCase())) { found = true; break; } }
+    if (!found) for (const starch of STARCHY_CARBOHYDRATES) { if (itemLower.includes(starch.toLowerCase())) { found = true; break; } }
+    if (!found) for (const fat of HEALTHY_FATS) { if (itemLower.includes(fat.toLowerCase())) { found = true; break; } }
+    if (!found) for (const supp of SUPPLEMENTS) { if (itemLower.includes(supp.toLowerCase())) { found = true; break; } }
+    if (!found) unrecognizedItems.push(item);
+  }
+
+  // =============================================
+  // WATER TRACKING
+  // =============================================
+  const waterKeywords = ['water', 'h2o', 'drank', 'drinking', 'hydrate', 'hydration', 'sparkling water', 'mineral water', 'soda water', 'glass of water', 'bottle of water', 'cup of water'];
+  const hasWater = waterKeywords.some(w => foodLower.includes(w));
+  const coffeeKeywords = ['coffee', 'cafe', 'espresso', 'latte', 'cappuccino', 'mocha', 'americano'];
+  const hasCoffee = coffeeKeywords.some(c => foodLower.includes(c));
+
+  let loggedWaterOz = 0;
+  if (hasWater) {
+    const waterAmountMatch = foodDescription.match(/(\d+)\s*(?:oz|ounces?|oz\.)/i);
+    if (waterAmountMatch) loggedWaterOz = parseInt(waterAmountMatch[1], 10);
+  }
+
+  const baseWaterOz = context.gender === 'male' ? 128 : 80;
+  const todayCoffee = context.todayCoffeeIntake || 0;
+  const todayWater = context.todayWaterIntake || 0;
+  const mealsLogged = context.mealsLoggedToday || 0;
+  const totalWaterNeeded = baseWaterOz + todayCoffee;
+  const effectiveTodayWater = todayWater + loggedWaterOz;
+  const remainingMeals = Math.max(1, 3 - mealsLogged);
+  const remainingWater = Math.max(0, totalWaterNeeded - effectiveTodayWater);
+  const waterPerMeal = remainingMeals > 0 ? Math.round((remainingWater / remainingMeals) * 10) / 10 : 0;
+
+  let waterTrackingMessage = '';
+  if (hasWater) {
+    if (loggedWaterOz > 0) {
+      waterTrackingMessage = waterPerMeal > 0
+        ? `💧 Water tracked: ${loggedWaterOz}oz logged. You need ${waterPerMeal}oz water per remaining meal today.`
+        : `💧 Great job staying hydrated! ${loggedWaterOz}oz logged - you're on track with water today!`;
+    } else {
+      waterTrackingMessage = waterPerMeal > 0
+        ? `💧 Water tracked. You need ${waterPerMeal}oz water per remaining meal today.`
+        : `💧 Great job staying hydrated! You're on track with water today.`;
+    }
+  } else if (hasCoffee) {
+    const coffeeOz = 8;
+    const adjustedTotal = totalWaterNeeded + coffeeOz;
+    const newRemaining = Math.max(0, adjustedTotal - todayWater);
+    const newWaterPerMeal = Math.round((newRemaining / remainingMeals) * 10) / 10;
+    waterTrackingMessage = `☕ Coffee counts toward fluids, but you still need water. You need ${newWaterPerMeal}oz water per remaining meal (includes coffee adjustment).`;
+  } else {
+    if (todayWater > 0) {
+      const shortFall = Math.round((totalWaterNeeded - todayWater) * 10) / 10;
+      waterTrackingMessage = `💧 You're ${shortFall}oz short on water today. You need ${waterPerMeal}oz water per remaining meal.`;
+    } else {
+      waterTrackingMessage = `💧 You need ${waterPerMeal}oz water per meal. Aim for ${totalWaterNeeded}oz total daily (${baseWaterOz}oz base + ${todayCoffee}oz coffee adjustment).`;
+    }
+  }
+
+  // =============================================
+  // PHASE-BASED STARCH RULES
+  // =============================================
+  const corrections: string[] = [];
+  const disallowedItems: string[] = [];
+  const missingCategories: string[] = [];
+  let onPhase = true;
+
+  // Phase 1: NO starch
+  if (phase === 1) {
+    if (hasStarch) {
+      disallowedItems.push(...unrecognizedItems.filter((_, i) => {
+        // Find which unrecognized items are starch-related
+        const itemLower = unrecognizedItems[i]?.toLowerCase() || '';
+        return STARCHY_CARBOHYDRATES.some(s => itemLower.includes(s.toLowerCase()));
+      }));
+      corrections.push(`⚠️ Phase 1 - NO starch! Skip the starch completely.`);
+      onPhase = false;
+    }
+  }
+  // Phase 2: Starch allowed Wed/Sat/Sun breakfast/lunch ONLY
+  else if (phase === 2 && hasStarch) {
+    const isBreakfastOrLunch = mealType === 'breakfast' || mealType === 'lunch' || context.mealType === 'breakfast' || context.mealType === 'lunch';
+    const isDinnerOrSnack = mealType === 'dinner' || mealType === 'snack' || context.mealType === 'dinner' || context.mealType === 'snack';
+
+    if (isDinnerOrSnack) {
+      corrections.push(`⚠️ Phase 2 - NO starch for ${mealType || context.mealType || 'this meal'}! Only breakfast and lunch get starch in Phase 2. Skip the starch.`);
+      onPhase = false;
+    } else if (context.mealDate) {
+      const mealDateObj = new Date(context.mealDate + 'T12:00:00');
+      const dayOfWeek = mealDateObj.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+      const allowedDays = [0, 3, 6]; // Sun (0), Wed (3), Sat (6)
+
+      if (!allowedDays.includes(dayOfWeek)) {
+        corrections.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. No starch today. Remove it or swap for extra veg.`);
+        onPhase = false;
+      } else if ((context.mealsLoggedToday || 0) >= 2) {
+        corrections.push(`⚠️ Phase 2 - starch only in first 2 meals. You've had ${context.mealsLoggedToday} meals today. Skip the starch.`);
+        onPhase = false;
+      }
+    } else {
+      corrections.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. Check if today is an allowed day before eating starch.`);
+      onPhase = false;
+    }
+  }
+  // Phase 5: Uses 3-day rotating rules
+  else if (phase === 5 && context.programType !== 'event_ready' && hasStarch) {
+    const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
+    const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
+    const rulePhase = currentDayRule?.phase || 1;
+
+    if (rulePhase === 1) {
+      corrections.push(`⚠️ Phase 5 Day ${dayNum} (strict phase) - NO starch! Skip the starch completely.`);
+      onPhase = false;
+    } else if (rulePhase === 2) {
+      const isBreakfastOrLunch = mealType === 'breakfast' || mealType === 'lunch' || context.mealType === 'breakfast' || context.mealType === 'lunch';
+      const isDinnerOrSnack = mealType === 'dinner' || mealType === 'snack' || context.mealType === 'dinner' || context.mealType === 'snack';
+
+      if (isDinnerOrSnack) {
+        corrections.push(`⚠️ Phase 5 Day ${dayNum} - starch allowed at breakfast & lunch ONLY. No starch at ${mealType || context.mealType}! Skip the starch.`);
+        onPhase = false;
+      }
+    }
+  }
+  // Phase 4 and Phase 6: starch allowed every meal - no violation
+
+  // =============================================
+  // CHECK MISSING CATEGORIES
+  // =============================================
+
+  if (phase === 6) {
+    if (!hasProtein) {
+      missingCategories.push('protein');
+      corrections.push(`💡 Add ${context.gender === 'male' ? '6oz' : '4oz'} lean protein.`);
+    }
+    if (!hasVeg) {
+      missingCategories.push('vegetable');
+      corrections.push(`💡 Add ${context.gender === 'male' ? '2 cups' : '1-2 cups'} fibrous vegetables.`);
+    }
+    if (!hasFat) {
+      missingCategories.push('fat');
+      corrections.push(`💡 Add ${context.gender === 'male' ? '3 tbsp' : '2 tbsp'} olive oil or healthy fat for Phase 6.`);
+    }
+    if (!hasStarch) {
+      corrections.push(`💡 Notice: Starch is allowed every meal in Phase 6 — add ${context.gender === 'male' ? '3 cups' : '2 cups'} if you'd like.`);
+    }
+  } else if (phase === 1 || phase === 2 || (phase === 5 && context.programType !== 'event_ready')) {
+    let rulePhase = phase;
+    if (phase === 5) {
+      const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
+      const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
+      rulePhase = currentDayRule?.phase || 1;
+    }
+
+    const isStrictPhase = rulePhase === 1 || rulePhase === 2;
+
+    if (isStrictPhase) {
+      if (!hasProtein) {
+        missingCategories.push('protein');
+        corrections.push(`💡 Add ${portions.protein} lean protein.`);
+      }
+      if (!hasVeg) {
+        missingCategories.push('vegetable');
+        corrections.push(`💡 Add ${portions.fibrousVegetables} fibrous vegetables.`);
+      }
+      if (!hasFat) {
+        missingCategories.push('fat');
+        corrections.push(`💡 Add ${portions.fat} olive oil or ${portions.avocado} avocado for healthy fat.`);
+      }
+      if (missingCategories.length > 0) onPhase = false;
+    }
+  } else if (phase === 4) {
+    if (!hasProtein) corrections.push(`💡 Notice: Consider adding some lean protein to round out your meal.`);
+    if (!hasVeg) corrections.push(`💡 Notice: Adding some fibrous vegetables would be great for your meal.`);
+    if (!hasFat) corrections.push(`💡 Notice: Don't forget healthy fat like olive oil, avocado, or nuts. Stay hydrated with water too!`);
+  }
+
+  // =============================================
+  // BUILD RESPONSE
+  // =============================================
+  let portionAdvice: string;
+
+  if (corrections.length === 0) {
+    if (phase === 4) {
+      portionAdvice = waterPerMeal > 0
+        ? `🎉 You're at goal and maintaining! Keep eating healthy. ${waterTrackingMessage} You've got this! 💪`
+        : `🎉 You're at goal and maintaining! Keep eating healthy. Great job staying hydrated! 💪`;
+    } else {
+      portionAdvice = waterPerMeal > 0
+        ? `Looks good! ${waterTrackingMessage} You've got this! 👊`
+        : `Looks good! Great job staying hydrated! 👊`;
+    }
+  } else {
+    const waterReminder = getWaterReminder(context.gender);
+    portionAdvice = corrections.join('\n') + '\n' + waterReminder;
+  }
+
+  return {
+    hasProtein,
+    hasVeg,
+    hasStarch,
+    hasFat,
+    hasWater,
+    hasSupplement,
+    unrecognizedItems,
+    missingCategories,
+    disallowedItems,
+    portionAdvice,
+    onPhase,
+    corrections,
+  };
+}
+
+// ============================================
+// MEAL EVALUATION: getMealEvaluationPrompt()
+// ============================================
+
+/**
+ * Generate a prompt for MiniMax from structured meal data.
+ * Takes the output of extractMealData() and analyzeMealPortion().
+ */
+export function getMealEvaluationPrompt(
+  mealData: MealData,
+  analysis: {
+    hasProtein: boolean;
+    hasVeg: boolean;
+    hasStarch: boolean;
+    hasFat: boolean;
+    hasWater: boolean;
+    hasSupplement: boolean;
+    unrecognizedItems: string[];
+    missingCategories: string[];
+    disallowedItems: string[];
+    onPhase: boolean;
+  },
+  context: CoachContext
+): string {
+  const { currentPhase: phase, gender, programType } = context;
+  const portions = getPortions(gender, phase);
+
+  // Build recognized foods list
+  const proteinItems = mealData.recognizedItems.filter(i => i.category === 'protein').map(i => i.item);
+  const vegItems = mealData.recognizedItems.filter(i => i.category === 'vegetable').map(i => i.item);
+  const starchItems = mealData.recognizedItems.filter(i => i.category === 'starch').map(i => i.item);
+  const fatItems = mealData.recognizedItems.filter(i => i.category === 'fat').map(i => i.item);
+  const suppItems = mealData.recognizedItems.filter(i => i.category === 'supplement').map(i => i.item);
+
+  // Phase rules description
+  let phaseRulesDesc = '';
+  if (phase === 1) {
+    phaseRulesDesc = 'NO starch. Protein, veggies, and healthy fats only.';
+  } else if (phase === 2) {
+    phaseRulesDesc = 'Starch allowed at breakfast & lunch only on Wed, Sat, Sun. No starch at dinner or snacks.';
+  } else if (phase === 4) {
+    phaseRulesDesc = 'Starch every meal. Maintenance mode.';
+  } else if (phase === 5) {
+    const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
+    const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
+    phaseRulesDesc = `Phase 5 Day ${dayNum}: ${currentDayRule?.label || 'rotating plan'}`;
+  } else if (phase === 6) {
+    phaseRulesDesc = 'Starch every meal. Higher carbs and fats. Whey + Creatine required.';
+  }
+
+  // Portions for this phase/gender
+  const proteinPortion = gender === 'male' ? '6oz' : '4oz';
+  const vegPortion = gender === 'male' ? '2 cups' : '1-2 cups';
+  const fatPortion = phase === 6 ? (gender === 'male' ? '3 tbsp' : '3 tbsp') : portions.fat;
+  const starchPortion = phase === 6 ? (gender === 'male' ? '3 cups' : '2 cups') : portions.starch;
+
+  // Build recognized string
+  let recognizedStr = '';
+  if (proteinItems.length) recognizedStr += `- Protein: ${proteinItems.join(', ')}\n`;
+  if (vegItems.length) recognizedStr += `- Vegetables: ${vegItems.join(', ')}\n`;
+  if (starchItems.length) recognizedStr += `- Starch: ${starchItems.join(', ')}\n`;
+  if (fatItems.length) recognizedStr += `- Fats: ${fatItems.join(', ')}\n`;
+  if (suppItems.length) recognizedStr += `- Supplements: ${suppItems.join(', ')}\n`;
+
+  // Build prompt
+  let prompt = `Client context: ${context.clientName || 'Client'}, Phase ${phase}, ${gender}, ${programType}\n\n`;
+
+  prompt += `Code detected:\n`;
+  if (recognizedStr) {
+    prompt += recognizedStr;
+  } else {
+    prompt += `- No recognized foods detected\n`;
+  }
+  if (analysis.unrecognizedItems.length > 0) {
+    prompt += `- Unrecognized foods: ${analysis.unrecognizedItems.join(', ')}\n`;
+  }
+  if (analysis.missingCategories.length > 0) {
+    prompt += `- Missing categories: ${analysis.missingCategories.join(', ')}\n`;
+  }
+  if (analysis.disallowedItems.length > 0) {
+    prompt += `- Disallowed items: ${analysis.disallowedItems.join(', ')}\n`;
+  }
+  prompt += `\nPhase ${phase} rules:\n- ${phaseRulesDesc}\n`;
+  prompt += `\nYour job:\n`;
+  prompt += `1. For each UNRECOGNIZED item: use your knowledge to tell client what's in it and if it violates phase rules. Be specific about what ingredient is the problem (e.g. "tacos have a tortilla = starch").\n`;
+  prompt += `2. For MISSING categories: tell client what's missing and the portion size for their phase (Protein: ${proteinPortion}, Veg: ${vegPortion}, Fat: ${fatPortion}).\n`;
+  prompt += `3. For DISALLOWED items: tell client to remove/replace it.\n`;
+  prompt += `4. Keep response SHORT — 1-3 sentences per issue. Allen's coaching voice.\n`;
+  prompt += `5. If everything looks good: "Nice! You're on track! 💪"\n`;
+  prompt += `6. If client asks about supplements: give advice. Otherwise stay silent on supplements.\n`;
+  prompt += `7. If water not mentioned: remind about water (${gender === 'male' ? '128oz daily' : '80oz daily'}).\n`;
+
+  return prompt;
 }
