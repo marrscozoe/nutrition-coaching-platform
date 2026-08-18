@@ -126,7 +126,9 @@ export async function db_all<T = any>(sql: string | PreparedStatement, ...params
     
     if (!table) return [];
     
-    let query = getSupabaseClient().from(table).select('*');
+    // Use admin client (service role key) to bypass RLS
+    const client = supabaseAdmin ?? getSupabaseClient();
+    let query = client.from(table).select('*');
     
     for (const [key, value] of Object.entries(conditions)) {
       query = query.eq(key, value);
@@ -316,7 +318,9 @@ export async function forceSyncDb(): Promise<void> {
 // ============================================
 
 export async function redis_get<T = any>(key: string): Promise<T | null> {
-  const { data, error } = await getSupabaseClient()
+  // Use admin client (service role key) to bypass RLS
+  const client = supabaseAdmin ?? getSupabaseClient();
+  const { data, error } = await client
     .from('kv_store')
     .select('value')
     .eq('key', key)
@@ -332,7 +336,9 @@ export async function redis_get<T = any>(key: string): Promise<T | null> {
 
 export async function redis_set(key: string, value: any): Promise<void> {
   const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-  const { error } = await getSupabaseClient().from('kv_store').upsert({ key, value: stringValue }, { onConflict: 'key' });
+  // Use admin client (service role key) to bypass RLS
+  const client = supabaseAdmin ?? getSupabaseClient();
+  const { error } = await client.from('kv_store').upsert({ key, value: stringValue }, { onConflict: 'key' });
   if (error) {
     console.error('[redis_set] Supabase upsert error:', error);
     throw new Error(`Failed to store in kv_store: ${error.message}`);
@@ -340,7 +346,9 @@ export async function redis_set(key: string, value: any): Promise<void> {
 }
 
 export async function redis_del(key: string): Promise<void> {
-  await getSupabaseClient().from('kv_store').delete().eq('key', key);
+  // Use admin client (service role key) to bypass RLS
+  const client = supabaseAdmin ?? getSupabaseClient();
+  await client.from('kv_store').delete().eq('key', key);
 }
 
 export async function db_hget<T = any>(key: string, field?: string): Promise<T | null> {
