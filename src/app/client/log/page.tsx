@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Toast from '@/components/Toast';
-import { getClientUser } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -57,12 +56,15 @@ export default function LogMealPage() {
   const [submittingCorrection, setSubmittingCorrection] = useState(false);
 
   useEffect(() => {
-    const user = getClientUser();
-    if (!user) {
+    const userData = sessionStorage.getItem('client_user');
+    const userType = sessionStorage.getItem('client_user_type');
+
+    if (!userData || userType !== 'client') {
       router.push('/');
       return;
     }
 
+    const user = JSON.parse(userData);
     setClient(user);
     setLoading(false);
     
@@ -303,8 +305,8 @@ export default function LogMealPage() {
         messedUp,
       };
 
-      // Store pending meal data in localStorage for chat page to display
-      localStorage.setItem('pending_meal_data', JSON.stringify(mealPayload));
+      // Store pending meal data in sessionStorage for chat page to display
+      sessionStorage.setItem('pending_meal_data', JSON.stringify(mealPayload));
 
       // Clear form
       setFoodDescription('');
@@ -382,8 +384,8 @@ export default function LogMealPage() {
           messedUp,
         };
 
-        // Store pending meal data in localStorage for chat page to pick up
-        localStorage.setItem('pending_meal_data', JSON.stringify(mealPayload));
+        // Store pending meal data in sessionStorage for chat page to pick up
+        sessionStorage.setItem('pending_meal_data', JSON.stringify(mealPayload));
 
         // Clear form
         setFoodDescription('');

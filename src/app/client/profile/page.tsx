@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Toast from '@/components/Toast';
-import { logout, getClientUser, setClientUser } from '@/lib/auth';
+import { logout } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -50,7 +50,7 @@ export default function ProfilePage() {
       if (res.ok) {
         const data = await res.json();
         setClient(data.user);
-        setClientUser(data.user);
+        sessionStorage.setItem('client_user', JSON.stringify(data.user));
       }
     } catch (err) {
       console.error('Failed to fetch client data:', err);
@@ -58,12 +58,15 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
-    const user = getClientUser();
-    if (!user) {
+    const userData = sessionStorage.getItem('client_user');
+    const userType = sessionStorage.getItem('client_user_type');
+
+    if (!userData || userType !== 'client') {
       router.push('/');
       return;
     }
 
+    const user = JSON.parse(userData);
     setClient(user);
 
     // Fetch fresh data from server to ensure phase and weights are current
@@ -278,8 +281,7 @@ case 'get_shredded': return 'Get Shredded';
                 onClick={async () => {
                   if (!editGoalWeight) return;
                   try {
-                    const user = getClientUser();
-                    if (!user) return;
+                    const user = JSON.parse(sessionStorage.getItem('client_user') || '{}');
                     const res = await fetch('/api/client/update-goal', {
                       method: 'POST',
                       headers: { 'x-client-id': user.id, 'Content-Type': 'application/json' },
@@ -293,7 +295,7 @@ case 'get_shredded': return 'Get Shredded';
                       if (fresh.ok) {
                         const data = await fresh.json();
                         setClient(data.user);
-                        setClientUser(data.user);
+                        sessionStorage.setItem('client_user', JSON.stringify(data.user));
                       }
                       setToast({ message: 'Goal updated! Week counter reset.', type: 'success' });
                     }
@@ -417,13 +419,13 @@ case 'get_shredded': return 'Get Shredded';
                       }),
                     });
                     if (res.ok) {
-                      // Update local state and localStorage (namespaced by client_id)
+                      // Update local state and sessionStorage
                       const updatedClient = {
                         ...client!,
                         starting_weight: parseFloat(editStartingWeight)
                       };
                       setClient(updatedClient);
-                      setClientUser(updatedClient);
+                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
                       setShowEditWeight(false);
                     } else {
                       setToast({ message: 'Failed to update weight. Please try again.', type: 'error' });
@@ -498,7 +500,7 @@ case 'get_shredded': return 'Get Shredded';
                         current_weight: parseFloat(editCurrentWeight)
                       };
                       setClient(updatedClient);
-                      setClientUser(updatedClient);
+                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
                       setShowEditCurrentWeightModal(false);
                       setToast({ message: 'Current weight updated!', type: 'success' });
                     } else {
@@ -606,7 +608,7 @@ case 'get_shredded': return 'Get Shredded';
                         event_date: selectedProgram === 'event_ready' ? (editEventDate || client.event_date) : client.event_date,
                       };
                       setClient(updatedClient);
-                      setClientUser(updatedClient);
+                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
                       setShowEditProgram(false);
                       setToast({ message: 'Program updated successfully!', type: 'success' });
                     } else {
@@ -681,7 +683,7 @@ case 'get_shredded': return 'Get Shredded';
                         event_date: editEventDate,
                       };
                       setClient(updatedClient);
-                      setClientUser(updatedClient);
+                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
                       setShowEventDateModal(false);
                       setToast({ message: 'Event date set successfully!', type: 'success' });
                     } else {

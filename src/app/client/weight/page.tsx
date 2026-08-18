@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getClientUser, setClientUser } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -112,12 +111,15 @@ export default function WeightPage() {
   // Response (no longer used - redirects to chat now)
 
   useEffect(() => {
-    const user = getClientUser();
-    if (!user) {
+    const userData = sessionStorage.getItem('client_user');
+    const userType = sessionStorage.getItem('client_user_type');
+
+    if (!userData || userType !== 'client') {
       router.push('/');
       return;
     }
 
+    const user = JSON.parse(userData);
     setClient(user);
     // Fetch fresh client data from server to ensure current_weight is accurate
     fetchClientData(user.id);
@@ -146,7 +148,7 @@ export default function WeightPage() {
       if (res.ok) {
         const data = await res.json();
         setClient(data.user);
-        setClientUser(data.user);
+        sessionStorage.setItem('client_user', JSON.stringify(data.user));
         return data.user;
       }
     } catch (err) {
@@ -161,7 +163,7 @@ export default function WeightPage() {
 
     setSubmitting(true);
 
-    // Fetch fresh client data to ensure prevWeight is accurate (not stale from localStorage)
+    // Fetch fresh client data to ensure prevWeight is accurate (not stale from sessionStorage)
     const freshClient = await fetchClientData(client.id);
     const currentWeightForCalc = freshClient?.current_weight || client.current_weight || client.starting_weight;
 
@@ -214,8 +216,8 @@ export default function WeightPage() {
           change: change,
         };
 
-        // Store pending weight data in localStorage for chat page to pick up
-        localStorage.setItem('pending_weight_data', JSON.stringify(weightPayload));
+        // Store pending weight data in sessionStorage for chat page to pick up
+        sessionStorage.setItem('pending_weight_data', JSON.stringify(weightPayload));
 
         // Clear form
         setWeight('');
@@ -226,10 +228,10 @@ export default function WeightPage() {
         // Refresh history
         fetchWeightHistory(client.id);
 
-        // Update local client state and localStorage (namespaced by client_id)
+        // Update local client state and sessionStorage
         const updatedClient = { ...client, current_weight: parseFloat(weight) };
         setClient(updatedClient);
-        setClientUser(updatedClient);
+        sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
 
         // Redirect to chat for AI weight commentary
         router.push('/client/chat');

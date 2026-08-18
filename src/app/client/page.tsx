@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
-import { logout, getClientUser, setClientUser } from '@/lib/auth';
+import { logout } from '@/lib/auth';
 import { getPhaseGuidance } from '@/lib/nutrition-data';
 
 interface ClientData {
@@ -44,8 +44,9 @@ export default function ClientDashboard() {
   useEffect(() => {
     function handleVisibilityChange() {
       if (document.visibilityState === 'visible') {
-        const user = getClientUser();
-        if (user) {
+        const userData = sessionStorage.getItem('client_user');
+        if (userData) {
+          const user = JSON.parse(userData);
           fetchRecentMeals(user.id);
         }
       }
@@ -55,13 +56,16 @@ export default function ClientDashboard() {
   }, []);
 
   useEffect(() => {
-    // Check if user is logged in (use namespaced keys for session isolation)
-    const user = getClientUser();
-    if (!user) {
+    // Check if user is logged in (use separate client keys to avoid overwriting trainer session)
+    const userData = sessionStorage.getItem('client_user');
+    const userType = sessionStorage.getItem('client_user_type');
+
+    if (!userData || userType !== 'client') {
       router.push('/');
       return;
     }
 
+    const user = JSON.parse(userData);
     setClient(user);
 
     // Fetch fresh client data from server on mount
@@ -92,8 +96,8 @@ export default function ClientDashboard() {
       if (res.ok) {
         const data = await res.json();
         setClient(data.user);
-        // Update localStorage with fresh data (namespaced by client_id)
-        setClientUser(data.user);
+        // Update sessionStorage with fresh data (use client-specific key)
+        sessionStorage.setItem('client_user', JSON.stringify(data.user));
       }
     } catch (err) {
       console.error('Failed to fetch client data:', err);
@@ -101,8 +105,9 @@ export default function ClientDashboard() {
   }
 
   async function handleRefresh() {
-    const user = getClientUser();
-    if (user) {
+    const userData = sessionStorage.getItem('client_user');
+    if (userData) {
+      const user = JSON.parse(userData);
       await Promise.all([
         fetchClientData(user.id),
         fetchRecentMeals(user.id)

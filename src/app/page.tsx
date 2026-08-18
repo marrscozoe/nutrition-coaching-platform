@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { setClientUser, setTrainerUser, getClientUser, getTrainerUser } from '@/lib/auth';
 
 export default function HomePage() {
   const router = useRouter();
@@ -26,20 +25,22 @@ export default function HomePage() {
         return;
       }
       
-      // Check trainer session first (namespaced), then client session (namespaced)
-      const trainer = getTrainerUser();
-      if (trainer) {
+      // Check trainer session first, then client session
+      const trainerUser = sessionStorage.getItem('trainer_user');
+      const trainerType = sessionStorage.getItem('trainer_user_type');
+      if (trainerUser && trainerType === 'trainer') {
         router.push('/trainer');
         return;
       }
       
-      const client = getClientUser();
-      if (client) {
+      const clientUser = sessionStorage.getItem('client_user');
+      const clientType = sessionStorage.getItem('client_user_type');
+      if (clientUser && clientType === 'client') {
         router.push('/client');
       }
     } catch (e) {
-      // If localStorage fails, just show login page
-      console.error('localStorage error:', e);
+      // If sessionStorage fails, just show login page
+      console.error('sessionStorage error:', e);
     }
   }, []); // Empty dependency - only run once on mount
 
@@ -85,11 +86,13 @@ export default function HomePage() {
           return;
         }
 
-        // Store user data in localStorage (use namespaced keys by user ID for session isolation)
+        // Store user data in localStorage (use separate keys for each user type to prevent overwriting)
         if (data.userType === 'trainer') {
-          setTrainerUser(data.user);
+          sessionStorage.setItem('trainer_user', JSON.stringify(data.user));
+          sessionStorage.setItem('trainer_user_type', 'trainer');
         } else {
-          setClientUser(data.user);
+          sessionStorage.setItem('client_user', JSON.stringify(data.user));
+          sessionStorage.setItem('client_user_type', 'client');
         }
 
         // Redirect based on user type

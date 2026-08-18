@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getTrainerUser, setTrainerUser, logout } from '@/lib/auth';
 
 interface TrainerData {
   id: string;
@@ -42,12 +41,15 @@ export default function TrainerSettingsPage() {
   const [loadingClients, setLoadingClients] = useState(false);
 
   useEffect(() => {
-    const user = getTrainerUser();
-    if (!user) {
+    const userData = sessionStorage.getItem('trainer_user');
+    const userType = sessionStorage.getItem('trainer_user_type');
+
+    if (!userData || userType !== 'trainer') {
       router.push('/?login=trainer');
       return;
     }
 
+    const user = JSON.parse(userData);
     setTrainer(user);
     setName(user.name || '');
     setBusinessName(user.business_name || '');
@@ -143,7 +145,7 @@ export default function TrainerSettingsPage() {
     setSaved(false);
 
     // In a real app, this would call an API to update the trainer's settings
-    // For now, we just update localStorage
+    // For now, we just update sessionStorage
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
 
     const updated = {
@@ -153,7 +155,7 @@ export default function TrainerSettingsPage() {
       brand_color: brandColor,
     };
     setTrainer(updated as any);
-    setTrainerUser(updated);
+    sessionStorage.setItem('trainer_user', JSON.stringify(updated));
 
     setSaving(false);
     setSaved(true);
@@ -362,8 +364,12 @@ export default function TrainerSettingsPage() {
         <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
           <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wider mb-4">Account</h2>
           <button
-            onClick={async () => {
-              await logout();
+            onClick={() => {
+              sessionStorage.removeItem('trainer_user');
+              sessionStorage.removeItem('trainer_user_type');
+              sessionStorage.removeItem('user'); // Legacy cleanup
+              sessionStorage.removeItem('userType'); // Legacy cleanup
+              router.push('/');
             }}
             className="w-full py-3 rounded-xl bg-red-500/20 text-red-400 font-medium hover:bg-red-500/30 transition-colors"
           >
