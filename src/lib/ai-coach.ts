@@ -415,9 +415,9 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
   const asksAboutPlan = lowerMessage.includes('what can i eat') || lowerMessage.includes('my plan') || lowerMessage.includes('show me') || lowerMessage.includes('what am i') || lowerMessage.includes('meal example') || lowerMessage.includes('example meal') || lowerMessage.includes('phase') || lowerMessage.includes('portion') || lowerMessage.includes('categories') || lowerMessage.includes('what to eat') || lowerMessage.includes('swap') || lowerMessage.includes('exchange');
 
   // Build dynamic food examples from the actual food lists
-  const proteinList = LEAN_PROTEINS.slice(0, 8).join(', ');
-  const veggieList = FIBROUS_VEGETABLES.slice(0, 10).join(', ');
-  const starchList = STARCHY_CARBOHYDRATES.slice(0, 8).join(', ');
+  const proteinList = LEAN_PROTEINS.slice(0, 10).join(', ');
+  const veggieList = FIBROUS_VEGETABLES.slice(0, 12).join(', ');
+  const starchList = STARCHY_CARBOHYDRATES.slice(0, 10).join(', ');
   const fatList = HEALTHY_FATS.slice(0, 6).join(', ');
 
   if (asksAboutPlan) {
@@ -433,10 +433,6 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
                             context.currentPhase === 2 ? 'STARCH ONLY for BREAKFAST & LUNCH on Wed/Sat/Sun - dinner & snack NEVER get starch' :
                             context.currentPhase === 5 ? `AGGRESSIVE FAT LOSS - 14-day rotating plan with 3-day blocks${phase5PlanDesc}` :
                             'MAINTENANCE - starch every meal, weigh Fri only';
-    const phaseNext = context.currentPhase === 1 ? 'Phase 2: Add starch Wed/Sat/Sun' :
-                      context.currentPhase === 2 ? 'Phase 4 or back to Phase 1 (based on goal)' :
-                      context.currentPhase === 5 ? 'Phase 5 runs 14 days, then transition to maintenance.' :
-                      'You\'re done - maintenance!';
     
     const proteinExamples = context.gender === 'male' 
       ? '6oz protein per meal' 
@@ -456,14 +452,19 @@ Fat: ${portions.fat} (${fatList})
 Starch: ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : context.currentPhase === 2 ? 'Only on Wed/Sat/Sun breakfast & lunch' : 'Every meal'}
 Water: ${context.gender === 'male' ? '32oz' : '20oz'} per meal
 
-LEAN PROTEINS: ${proteinList}
-FIBROUS VEGETABLES: ${veggieList}
-HEALTHY FATS: ${fatList}
-${context.currentPhase !== 1 ? `STARCHY CARBOHYDRATES: ${starchList}` : ''}
+YOUR APPROVED FOODS:
+• LEAN PROTEINS: ${proteinList}
+• FIBROUS VEGETABLES: ${veggieList}
+• HEALTHY FATS: ${fatList}
+${context.currentPhase !== 1 ? `• STARCHY CARBOHYDRATES: ${starchList}` : ''}
 
 Example: ${mealExample}
 
-⚠️ IMPORTANT: When you respond about portions, ALWAYS specify "of olive oil" after the fat amount. Example: "3 tablespoons of olive oil" — NEVER just say "3 tablespoons" without the fat source!
+⚠️ IMPORTANT RULES:
+1. When giving advice about foods, ONLY recommend foods from the APPROVED LISTS above
+2. NEVER suggest foods not listed above (no pasta, bread, cereal, etc.)
+3. When you respond about portions, ALWAYS specify "of olive oil" after the fat amount
+4. AVOCADO IS A HEALTHY FAT - encourage it!
 
 ${context.eventDate ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
 
@@ -471,10 +472,10 @@ Ask me anything about specific foods!`;
   }
 
   // Build dynamic food lists for the evaluation protocol
-  const evalProteinExamples = LEAN_PROTEINS.slice(0, 6).join(', ');
-  const evalVegExamples = FIBROUS_VEGETABLES.slice(0, 8).join(', ');
-  const evalStarchExamples = STARCHY_CARBOHYDRATES.slice(0, 6).join(', ');
-  const evalFatExamples = HEALTHY_FATS.slice(0, 5).join(', ');
+  const evalProteinExamples = LEAN_PROTEINS.slice(0, 8).join(', ');
+  const evalVegExamples = FIBROUS_VEGETABLES.slice(0, 10).join(', ');
+  const evalStarchExamples = STARCHY_CARBOHYDRATES.slice(0, 8).join(', ');
+  const evalFatExamples = HEALTHY_FATS.slice(0, 6).join(', ');
 
   return `You are ALLEN'S AI NUTRITION COACH. You act exactly like Allen would in a text conversation with a client.
 

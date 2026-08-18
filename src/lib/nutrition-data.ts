@@ -270,20 +270,26 @@ export function getPhaseGuidance(
   const fatPortion = p.fat;
   const starchPortion = p.starch;
 
+  // Build food lists from actual food lists
+  const proteinList = LEAN_PROTEINS.slice(0, 10).join(', ');
+  const veggieList = FIBROUS_VEGETABLES.slice(0, 12).join(', ');
+  const starchList = STARCHY_CARBOHYDRATES.slice(0, 10).join(', ');
+  const fatList = HEALTHY_FATS.slice(0, 6).join(', ');
+
   switch (phase) {
     case 1:
       return {
         advice: 'No starch — protein, fibrous vegetables, and healthy fats only',
         canEat: [
-          `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
-          `Fibrous vegetables: ${vegPortion} broccoli, spinach, peppers, salad`,
-          `Healthy fats: ${fatPortion} olive oil or 1/2 avocado`,
+          `LEAN PROTEINS: ${proteinList}`,
+          `FIBROUS VEGETABLES: ${veggieList}`,
+          `HEALTHY FATS: ${fatList}`,
         ],
         cannotEat: [
-          'No processed foods (no cans or boxes, fresh or frozen only)',
           'NO starch — no bread, rice, pasta, potato, beans, corn, oatmeal, cereal',
           'NO dairy',
           'NO sugar',
+          'No processed foods (no cans or boxes, fresh or frozen only)',
         ],
         water: p.water,
         exampleMeal: `${proteinOz} grilled chicken breast, ${vegPortion} broccoli, ${fatPortion} olive oil, water`,
@@ -292,17 +298,17 @@ export function getPhaseGuidance(
       return {
         advice: 'Add starch Wed/Sat/Sun to first 2 meals',
         canEat: [
-          `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
-          `Fibrous vegetables: ${vegPortion} broccoli, spinach, peppers, salad`,
-          `Healthy fats: ${fatPortion} olive oil or 1/2 avocado`,
-          `Starch (Wed/Sat/Sun only, first 2 meals): oatmeal, rice, potato — ${starchPortion}`,
+          `LEAN PROTEINS: ${proteinList}`,
+          `FIBROUS VEGETABLES: ${veggieList}`,
+          `HEALTHY FATS: ${fatList}`,
+          `STARCHY CARBOHYDRATES (Wed/Sat/Sun only): ${starchList}`,
         ],
         cannotEat: [
-          'No processed foods (no cans or boxes, fresh or frozen only)',
           'NO starch on Mon, Tue, Thu, Fri',
           'NO starch in dinner or snacks',
           'NO dairy',
           'NO sugar',
+          'No processed foods (no cans or boxes, fresh or frozen only)',
         ],
         water: p.water,
         exampleMeal: `Example (Wed/Sat/Sun breakfast): ${isMale ? '3' : '2'} eggs scrambled, ${starchPortion} oatmeal, 1 cup spinach, no additional fat, water`,
@@ -311,10 +317,10 @@ export function getPhaseGuidance(
       return {
         advice: 'Maintenance — add starch to every meal',
         canEat: [
-          `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
-          `Fibrous vegetables: ${vegPortion} unlimited`,
-          `Healthy fats: ${fatPortion} olive oil or 1/2 avocado`,
-          `Natural starch: rice, potato, oatmeal — every meal — ${starchPortion}`,
+          `LEAN PROTEINS: ${proteinList}`,
+          `FIBROUS VEGETABLES: ${veggieList}`,
+          `HEALTHY FATS: ${fatList}`,
+          `STARCHY CARBOHYDRATES: ${starchList}`,
         ],
         cannotEat: [
           'No processed foods',
@@ -341,17 +347,15 @@ export function getPhaseGuidance(
       return {
         advice: 'Aggressive fat loss — 14-day rotating plan with 3-day blocks',
         canEat: [
-          `${proteinOz} chicken, beef, fish, eggs, turkey`,
-          `Fibrous vegetables: ${vegPortion} unlimited`,
-          `Healthy fats: ${fatPortion} olive oil, 1/2 avocado`,
-          `Starch varies by 3-day block: check your plan for today`,
+          `LEAN PROTEINS: ${proteinList}`,
+          `FIBROUS VEGETABLES: ${veggieList}`,
+          `HEALTHY FATS: ${fatList}`,
+          'Starch varies by 3-day block: check your plan for today',
         ],
         cannotEat: [
-          'No dairy',
-          'No sugar',
-          'NO starch during strict blocks — no rice, potato, bread, pasta, oatmeal, beans, corn',
-          'NO sugar — no fruit, candy, soda, alcohol',
-          'NO dairy during strict blocks',
+          'NO starch during strict blocks',
+          'NO dairy',
+          'NO sugar',
           'No processed foods',
           'No cans or boxes (fresh or frozen only)',
         ],
@@ -363,10 +367,10 @@ export function getPhaseGuidance(
       return {
         advice: 'Muscle gain — higher carbs and fats to fuel growth',
         canEat: [
-          `Lean protein: ${proteinOz} chicken, beef, fish, eggs, turkey`,
-          `Fibrous vegetables: ${vegPortion} broccoli, spinach, peppers, salad`,
-          `Healthy fats: ${fatPortion} olive oil, ${p.avocado} avocado, nuts`,
-          `Starch: rice, potato, oatmeal — every meal — ${starchPortion}`,
+          `LEAN PROTEINS: ${proteinList}`,
+          `FIBROUS VEGETABLES: ${veggieList}`,
+          `HEALTHY FATS: ${fatList}`,
+          `STARCHY CARBOHYDRATES: ${starchList}`,
           `Whey protein: ${isMale ? '40g' : '20g'} 1st thing AM & last thing PM (NOT with meals)`,
           `Creatine: Daily`,
         ],
