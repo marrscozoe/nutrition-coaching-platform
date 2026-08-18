@@ -20,8 +20,8 @@ export default function TrainerProfilePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('trainer_user');
-    const userType = sessionStorage.getItem('trainer_user_type');
+    const userData = localStorage.getItem('trainer_user');
+    const userType = localStorage.getItem('trainer_user_type');
 
     if (!userData || userType !== 'trainer') {
       router.push('/?login=trainer');

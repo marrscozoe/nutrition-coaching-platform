@@ -26,21 +26,21 @@ export default function HomePage() {
       }
       
       // Check trainer session first, then client session
-      const trainerUser = sessionStorage.getItem('trainer_user');
-      const trainerType = sessionStorage.getItem('trainer_user_type');
+      const trainerUser = localStorage.getItem('trainer_user');
+      const trainerType = localStorage.getItem('trainer_user_type');
       if (trainerUser && trainerType === 'trainer') {
         router.push('/trainer');
         return;
       }
       
-      const clientUser = sessionStorage.getItem('client_user');
-      const clientType = sessionStorage.getItem('client_user_type');
+      const clientUser = localStorage.getItem('client_user');
+      const clientType = localStorage.getItem('client_user_type');
       if (clientUser && clientType === 'client') {
         router.push('/client');
       }
     } catch (e) {
-      // If sessionStorage fails, just show login page
-      console.error('sessionStorage error:', e);
+      // If localStorage fails, just show login page
+      console.error('localStorage error:', e);
     }
   }, []); // Empty dependency - only run once on mount
 
@@ -88,11 +88,11 @@ export default function HomePage() {
 
         // Store user data in localStorage (use separate keys for each user type to prevent overwriting)
         if (data.userType === 'trainer') {
-          sessionStorage.setItem('trainer_user', JSON.stringify(data.user));
-          sessionStorage.setItem('trainer_user_type', 'trainer');
+          localStorage.setItem('trainer_user', JSON.stringify(data.user));
+          localStorage.setItem('trainer_user_type', 'trainer');
         } else {
-          sessionStorage.setItem('client_user', JSON.stringify(data.user));
-          sessionStorage.setItem('client_user_type', 'client');
+          localStorage.setItem('client_user', JSON.stringify(data.user));
+          localStorage.setItem('client_user_type', 'client');
         }
 
         // Redirect based on user type

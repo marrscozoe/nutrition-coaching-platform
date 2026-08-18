@@ -60,8 +60,8 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('client_user');
-    const userType = sessionStorage.getItem('client_user_type');
+    const userData = localStorage.getItem('client_user');
+    const userType = localStorage.getItem('client_user_type');
 
     if (!userData || userType !== 'client') {
       router.push('/');
@@ -71,9 +71,9 @@ export default function ChatPage() {
     const user = JSON.parse(userData);
     setClient(user);
 
-    // Load chat history from sessionStorage (use client-specific key to prevent cross-contamination)
+    // Load chat history from localStorage (use client-specific key to prevent cross-contamination)
     const chatKey = `chat_history_${user.id}`;
-    const history = sessionStorage.getItem(chatKey);
+    const history = localStorage.getItem(chatKey);
     if (history) {
       try {
         const parsed = JSON.parse(history);
@@ -97,22 +97,22 @@ export default function ChatPage() {
     setLoading(false);
   }, [router]);
 
-  // Process pending meal/weight data from sessionStorage
+  // Process pending meal/weight data from localStorage
   useEffect(() => {
     if (!client || loading) return;
 
-    const pendingMeal = sessionStorage.getItem('pending_meal_data');
-    const pendingWeight = sessionStorage.getItem('pending_weight_data');
+    const pendingMeal = localStorage.getItem('pending_meal_data');
+    const pendingWeight = localStorage.getItem('pending_weight_data');
 
     if (pendingMeal) {
-      sessionStorage.removeItem('pending_meal_data');
+      localStorage.removeItem('pending_meal_data');
       const mealData: PendingMealData = JSON.parse(pendingMeal);
       processMealData(mealData);
       return;
     }
 
     if (pendingWeight) {
-      sessionStorage.removeItem('pending_weight_data');
+      localStorage.removeItem('pending_weight_data');
       const weightData: PendingWeightData = JSON.parse(pendingWeight);
       processWeightData(weightData);
       return;
@@ -278,7 +278,7 @@ export default function ChatPage() {
   function saveHistory(allMessages: ChatMessage[]) {
     if (!client) return;
     const chatKey = `chat_history_${client.id}`;
-    sessionStorage.setItem(chatKey, JSON.stringify(allMessages));
+    localStorage.setItem(chatKey, JSON.stringify(allMessages));
   }
 
   // Auto-scroll to bottom
@@ -374,7 +374,7 @@ export default function ChatPage() {
       content: "Chat cleared! What do you need? Ask me about meals, portions, your progress, or just chat! 💪",
       timestamp: new Date(),
     }]);
-    sessionStorage.removeItem(chatKey);
+    localStorage.removeItem(chatKey);
   }
 
   if (loading || !client) {

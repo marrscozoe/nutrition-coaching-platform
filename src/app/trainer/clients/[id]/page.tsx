@@ -66,8 +66,8 @@ export default function ClientDetailPage() {
   const [currentWeek, setCurrentWeek] = useState(1);
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('trainer_user');
-    const userType = sessionStorage.getItem('trainer_user_type');
+    const userData = localStorage.getItem('trainer_user');
+    const userType = localStorage.getItem('trainer_user_type');
 
     if (!userData || userType !== 'trainer') {
       router.push('/?login=trainer');

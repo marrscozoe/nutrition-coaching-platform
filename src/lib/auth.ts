@@ -3,24 +3,24 @@ import { supabase } from './supabase';
 
 export async function logout(): Promise<void> {
   try {
-    // Clear all user session data from sessionStorage (per-tab, prevents cross-tab contamination)
-    sessionStorage.removeItem('trainer_user');
-    sessionStorage.removeItem('trainer_user_type');
-    sessionStorage.removeItem('client_user');
-    sessionStorage.removeItem('client_user_type');
-    sessionStorage.removeItem('user'); // Legacy key cleanup
-    sessionStorage.removeItem('userType'); // Legacy key cleanup
+    // Clear all user session data from localStorage (per-tab, prevents cross-tab contamination)
+    localStorage.removeItem('trainer_user');
+    localStorage.removeItem('trainer_user_type');
+    localStorage.removeItem('client_user');
+    localStorage.removeItem('client_user_type');
+    localStorage.removeItem('user'); // Legacy key cleanup
+    localStorage.removeItem('userType'); // Legacy key cleanup
     
     // Clear chat history for the current user type (prevents cross-contamination between sessions)
-    const trainerData = sessionStorage.getItem('trainer_user');
-    const trainerType = sessionStorage.getItem('trainer_user_type');
-    const clientData = sessionStorage.getItem('client_user');
-    const clientType = sessionStorage.getItem('client_user_type');
+    const trainerData = localStorage.getItem('trainer_user');
+    const trainerType = localStorage.getItem('trainer_user_type');
+    const clientData = localStorage.getItem('client_user');
+    const clientType = localStorage.getItem('client_user_type');
 
     if (trainerData && trainerType === 'trainer') {
       try {
         const trainer = JSON.parse(trainerData);
-        sessionStorage.removeItem(`chat_history_trainer_${trainer.id}`);
+        localStorage.removeItem(`chat_history_trainer_${trainer.id}`);
       } catch (e) {
         // ignore parse errors
       }
@@ -28,7 +28,7 @@ export async function logout(): Promise<void> {
     if (clientData && clientType === 'client') {
       try {
         const client = JSON.parse(clientData);
-        sessionStorage.removeItem(`chat_history_${client.id}`);
+        localStorage.removeItem(`chat_history_${client.id}`);
       } catch (e) {
         // ignore parse errors
       }
@@ -52,8 +52,8 @@ export async function logout(): Promise<void> {
 export function getCurrentUser(): { user: any; userType: string | null } | null {
   try {
     // Check trainer session first
-    const trainerData = sessionStorage.getItem('trainer_user');
-    const trainerType = sessionStorage.getItem('trainer_user_type');
+    const trainerData = localStorage.getItem('trainer_user');
+    const trainerType = localStorage.getItem('trainer_user_type');
     if (trainerData && trainerType === 'trainer') {
       return {
         user: JSON.parse(trainerData),
@@ -62,8 +62,8 @@ export function getCurrentUser(): { user: any; userType: string | null } | null 
     }
     
     // Check client session
-    const clientData = sessionStorage.getItem('client_user');
-    const clientType = sessionStorage.getItem('client_user_type');
+    const clientData = localStorage.getItem('client_user');
+    const clientType = localStorage.getItem('client_user_type');
     if (clientData && clientType === 'client') {
       return {
         user: JSON.parse(clientData),
@@ -72,8 +72,8 @@ export function getCurrentUser(): { user: any; userType: string | null } | null 
     }
     
     // Legacy support: check old keys
-    const userData = sessionStorage.getItem('user');
-    const userType = sessionStorage.getItem('userType');
+    const userData = localStorage.getItem('user');
+    const userType = localStorage.getItem('userType');
     if (userData && userType) {
       return {
         user: JSON.parse(userData),
@@ -94,7 +94,7 @@ export function isAuthenticated(): boolean {
 
 export function getTrainerUser(): { user: any } | null {
   try {
-    const trainerData = sessionStorage.getItem('trainer_user');
+    const trainerData = localStorage.getItem('trainer_user');
     if (trainerData) {
       return { user: JSON.parse(trainerData) };
     }
@@ -106,7 +106,7 @@ export function getTrainerUser(): { user: any } | null {
 
 export function getClientUser(): { user: any } | null {
   try {
-    const clientData = sessionStorage.getItem('client_user');
+    const clientData = localStorage.getItem('client_user');
     if (clientData) {
       return { user: JSON.parse(clientData) };
     }

@@ -56,8 +56,8 @@ export default function LogMealPage() {
   const [submittingCorrection, setSubmittingCorrection] = useState(false);
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('client_user');
-    const userType = sessionStorage.getItem('client_user_type');
+    const userData = localStorage.getItem('client_user');
+    const userType = localStorage.getItem('client_user_type');
 
     if (!userData || userType !== 'client') {
       router.push('/');
@@ -305,8 +305,8 @@ export default function LogMealPage() {
         messedUp,
       };
 
-      // Store pending meal data in sessionStorage for chat page to display
-      sessionStorage.setItem('pending_meal_data', JSON.stringify(mealPayload));
+      // Store pending meal data in localStorage for chat page to display
+      localStorage.setItem('pending_meal_data', JSON.stringify(mealPayload));
 
       // Clear form
       setFoodDescription('');
@@ -384,8 +384,8 @@ export default function LogMealPage() {
           messedUp,
         };
 
-        // Store pending meal data in sessionStorage for chat page to pick up
-        sessionStorage.setItem('pending_meal_data', JSON.stringify(mealPayload));
+        // Store pending meal data in localStorage for chat page to pick up
+        localStorage.setItem('pending_meal_data', JSON.stringify(mealPayload));
 
         // Clear form
         setFoodDescription('');

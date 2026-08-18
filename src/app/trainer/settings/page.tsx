@@ -41,8 +41,8 @@ export default function TrainerSettingsPage() {
   const [loadingClients, setLoadingClients] = useState(false);
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('trainer_user');
-    const userType = sessionStorage.getItem('trainer_user_type');
+    const userData = localStorage.getItem('trainer_user');
+    const userType = localStorage.getItem('trainer_user_type');
 
     if (!userData || userType !== 'trainer') {
       router.push('/?login=trainer');
@@ -145,7 +145,7 @@ export default function TrainerSettingsPage() {
     setSaved(false);
 
     // In a real app, this would call an API to update the trainer's settings
-    // For now, we just update sessionStorage
+    // For now, we just update localStorage
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
 
     const updated = {
@@ -155,7 +155,7 @@ export default function TrainerSettingsPage() {
       brand_color: brandColor,
     };
     setTrainer(updated as any);
-    sessionStorage.setItem('trainer_user', JSON.stringify(updated));
+    localStorage.setItem('trainer_user', JSON.stringify(updated));
 
     setSaving(false);
     setSaved(true);
@@ -365,10 +365,10 @@ export default function TrainerSettingsPage() {
           <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wider mb-4">Account</h2>
           <button
             onClick={() => {
-              sessionStorage.removeItem('trainer_user');
-              sessionStorage.removeItem('trainer_user_type');
-              sessionStorage.removeItem('user'); // Legacy cleanup
-              sessionStorage.removeItem('userType'); // Legacy cleanup
+              localStorage.removeItem('trainer_user');
+              localStorage.removeItem('trainer_user_type');
+              localStorage.removeItem('user'); // Legacy cleanup
+              localStorage.removeItem('userType'); // Legacy cleanup
               router.push('/');
             }}
             className="w-full py-3 rounded-xl bg-red-500/20 text-red-400 font-medium hover:bg-red-500/30 transition-colors"
