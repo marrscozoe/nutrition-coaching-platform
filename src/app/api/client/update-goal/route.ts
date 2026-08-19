@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       goal_weight, now, now, clientId
     );
 
-    // Phase transition logic - check if new goal weight triggers goal attained
+    // Phase transition logic - check if new goal weight triggers phase transitions
     let phaseChanged = false;
     let newPhase = oldClient?.current_phase;
 
@@ -37,8 +37,15 @@ export async function POST(request: NextRequest) {
       const programType = oldClient.program_type;
       const currentPhase = oldClient.current_phase || 1;
 
-      // GOAL ATTAINED - check FIRST (except for Phase 4 and Phase 6)
-      if (currentWeight && currentPhase !== 4 && currentPhase !== 6) {
+      // Phase 4 check: if weight exceeds threshold, go to Phase 1
+      // (GET_SHREDDED, EVENT_READY, GENERAL_HEALTH: over goal + 4 lbs = Phase 1)
+      if (currentPhase === 4 && currentWeight && currentWeight > goal_weight + 4) {
+        newPhase = 1;
+        phaseChanged = true;
+      }
+      // GOAL ATTAINED - check if at goal, go to Phase 4
+      // (except for Phase 6 which has special logic)
+      else if (currentPhase !== 6 && currentWeight) {
         const atGoal = (programType === 'muscle_gain')
           ? (currentWeight >= goal_weight)
           : (currentWeight <= goal_weight);
