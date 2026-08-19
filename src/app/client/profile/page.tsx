@@ -34,8 +34,6 @@ export default function ProfilePage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showEditWeight, setShowEditWeight] = useState(false);
   const [editStartingWeight, setEditStartingWeight] = useState('');
-  const [editCurrentWeight, setEditCurrentWeight] = useState('');
-  const [showEditCurrentWeightModal, setShowEditCurrentWeightModal] = useState(false);
   const [showEditProgram, setShowEditProgram] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState('general_health');
   const [showEventDateModal, setShowEventDateModal] = useState(false);
@@ -184,24 +182,11 @@ case 'get_shredded': return 'Get Shredded';
               <button
                 onClick={() => {
                   setEditStartingWeight(client.starting_weight?.toString() || '');
-                  setEditCurrentWeight(client.current_weight?.toString() || '');
                   setShowEditWeight(true);
                 }}
                 className="text-brand-orange text-sm hover:underline"
               >
                 {client.starting_weight || '--'} lbs ✏️
-              </button>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-brand-cream/60">Current Weight</span>
-              <button
-                onClick={() => {
-                  setEditCurrentWeight(client.current_weight?.toString() || '');
-                  setShowEditCurrentWeightModal(true);
-                }}
-                className="text-brand-orange text-sm hover:underline"
-              >
-                {client.current_weight || '--'} lbs ✏️
               </button>
             </div>
             <div className="flex justify-between items-center">
@@ -419,14 +404,15 @@ case 'get_shredded': return 'Get Shredded';
                       }),
                     });
                     if (res.ok) {
-                      // Update local state and sessionStorage
-                      const updatedClient = {
-                        ...client!,
-                        starting_weight: parseFloat(editStartingWeight)
-                      };
-                      setClient(updatedClient);
-                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
+                      // Refresh client data from server
+                      const fresh = await fetch('/api/auth/me', { headers: { 'x-client-id': client!.id } });
+                      if (fresh.ok) {
+                        const data = await fresh.json();
+                        setClient(data.user);
+                        sessionStorage.setItem('client_user', JSON.stringify(data.user));
+                      }
                       setShowEditWeight(false);
+                      setToast({ message: 'Starting weight updated!', type: 'success' });
                     } else {
                       setToast({ message: 'Failed to update weight. Please try again.', type: 'error' });
                     }
@@ -437,82 +423,6 @@ case 'get_shredded': return 'Get Shredded';
                   }
                 }}
                 disabled={submitting || !editStartingWeight}
-                className="flex-1 py-3 rounded-lg bg-brand-orange text-white font-semibold hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
-              >
-                {submitting ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Current Weight Modal */}
-      {showEditCurrentWeightModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-md bg-brand-charcoal/95 rounded-2xl border border-brand-cream/20 p-6">
-            <h3 className="text-lg font-bold text-brand-cream mb-2">Edit Current Weight</h3>
-            <p className="text-sm text-brand-cream/60 mb-4">
-              Update your current weight. For regular tracking, use the weigh-in feature instead.
-            </p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-brand-cream/80 mb-2">Current Weight (lbs)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={editCurrentWeight}
-                  onChange={(e) => setEditCurrentWeight(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream focus:outline-none focus:border-brand-orange"
-                  placeholder="Enter current weight"
-                />
-              </div>
-              <p className="text-xs text-brand-cream/50">
-                For regular updates, log your weigh-in on the Weight page.
-              </p>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                type="button"
-                onClick={() => setShowEditCurrentWeightModal(false)}
-                className="flex-1 py-3 rounded-lg bg-brand-charcoal/80 text-brand-cream font-medium hover:bg-brand-charcoal/60 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!editCurrentWeight) return;
-                  setSubmitting(true);
-                  try {
-                    const res = await fetch('/api/client/update-weight', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'x-client-id': client!.id,
-                      },
-                      body: JSON.stringify({
-                        current_weight: parseFloat(editCurrentWeight)
-                      }),
-                    });
-                    if (res.ok) {
-                      const updatedClient = {
-                        ...client!,
-                        current_weight: parseFloat(editCurrentWeight)
-                      };
-                      setClient(updatedClient);
-                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
-                      setShowEditCurrentWeightModal(false);
-                      setToast({ message: 'Current weight updated!', type: 'success' });
-                    } else {
-                      setToast({ message: 'Failed to update weight. Please try again.', type: 'error' });
-                    }
-                  } catch (err) {
-                    setToast({ message: 'Failed to update weight. Please try again.', type: 'error' });
-                  } finally {
-                    setSubmitting(false);
-                  }
-                }}
-                disabled={submitting || !editCurrentWeight}
                 className="flex-1 py-3 rounded-lg bg-brand-orange text-white font-semibold hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
               >
                 {submitting ? 'Saving...' : 'Save'}
