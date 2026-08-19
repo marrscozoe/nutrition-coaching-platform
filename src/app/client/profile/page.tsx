@@ -602,13 +602,12 @@ case 'get_shredded': return 'Get Shredded';
                       }),
                     });
                     if (res.ok) {
-                      const updatedClient = {
-                        ...client!,
-                        program_type: selectedProgram,
-                        event_date: selectedProgram === 'event_ready' ? (editEventDate || client.event_date) : client.event_date,
-                      };
-                      setClient(updatedClient);
-                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
+                      // Use the client data returned from API (includes correct current_phase)
+                      const data = await res.json();
+                      if (data.client) {
+                        setClient(data.client);
+                        sessionStorage.setItem('client_user', JSON.stringify(data.client));
+                      }
                       setShowEditProgram(false);
                       setToast({ message: 'Program updated successfully!', type: 'success' });
                     } else {
@@ -677,13 +676,12 @@ case 'get_shredded': return 'Get Shredded';
                       }),
                     });
                     if (res.ok) {
-                      const updatedClient = {
-                        ...client!,
-                        program_type: 'event_ready',
-                        event_date: editEventDate,
-                      };
-                      setClient(updatedClient);
-                      sessionStorage.setItem('client_user', JSON.stringify(updatedClient));
+                      // Use the client data returned from API (includes correct current_phase)
+                      const data = await res.json();
+                      if (data.client) {
+                        setClient(data.client);
+                        sessionStorage.setItem('client_user', JSON.stringify(data.client));
+                      }
                       setShowEventDateModal(false);
                       setToast({ message: 'Event date set successfully!', type: 'success' });
                     } else {

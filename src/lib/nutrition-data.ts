@@ -488,7 +488,7 @@ export const PROGRAM_FLOWS = {
       1: { next: 2, condition: "14 days completed OR goal attained" },
       2: { next: 4, condition: "7 days completed AND goal attained" },
       "2_to_1": { next: 1, condition: "7 days completed AND goal not attained" },
-      4: { next: 1, condition: "weight > goal + 5 lbs" }
+      4: { next: 1, condition: "weight > goal + 4 lbs" }
     }
   },
   
@@ -501,7 +501,7 @@ export const PROGRAM_FLOWS = {
       1: { next: 5, condition: "14 days completed" },
       5: { next: 4, condition: "14 days completed AND goal attained" },
       "5_to_1": { next: 1, condition: "14 days completed AND goal not attained" },
-      4: { next: 1, condition: "weight > goal + 5 lbs" }
+      4: { next: 1, condition: "weight > goal + 4 lbs" }
     }
   },
   
@@ -509,10 +509,9 @@ export const PROGRAM_FLOWS = {
     name: "General Health",
     phases: [4],
     description: "Maintenance-focused. Long-term healthy habits.",
-    flow: "Phase 4 (steady) → Phase 1 (7d MAX) if weight > goal + 5 → Phase 4",
+    flow: "Phase 4 (steady)",
     transitions: {
-      4: { next: 1, condition: "weight > goal + 5 lbs" },
-      1: { next: 4, condition: "7 days completed" }
+      4: { next: 4, condition: "stays in Phase 4 - no weight-based transitions" }
     }
   },
   
@@ -520,10 +519,10 @@ export const PROGRAM_FLOWS = {
     name: "Muscle Gain",
     phases: [4, 6],
     description: "Build lean muscle. Strategic portion increases.",
-    flow: "Phase 6 → Phase 4 (goal attained) → Phase 6 (weight < goal - 5)",
+    flow: "Phase 6 → Phase 4 (goal attained) → Phase 6 (weight < goal - 4)",
     transitions: {
       6: { next: 4, condition: "goal attained" },
-      4: { next: 6, condition: "weight < goal - 5 lbs" }
+      4: { next: 6, condition: "weight < goal - 4 lbs" }
     }
   }
 } as const;

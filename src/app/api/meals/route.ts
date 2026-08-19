@@ -183,27 +183,25 @@ export async function POST(request: NextRequest) {
             resetStreak = true;
           }
         }
-        // MUSCLE_GAIN: Phase 6 ↔ Phase 4 (at goal = Phase 4, 5+ lbs below = Phase 6)
+        // MUSCLE_GAIN: Phase 6 ↔ Phase 4 (at goal = Phase 4, 4+ lbs below = Phase 6)
         else if (programType === 'muscle_gain' && newPhase === currentPhase) {
-          // At goal → Phase 4
-          if (goalWeight && currentWeight && currentWeight >= goalWeight) {
-            newPhase = 4;
-            resetStreak = true;
-          }
-          // Weight drops 5+ lbs below goal → Phase 6
-          else if (currentPhase === 4 && goalWeight && currentWeight && currentWeight < goalWeight - 5) {
+          // Phase 4 → Phase 6: If weight drops 4+ lbs below goal (independent check)
+          if (currentPhase === 4 && goalWeight && currentWeight && currentWeight < goalWeight - 4) {
             newPhase = 6;
             resetStreak = true;
           }
-          // At goal again → Phase 4 (from Phase 6)
+          // Phase 6 → Phase 4: At goal (only trigger when transitioning FROM Phase 6)
           else if (currentPhase === 6 && goalWeight && currentWeight && currentWeight >= goalWeight) {
             newPhase = 4;
             resetStreak = true;
           }
+          // Initial goal attainment (from Phase 6) → Phase 4
+          // This is handled above by the Phase 6 → Phase 4 check
         }
         
         // Phase 5: Check if plan has expired and needs regeneration
         // Plan expires after 3 days (day 1, 2, 3 = 3 days total)
+        // Note: streak is updated as part of this update (newStreak was computed above)
         if (currentPhase === 5 && client.phase5_start_date) {
           const phase5StartDate = new Date(client.phase5_start_date + 'T12:00:00');
           const daysSinceStart = Math.floor((new Date(now).getTime() - phase5StartDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -219,7 +217,7 @@ export async function POST(request: NextRequest) {
                 updated_at: now,
               })
               .eq('id', clientId);
-            // Phase 5 plan regenerated - skip phase transition logic
+            // Phase 5 plan regenerated - return early but streak was already updated above
             return NextResponse.json({
               success: true,
               mealId,
