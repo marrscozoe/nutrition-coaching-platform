@@ -3,6 +3,14 @@ import { db_run } from '@/lib/db';
 
 const VALID_PROGRAMS = ['get_shredded', 'muscle_gain', 'event_ready', 'general_health'];
 
+// Starting phases for each program
+const PROGRAM_STARTING_PHASES: Record<string, number> = {
+  event_ready: 1,
+  get_shredded: 1,
+  general_health: 4,
+  muscle_gain: 6,
+};
+
 export async function POST(request: NextRequest) {
   try {
     const clientId = request.headers.get('x-client-id');
@@ -23,8 +31,8 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
 
     // Build dynamic update query
-    const updates: string[] = ['program_type = ?'];
-    const values: any[] = [program_type];
+    const updates: string[] = ['program_type = ?', 'current_phase = ?'];
+    const values: any[] = [program_type, PROGRAM_STARTING_PHASES[program_type]];
 
     // If event_ready program, require event_date
     if (program_type === 'event_ready') {
