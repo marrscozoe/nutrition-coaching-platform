@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
 
           // ===== PROGRAM-SPECIFIC PHASE TRANSITIONS =====
 
-          // GET_SHREDDED: Phase 1 ↔ Phase 5 (14 days each), Phase 4 when 5+ lbs over goal
+          // GET_SHREDDED: Phase 1 ↔ Phase 5 (14 days each), Phase 4 when 4+ lbs over goal
           if (programType === 'get_shredded' && newPhase === currentPhase) {
             // Phase 1 → Phase 5: After 14 days
             if (currentPhase === 1 && daysInPhase >= 14) {
@@ -105,14 +105,14 @@ export async function POST(request: NextRequest) {
               newPhase = 1;
               resetPhaseStart = true;
             }
-            // Phase 4: If 5+ lbs over goal → Phase 1
-            else if (currentPhase === 4 && goalWeight && weight > goalWeight + 5) {
+            // Phase 4: If 4+ lbs over goal → Phase 1
+            else if (currentPhase === 4 && goalWeight && weight > goalWeight + 4) {
               newPhase = 1;
               resetPhaseStart = true;
             }
           }
 
-          // EVENT_READY: Phase 1 → Phase 2 (14 days), Phase 2 → Phase 1 (7 days), Phase 4 when 5+ lbs over goal
+          // EVENT_READY: Phase 1 → Phase 2 (14 days), Phase 2 → Phase 1 (7 days), Phase 4 when 4+ lbs over goal
           else if (programType === 'event_ready' && newPhase === currentPhase) {
             // Phase 1 → Phase 2: After 14 days
             if (currentPhase === 1 && daysInPhase >= 14) {
@@ -124,8 +124,8 @@ export async function POST(request: NextRequest) {
               newPhase = 1;
               resetPhaseStart = true;
             }
-            // Phase 4: If 5+ lbs over goal → Phase 1
-            else if (currentPhase === 4 && goalWeight && weight > goalWeight + 5) {
+            // Phase 4: If 4+ lbs over goal → Phase 1
+            else if (currentPhase === 4 && goalWeight && weight > goalWeight + 4) {
               newPhase = 1;
               resetPhaseStart = true;
             }
@@ -133,6 +133,17 @@ export async function POST(request: NextRequest) {
 
           // GENERAL_HEALTH: Phase 4 ↔ Phase 1 (4+ lbs gain triggers Phase 1, 7 days returns to Phase 4)
           else if (programType === 'general_health' && newPhase === currentPhase) {
+            // Phase 4 → Phase 1: If client GAINS 4+ lbs over goal
+            if (currentPhase === 4 && goalWeight && weight > goalWeight + 4) {
+              newPhase = 1;
+              resetPhaseStart = true;
+            }
+            // Phase 1 → Phase 4: After 7 days
+            else if (currentPhase === 1 && daysInPhase >= 7) {
+              newPhase = 4;
+              resetPhaseStart = true;
+            }
+          }
             // Phase 4 → Phase 1: If client GAINS 4+ lbs over goal
             if (currentPhase === 4 && goalWeight && weight > goalWeight + 4) {
               newPhase = 1;

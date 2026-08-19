@@ -911,23 +911,23 @@ Even if client changes goal weight to be "at goal", they still flow to next phas
 
 ### EVENT READY (event_ready)
 - Phase 1 (14d max) → Phase 2 (7d fixed) → Phase 1 (loop) OR Phase 4 (goal)
-- If weight > goal + 5 while in Phase 4: back to Phase 1
+- If weight > goal + 4 while in Phase 4: back to Phase 1
 - **Loop:** Phase 1 → Phase 2 → (Phase 1 or Phase 4) → repeat until goal attained
 
 ---
 
 ### GET SHREDDED (get_shredded)
 - Phase 1 (14d max) → Phase 5 (14d fixed) → Phase 1 (loop) OR Phase 4 (goal)
-- If weight > goal + 5 while in Phase 4: back to Phase 1
+- If weight > goal + 4 while in Phase 4: back to Phase 1
 - **Loop:** Phase 1 → Phase 5 → (Phase 1 or Phase 4) → repeat until goal attained
 
 ---
 
 ### GENERAL HEALTH (general_health)
 - Starts at Phase 4 (maintenance)
-- If weight > goal + 5: Phase 1 (7d max) → Phase 4
+- If weight > goal + 4: Phase 1 (7d max) → Phase 4
 - If goal attained: Phase 4
-- **Trigger back to Phase 1:** weight > goal + 5 lbs only
+- **Trigger back to Phase 1:** weight > goal + 4 lbs only
 - **NO automatic goal attainment → Phase 4 transition** (already at Phase 4)
 
 ---
@@ -935,8 +935,7 @@ Even if client changes goal weight to be "at goal", they still flow to next phas
 ### MUSCLE GAIN (muscle_gain)
 - Starts at Phase 6
 - Goal attained → Phase 4
-- Weight < goal - 5 while in Phase 4: back to Phase 6
-- **NO +5 rule** — only goal-based transitions
+- Weight < goal - 4 while in Phase 4: back to Phase 6
 - **Loop:** Phase 6 ↔ Phase 4 based on weight vs goal
 
 ---
