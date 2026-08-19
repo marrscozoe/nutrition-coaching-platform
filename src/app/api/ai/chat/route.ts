@@ -413,7 +413,8 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
         return Math.min(14, Math.max(1, diffDays + 1));
       })() : 1;
       const todayRule = context.phase5Plan?.find(d => d.day === dayNum);
-      const rulePhase = todayRule?.phase || 1;
+      const ruleType = todayRule?.type || 'phase1';
+      const rulePhase = ruleType === 'phase1' ? 1 : ruleType === 'phase2' ? 2 : 4;
       
       response += `Day ${dayNum}/14 — `;
       
@@ -524,8 +525,6 @@ function getPhaseAdvice(phase: number): string {
       return 'No starch! Focus on lean protein, fibrous vegetables, and healthy fats.';
     case 2:
       return 'Add starch on Wed/Sat/Sun to first 2 meals only.';
-    case 3:
-      return 'Evaluation checkpoint — are you at goal?';
     case 4:
       return 'Maintenance mode — add starch to every meal, weigh Fridays only.';
     default:

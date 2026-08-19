@@ -284,49 +284,34 @@ export interface CoachContext {
   todaySugarServings?: number; // sugar servings logged today (men: 2 allowed, women: 1 allowed)
   todayProcessedMeals?: number; // processed meals logged today (1 allowed)
   // Phase 5 tracking
-  phase5Plan?: Phase5Day[]; // 3-day rotating plan
-  phase5StartDate?: string; // YYYY-MM-DD when the current 3-day plan started
+  phase5Plan?: Phase5Day[]; // 14-day plan with daily type assignment
+  phase5StartDate?: string; // YYYY-MM-DD when the current 14-day plan started
 }
 
 export interface Phase5Day {
   day: number;
-  phase: 1 | 2 | 4; // Full phase rules (P1, P2, or P4)
+  type: 'phase1' | 'phase2' | 'phase4';
   label: string;
 }
 
-// Phase 5: 14-day plan with 3-day blocks
-// Each 3-day block randomly assigned to P1, P2, or P4 FULL rules
+// Phase 5: 14-day plan where each day is randomly assigned ONE of three behaviors:
+// Type A (Phase 1 behavior): No starches all day. Protein + veg + fat only.
+// Type B (Phase 2 behavior): Starches with breakfast and lunch only. Dinner no starch.
+// Type C (Phase 4 behavior): Starches with every meal.
 export function generatePhase5Plan(): Phase5Day[] {
-  const phases: Array<1 | 2 | 4> = [1, 2, 4];
-  const phaseLabels: Record<1 | 2 | 4, string> = {
-    1: 'No starch — lean protein, veggies, healthy fats only',
-    2: 'Starch allowed at breakfast & lunch only',
-    4: 'Starch allowed at every meal',
+  const types: Array<'phase1' | 'phase2' | 'phase4'> = ['phase1', 'phase2', 'phase4'];
+  const typeLabels: Record<'phase1' | 'phase2' | 'phase4', string> = {
+    phase1: 'No starch today',
+    phase2: 'Starch with breakfast and lunch only',
+    phase4: 'Starch with every meal',
   };
   
-  // Generate 14-day plan with 3-day blocks
-  // Days 1-3, 4-6, 7-9, 10-12 = 4 full blocks of 3 days
-  // Days 13-14 = final partial block (2 days)
+  // Generate 14-day plan with each day randomly assigned a type
   const plan: Phase5Day[] = [];
-  let dayNum = 1;
-  
-  // 4 complete 3-day blocks (days 1-12)
-  for (let block = 1; block <= 4; block++) {
-    // Pick random phase for this block
-    const randomPhase = phases[Math.floor(Math.random() * phases.length)];
-    const label = phaseLabels[randomPhase];
-    
-    // Each block is 3 days
-    for (let i = 0; i < 3; i++) {
-      plan.push({ day: dayNum++, phase: randomPhase, label });
-    }
+  for (let day = 1; day <= 14; day++) {
+    const type = types[Math.floor(Math.random() * types.length)];
+    plan.push({ day, type, label: typeLabels[type] });
   }
-  
-  // Final 2-day block (days 13-14)
-  const finalPhase = phases[Math.floor(Math.random() * phases.length)];
-  plan.push({ day: 13, phase: finalPhase, label: phaseLabels[finalPhase] });
-  plan.push({ day: 14, phase: finalPhase, label: phaseLabels[finalPhase] });
-  
   return plan;
 }
 
@@ -349,45 +334,43 @@ export function isPhase5PlanExpired(phase5StartDate: string): boolean {
   return diffDays >= 14; // Needs new plan after 14 days
 }
 
-// Get tomorrow's phase for Phase 5
+// Get tomorrow's type for Phase 5
 export function getTomorrowPhase(
   phase5Plan: Phase5Day[],
   phase5StartDate: string
-): 1 | 2 | 4 | null {
+): 'phase1' | 'phase2' | 'phase4' | null {
   if (!phase5Plan || phase5Plan.length === 0) return null;
   
   const currentDay = getPhase5DayNumber(phase5StartDate);
   const tomorrowDay = Math.min(14, currentDay + 1);
   
   const tomorrowEntry = phase5Plan.find(d => d.day === tomorrowDay);
-  return tomorrowEntry?.phase || null;
+  return tomorrowEntry?.type || null;
 }
 
-// Get simple starch message for tomorrow (NO phase names, NO jargon)
+// Get simple starch message for tomorrow (NO phase numbers, NO jargon)
 export function getTomorrowStarchMessage(
-  tomorrowPhase: 1 | 2 | 4 | 6 | null,
+  tomorrowType: 'phase1' | 'phase2' | 'phase4' | null,
   isPhase5: boolean = false,
   phase5Plan?: Phase5Day[],
   phase5StartDate?: string
 ): string {
-  // For Phase 5, look up tomorrow's actual phase from the plan
+  // For Phase 5, look up tomorrow's actual type from the plan
   if (isPhase5 && phase5Plan && phase5StartDate) {
-    const actualTomorrowPhase = getTomorrowPhase(phase5Plan, phase5StartDate);
-    if (actualTomorrowPhase) {
-      tomorrowPhase = actualTomorrowPhase;
+    const actualTomorrowType = getTomorrowPhase(phase5Plan, phase5StartDate);
+    if (actualTomorrowType) {
+      tomorrowType = actualTomorrowType;
     }
   }
   
-  if (tomorrowPhase === 1) {
-    return 'Tomorrow: no starches';
+  if (tomorrowType === 'phase1') {
+    return '⏰ Tomorrow: no starches all day. Protein + veg + fat only.';
   }
-  if (tomorrowPhase === 2) {
-    return 'Tomorrow: add starches to breakfast and lunch. No starch at dinner or snacks.';
+  if (tomorrowType === 'phase2') {
+    return '⏰ Tomorrow: starches with breakfast and lunch only. Dinner no starch.';
   }
-  if (tomorrowPhase === 4 || tomorrowPhase === 6) {
-    return tomorrowPhase === 6 
-      ? 'Tomorrow: add starches every meal. Remember your whey and creatine.'
-      : 'Tomorrow: add starches every meal';
+  if (tomorrowType === 'phase4') {
+    return '⏰ Tomorrow: starches with every meal. Add to all meals.';
   }
   return '';
 }
@@ -399,6 +382,13 @@ export function getPhase5CurrentRule(phase5Plan: Phase5Day[], phase5StartDate: s
   const currentDay = getPhase5DayNumber(phase5StartDate);
   const currentEntry = phase5Plan.find(d => d.day === currentDay);
   return currentEntry?.label || '';
+}
+
+// Helper: convert type string to numeric phase
+function typeToNumericPhase(type: 'phase1' | 'phase2' | 'phase4' | undefined): 1 | 2 | 4 {
+  if (type === 'phase1') return 1;
+  if (type === 'phase2') return 2;
+  return 4;
 }
 
 // Food categories (LEAN_PROTEINS, STARCHY_CARBOHYDRATES, HEALTHY_FATS, FIBROUS_VEGETABLES)
@@ -818,7 +808,7 @@ export function extractMealData(
   else if (phase === 5) {
     const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
     const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
-    const rulePhase = currentDayRule?.phase || 1;
+    const rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
 
     if (rulePhase === 1) {
       if (hasStarch) {
@@ -1148,7 +1138,7 @@ export async function analyzeMealPortion(
   else if (phase === 5 && context.programType !== 'event_ready' && hasStarch) {
     const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
     const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
-    const rulePhase = currentDayRule?.phase || 1;
+    const rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
 
     if (rulePhase === 1) {
       corrections.push(`⚠️ Phase 5 Day ${dayNum} (strict phase) - NO starch! Skip the starch completely.`);
@@ -1190,7 +1180,7 @@ export async function analyzeMealPortion(
     if (phase === 5) {
       const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
       const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
-      rulePhase = currentDayRule?.phase || 1;
+      rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
     }
 
     const isStrictPhase = rulePhase === 1 || rulePhase === 2;

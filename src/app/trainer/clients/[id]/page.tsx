@@ -246,7 +246,7 @@ export default function ClientDetailPage() {
                   const phasesByProgram: Record<string, number[]> = {
                     event_ready: [1, 2, 4],
                     get_shredded: [1, 5, 4],
-                    general_health: [4, 1],
+                    general_health: [4],
                     muscle_gain: [6, 4],
                   };
                   const validPhases = phasesByProgram[client?.program_type || ''] || [1, 2, 4];

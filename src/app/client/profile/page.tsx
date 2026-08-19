@@ -153,7 +153,7 @@ case 'get_shredded': return 'Get Shredded';
             </div>
             <div className="text-center p-3 rounded-lg bg-brand-charcoal/60">
               <p className="text-2xl font-bold text-green-400">{weightLost > 0 ? `-${weightLost}` : '0'}</p>
-              <p className="text-xs text-brand-cream/50">lbs Lost</p>
+              <p className="text-xs text-brand-cream/50">lbs Lost/Gain</p>
             </div>
           </div>
         </div>

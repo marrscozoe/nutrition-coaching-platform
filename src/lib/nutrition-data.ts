@@ -234,7 +234,7 @@ export function formatMealSuggestion(suggestion: MealSuggestion): string {
 
 export interface Phase5Day {
   day: number;
-  phase: 1 | 2 | 4;
+  type: 'phase1' | 'phase2' | 'phase4';
   label: string;
 }
 
@@ -250,6 +250,13 @@ function getPhase5CurrentRule(phase5Plan: Phase5Day[], phase5StartDate: string):
   if (!phase5Plan || phase5Plan.length === 0) return null;
   const currentDay = getPhase5DayNumber(phase5StartDate);
   return phase5Plan.find(d => d.day === currentDay) || null;
+}
+
+// Map type string to numeric phase for sub-phase logic
+function typeToPhase(type: 'phase1' | 'phase2' | 'phase4'): 1 | 2 | 4 {
+  if (type === 'phase1') return 1;
+  if (type === 'phase2') return 2;
+  return 4;
 }
 
 // ============================================
@@ -344,7 +351,7 @@ export function getPhaseGuidance(
         const dayNum = getPhase5DayNumber(phase5StartDate);
         if (currentRule) {
           // Delegate to the sub-phase's guidance (1, 2, or 4) with Phase 5 day context
-          const subPhaseGuidance = getPhaseGuidance(currentRule.phase, gender);
+          const subPhaseGuidance = getPhaseGuidance(typeToPhase(currentRule.type), gender);
           return {
             ...subPhaseGuidance,
             advice: `Day ${dayNum} of 14 — ${currentRule.label}`,

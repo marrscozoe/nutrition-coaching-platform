@@ -6,7 +6,7 @@ import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
 import { logout } from '@/lib/auth';
-import { getPhaseGuidance } from '@/lib/nutrition-data';
+import { getPhaseGuidance, getPortions } from '@/lib/nutrition-data';
 
 interface ClientData {
   id: string;
@@ -119,8 +119,8 @@ export default function ClientDashboard() {
 
   function getWeeksUntilEvent(eventDate?: string): number | null {
     if (!eventDate) return null;
-    const weeks = Math.ceil((new Date(eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000));
-    return weeks > 0 ? weeks : null;
+    const days = Math.ceil((new Date(eventDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+    return days > 0 ? days : null;
   }
 
   async function handleLogout() {
@@ -167,7 +167,7 @@ export default function ClientDashboard() {
       {/* Event Countdown Banner */}
       {weeksUntilEvent !== null && (
         <div className="mx-4 mt-4 p-4 rounded-xl bg-gradient-to-r from-brand-orange to-brand-orange-dark">
-          <p className="text-white/80 text-sm font-medium">🎯 {weeksUntilEvent} weeks until your event!</p>
+          <p className="text-white/80 text-sm font-medium">🎯 {weeksUntilEvent} days until your event!</p>
           <p className="text-white text-xs mt-1">Keep pushing — you've got this!</p>
         </div>
       )}
@@ -236,6 +236,39 @@ export default function ClientDashboard() {
         })()}
       </div>
 
+      {/* PORTIONS Section */}
+      <div className="mx-4 mt-4 p-5 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
+        <p className="text-sm text-brand-orange font-semibold mb-3">📋 DAILY PORTIONS</p>
+        {client.current_phase === 5 ? (
+          <p className="text-xs text-brand-cream/70">See today's plan above for your specific portions.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex justify-between text-xs">
+              <span className="text-brand-cream/60">Protein:</span>
+              <span className="text-brand-cream font-medium">{getPortions(client.gender as 'male' | 'female', client.current_phase || 1).protein}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-brand-cream/60">Veg:</span>
+              <span className="text-brand-cream font-medium">{getPortions(client.gender as 'male' | 'female', client.current_phase || 1).fibrousVegetables}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-brand-cream/60">Starch:</span>
+              <span className="text-brand-cream font-medium">
+                {client.current_phase === 1 ? '0' : getPortions(client.gender as 'male' | 'female', client.current_phase || 1).starch}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-brand-cream/60">Fat:</span>
+              <span className="text-brand-cream font-medium">{getPortions(client.gender as 'male' | 'female', client.current_phase || 1).fat}</span>
+            </div>
+            <div className="flex justify-between text-xs col-span-2 pt-2 border-t border-brand-cream/10">
+              <span className="text-brand-cream/60">Water:</span>
+              <span className="text-brand-cream font-medium">{getPortions(client.gender as 'male' | 'female', client.current_phase || 1).water}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Weight Stats */}
       <div className="mx-4 mt-4 grid grid-cols-3 gap-3">
         <div className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 text-center">
@@ -249,7 +282,7 @@ export default function ClientDashboard() {
           <p className="text-brand-cream/40 text-xs">lbs</p>
         </div>
         <div className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 text-center">
-          <p className="text-brand-cream/60 text-xs mb-1">Lost</p>
+          <p className="text-brand-cream/60 text-xs mb-1">Lost/Gain</p>
           <p className={`text-lg font-bold ${weightLost > 0 ? 'text-green-400' : weightLost < 0 ? 'text-red-400' : 'text-brand-cream/60'}`}>
             {weightLost > 0 ? `-${weightLost}` : weightLost < 0 ? `+${Math.abs(weightLost)}` : '0'}
           </p>

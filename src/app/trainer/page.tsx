@@ -25,6 +25,7 @@ interface ClientData {
   program_type: string;
   subscription_status: string;
   created_at: string;
+  last_meal_date?: string;
 }
 
 export default function TrainerDashboard() {
@@ -91,6 +92,19 @@ export default function TrainerDashboard() {
 
   const activeClients = clients.filter(c => c && (c.subscription_status === 'active' || c.subscription_status === 'trial'));
 
+  // Calculate At Risk clients: no meal in 3+ days OR weight trending up 2+ weeks
+  const atRiskClients = activeClients.filter(c => {
+    // Check: no meal in 3+ days
+    if (c.last_meal_date) {
+      const lastMealDate = new Date(c.last_meal_date);
+      const daysSinceLastMeal = Math.floor((Date.now() - lastMealDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSinceLastMeal >= 3) return true;
+    }
+    // Note: Weight trending check would require weight history data
+    // For now, only checking "no meal in 3+ days"
+    return false;
+  });
+
   return (
     <main className="min-h-screen pb-20">
       {/* Header */}
@@ -118,7 +132,7 @@ export default function TrainerDashboard() {
           </div>
           <div className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
             <p className="text-brand-cream/60 text-xs uppercase tracking-wider">At Risk</p>
-            <p className="text-3xl font-bold text-red-400 mt-1">0</p>
+            <p className="text-3xl font-bold text-red-400 mt-1">{atRiskClients.length}</p>
           </div>
         </div>
       </div>

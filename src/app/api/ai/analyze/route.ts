@@ -166,21 +166,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Helper to get tomorrow's starch message (for after dinner)
+    // Helper to get tomorrow's starch message (for after last meal of the day)
+    // For Phase 5: use the plan to get tomorrow's type
+    // For other phases: pass the current phase as the "tomorrow" type
     const getAfterDinnerMessage = (): string => {
-      if (mealType !== 'dinner') return '';
-      
-      const tomorrowPhase = context.currentPhase === 5 
-        ? getTomorrowPhase(context.phase5Plan || [], context.phase5StartDate || '')
-        : (context.currentPhase as 1 | 2 | 4 | 6 | null);
+      if (mealType !== 'dinner' && mealType !== 'lunch') return '';
       
       const isPhase5 = context.currentPhase === 5;
-      return getTomorrowStarchMessage(
-        tomorrowPhase as 1 | 2 | 4 | 6 | null,
-        isPhase5,
-        context.phase5Plan,
-        context.phase5StartDate
-      );
+      
+      if (isPhase5) {
+        // Phase 5: look up tomorrow's type from the plan
+        const tomorrowType = getTomorrowPhase(context.phase5Plan || [], context.phase5StartDate || '');
+        return getTomorrowStarchMessage(tomorrowType, true, context.phase5Plan, context.phase5StartDate);
+      } else {
+        // Non-Phase 5: tomorrow has same rules as today
+        const phaseToType: Record<number, 'phase1' | 'phase2' | 'phase4'> = {
+          1: 'phase1',
+          2: 'phase2',
+          4: 'phase4',
+          6: 'phase4',
+        };
+        const tomorrowType = phaseToType[context.currentPhase] || 'phase1';
+        return getTomorrowStarchMessage(tomorrowType, false);
+      }
     };
 
     // If photo provided, analyze with AI using fallback chain

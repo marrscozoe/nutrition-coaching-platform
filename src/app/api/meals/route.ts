@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db_all, db_get, db_run, getAdminClient, MealLog } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { generatePhase5Plan } from '@/lib/ai-coach';
+import { generatePhase5Plan, getTomorrowPhase, getTomorrowStarchMessage } from '@/lib/ai-coach';
 
 // GET - Fetch meal logs for a client
 export async function GET(request: NextRequest) {
@@ -200,13 +200,13 @@ export async function POST(request: NextRequest) {
         }
         
         // Phase 5: Check if plan has expired and needs regeneration
-        // Plan expires after 3 days (day 1, 2, 3 = 3 days total)
+        // Plan expires after 14 days
         // Note: streak is updated as part of this update (newStreak was computed above)
         if (currentPhase === 5 && client.phase5_start_date) {
           const phase5StartDate = new Date(client.phase5_start_date + 'T12:00:00');
           const daysSinceStart = Math.floor((new Date(now).getTime() - phase5StartDate.getTime()) / (1000 * 60 * 60 * 24));
-          if (daysSinceStart >= 3) {
-            // Plan expired - generate new 3-day plan
+          if (daysSinceStart >= 14) {
+            // Plan expired - generate new 14-day plan
             const newPhase5Plan = generatePhase5Plan();
             await supabase
               .from('clients')
@@ -218,10 +218,19 @@ export async function POST(request: NextRequest) {
               })
               .eq('id', clientId);
             // Phase 5 plan regenerated - return early but streak was already updated above
+            // Still compute tomorrow's plan message for the new plan
+            let tomorrowsPlanForRegen = '';
+            try {
+              const tomorrowType = getTomorrowPhase(newPhase5Plan, now.split('T')[0]);
+              tomorrowsPlanForRegen = getTomorrowStarchMessage(tomorrowType, true, newPhase5Plan, now.split('T')[0]);
+            } catch (e) {
+              console.error('Error computing tomorrow plan:', e);
+            }
             return NextResponse.json({
               success: true,
               mealId,
-              message: 'Meal logged successfully',
+              message: tomorrowsPlanForRegen ? `Meal logged. ${tomorrowsPlanForRegen}` : 'Meal logged successfully',
+              tomorrowsPlan: tomorrowsPlanForRegen,
               phase5PlanRegenerated: true,
             });
           }
@@ -254,10 +263,54 @@ export async function POST(request: NextRequest) {
       // Don't fail meal logging if phase logic fails
     }
 
+    // Check if this is the last meal of the day (dinner) and compute tomorrow's plan message
+    // Also handle "lunch with no dinner" case by checking today's meals
+    let tomorrowsPlanMessage = '';
+    if (mealType === 'dinner' || mealType === 'lunch') {
+      // For lunch, check if dinner exists for today
+      let isLastMealOfDay = mealType === 'dinner';
+      if (mealType === 'lunch' && !isLastMealOfDay) {
+        // Check if dinner exists for today
+        const today = now.split('T')[0]; // YYYY-MM-DD
+        const { data: todayMeals } = await supabase
+          .from('meals')
+          .select('meal_type')
+          .eq('client_id', clientId)
+          .gte('logged_at', today + 'T00:00:00')
+          .lte('logged_at', today + 'T23:59:59')
+          .eq('meal_type', 'dinner');
+        isLastMealOfDay = !todayMeals || todayMeals.length === 0;
+      }
+      
+      if (isLastMealOfDay) {
+        // Get client's Phase 5 data to compute tomorrow's plan
+        const { data: clientForPlan } = await supabase
+          .from('clients')
+          .select('phase5_plan, phase5_start_date, current_phase, program_type')
+          .eq('id', clientId)
+          .single();
+        
+        if (clientForPlan && clientForPlan.current_phase === 5 && clientForPlan.phase5_plan) {
+          try {
+            const phase5Plan = JSON.parse(clientForPlan.phase5_plan);
+            const tomorrowType = getTomorrowPhase(phase5Plan, clientForPlan.phase5_start_date || '');
+            tomorrowsPlanMessage = getTomorrowStarchMessage(tomorrowType, true, phase5Plan, clientForPlan.phase5_start_date);
+          } catch (e) {
+            console.error('Error computing tomorrow plan:', e);
+          }
+        } else if (clientForPlan && clientForPlan.program_type === 'get_shredded') {
+          // get_shredded clients not in Phase 5 yet - show generic tomorrow message
+          // They're likely in Phase 1 (no starch)
+          tomorrowsPlanMessage = getTomorrowStarchMessage('phase1', false);
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       mealId,
-      message: 'Meal logged successfully',
+      message: tomorrowsPlanMessage ? `Meal logged successfully. ${tomorrowsPlanMessage}` : 'Meal logged successfully',
+      tomorrowsPlan: tomorrowsPlanMessage,
     });
   } catch (error) {
     console.error('Log meal error:', error);
