@@ -144,27 +144,16 @@ export async function POST(request: NextRequest) {
               resetPhaseStart = true;
             }
           }
-            // Phase 4 → Phase 1: If client GAINS 4+ lbs over goal
-            if (currentPhase === 4 && goalWeight && weight > goalWeight + 4) {
-              newPhase = 1;
-              resetPhaseStart = true;
-            }
-            // Phase 1 → Phase 4: After 7 days
-            else if (currentPhase === 1 && daysInPhase >= 7) {
-              newPhase = 4;
-              resetPhaseStart = true;
-            }
-          }
 
-          // MUSCLE_GAIN: Phase 6 ↔ Phase 4 (at goal = Phase 4, 5+ lbs below = Phase 6)
+          // MUSCLE_GAIN: Phase 6 ↔ Phase 4 (at goal = Phase 4, 4+ lbs below = Phase 6)
           else if (programType === 'muscle_gain' && newPhase === currentPhase) {
             // At goal → Phase 4
             if (goalWeight && weight >= goalWeight) {
               newPhase = 4;
               resetPhaseStart = true;
             }
-            // Weight drops 5+ lbs below goal → Phase 6
-            else if (currentPhase === 4 && goalWeight && weight < goalWeight - 5) {
+            // Weight drops 4+ lbs below goal → Phase 6
+            else if (currentPhase === 4 && goalWeight && weight < goalWeight - 4) {
               newPhase = 6;
               resetPhaseStart = true;
             }
