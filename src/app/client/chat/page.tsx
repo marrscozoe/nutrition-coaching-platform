@@ -53,6 +53,7 @@ export default function ChatPage() {
   const [client, setClient] = useState<ClientData | null>(null);
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -85,13 +86,8 @@ export default function ChatPage() {
         // Invalid history, start fresh
       }
     } else {
-      // Welcome message
-      setMessages([{
-        id: 'welcome',
-        role: 'coach',
-        content: "Hey! I'm your AI nutrition coach! 💪 Ask me anything about your meals, portions, or just chat! LEEETS GOOOO!",
-        timestamp: new Date(),
-      }]);
+      // Show welcome intro at the top, not in messages
+      setShowWelcome(true);
     }
 
     // Fetch past meals from database and add to chat history
@@ -463,6 +459,13 @@ export default function ChatPage() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pt-[140px]">
+        {/* Welcome intro - pinned at top */}
+        {showWelcome && (
+          <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-brand-orange/20 to-brand-orange/10 border border-brand-orange/30">
+            <p className="text-sm text-brand-cream font-medium mb-2">👋 Hey! I'm your AI nutrition coach!</p>
+            <p className="text-xs text-brand-cream/70">Ask me anything about your meals, portions, or just chat!</p>
+          </div>
+        )}
         {messages.map((message) => (
           <div
             key={message.id}
