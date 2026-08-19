@@ -271,7 +271,23 @@ export default function ChatPage() {
     saveHistory(updatedMessages);
 
     try {
-      // Call chat API with weight data for AI commentary
+      // First, save the weight to the database (same as Weight tab does)
+      await fetch('/api/weight', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-id': client!.id,
+        },
+        body: JSON.stringify({
+          weight: weightData.weight,
+          bodyFatPercent: weightData.bodyFatPercent || null,
+          pantSize: weightData.pantSize || null,
+          waistSize: weightData.waistSize || null,
+          weighDay: weightData.weighDay || null,
+        }),
+      });
+
+      // Then, call chat API with weight data for AI commentary
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
