@@ -296,9 +296,9 @@ export function getPhaseGuidance(
       return {
         advice: 'No starch — protein, fibrous vegetables, and healthy fats only',
         canEat: [
-          `LEAN PROTEINS: ${proteinList}`,
-          `FIBROUS VEGETABLES: ${veggieList}`,
-          `HEALTHY FATS: ${fatList}`,
+          `LEAN PROTEINS ${proteinOz}: ${proteinList}`,
+          `FIBROUS VEGETABLES ${vegPortion}: ${veggieList}`,
+          `HEALTHY FATS ${fatPortion}: ${fatList}`,
         ],
         cannotEat: [
           'NO starch — no bread, rice, pasta, potato, beans, corn, oatmeal, cereal',
@@ -313,10 +313,10 @@ export function getPhaseGuidance(
       return {
         advice: 'Add starch Wed/Sat/Sun to first 2 meals',
         canEat: [
-          `LEAN PROTEINS: ${proteinList}`,
-          `FIBROUS VEGETABLES: ${veggieList}`,
-          `HEALTHY FATS: ${fatList}`,
-          `STARCHY CARBOHYDRATES (Wed/Sat/Sun only): ${starchList}`,
+          `LEAN PROTEINS ${proteinOz}: ${proteinList}`,
+          `FIBROUS VEGETABLES ${vegPortion}: ${veggieList}`,
+          `HEALTHY FATS ${fatPortion}: ${fatList}`,
+          `STARCHY CARBOHYDRATES ${starchPortion} (Wed/Sat/Sun only): ${starchList}`,
         ],
         cannotEat: [
           'NO starch on Mon, Tue, Thu, Fri',
@@ -332,10 +332,10 @@ export function getPhaseGuidance(
       return {
         advice: 'Maintenance — add starch to every meal',
         canEat: [
-          `LEAN PROTEINS: ${proteinList}`,
-          `FIBROUS VEGETABLES: ${veggieList}`,
-          `HEALTHY FATS: ${fatList}`,
-          `STARCHY CARBOHYDRATES: ${starchList}`,
+          `LEAN PROTEINS ${proteinOz}: ${proteinList}`,
+          `FIBROUS VEGETABLES ${vegPortion}: ${veggieList}`,
+          `HEALTHY FATS ${fatPortion}: ${fatList}`,
+          `STARCHY CARBOHYDRATES ${starchPortion}: ${starchList}`,
         ],
         cannotEat: [
           'No processed foods',
@@ -362,10 +362,10 @@ export function getPhaseGuidance(
       return {
         advice: 'Aggressive fat loss — 14-day rotating plan with 3-day blocks',
         canEat: [
-          `LEAN PROTEINS: ${proteinList}`,
-          `FIBROUS VEGETABLES: ${veggieList}`,
-          `HEALTHY FATS: ${fatList}`,
-          'Starch varies by 3-day block: check your plan for today',
+          `LEAN PROTEINS ${proteinOz}: ${proteinList}`,
+          `FIBROUS VEGETABLES ${vegPortion}: ${veggieList}`,
+          `HEALTHY FATS ${fatPortion}: ${fatList}`,
+          'Starch varies by day: check your plan for today',
         ],
         cannotEat: [
           'NO starch during strict blocks',
@@ -382,10 +382,10 @@ export function getPhaseGuidance(
       return {
         advice: 'Muscle gain — higher carbs and fats to fuel growth',
         canEat: [
-          `LEAN PROTEINS: ${proteinList}`,
-          `FIBROUS VEGETABLES: ${veggieList}`,
-          `HEALTHY FATS: ${fatList}`,
-          `STARCHY CARBOHYDRATES: ${starchList}`,
+          `LEAN PROTEINS ${proteinOz}: ${proteinList}`,
+          `FIBROUS VEGETABLES ${vegPortion}: ${veggieList}`,
+          `HEALTHY FATS ${fatPortion}: ${fatList}`,
+          `STARCHY CARBOHYDRATES ${starchPortion}: ${starchList}`,
           `Whey protein: ${isMale ? '40g' : '20g'} 1st thing AM & last thing PM (NOT with meals)`,
           `Creatine: Daily`,
         ],

@@ -236,39 +236,6 @@ export default function ClientDashboard() {
         })()}
       </div>
 
-      {/* PORTIONS Section */}
-      <div className="mx-4 mt-4 p-5 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
-        <p className="text-sm text-brand-orange font-semibold mb-3">📋 DAILY PORTIONS</p>
-        {client.current_phase === 5 ? (
-          <p className="text-xs text-brand-cream/70">See today's plan above for your specific portions.</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex justify-between text-xs">
-              <span className="text-brand-cream/60">Protein:</span>
-              <span className="text-brand-cream font-medium">{getPortions(client.gender as 'male' | 'female', client.current_phase || 1).protein}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-brand-cream/60">Veg:</span>
-              <span className="text-brand-cream font-medium">{getPortions(client.gender as 'male' | 'female', client.current_phase || 1).fibrousVegetables}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-brand-cream/60">Starch:</span>
-              <span className="text-brand-cream font-medium">
-                {client.current_phase === 1 ? '0' : getPortions(client.gender as 'male' | 'female', client.current_phase || 1).starch}
-              </span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-brand-cream/60">Fat:</span>
-              <span className="text-brand-cream font-medium">{getPortions(client.gender as 'male' | 'female', client.current_phase || 1).fat}</span>
-            </div>
-            <div className="flex justify-between text-xs col-span-2 pt-2 border-t border-brand-cream/10">
-              <span className="text-brand-cream/60">Water:</span>
-              <span className="text-brand-cream font-medium">{getPortions(client.gender as 'male' | 'female', client.current_phase || 1).water}</span>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Weight Stats */}
       <div className="mx-4 mt-4 grid grid-cols-3 gap-3">
         <div className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 text-center">
