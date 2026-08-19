@@ -463,7 +463,7 @@ export default function ChatPage() {
         {showWelcome && (
           <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-brand-orange/20 to-brand-orange/10 border border-brand-orange/30">
             <p className="text-sm text-brand-cream font-medium mb-2">👋 Hey! I'm your AI nutrition coach!</p>
-            <p className="text-xs text-brand-cream/70">Ask me anything about your meals, portions, or just chat!</p>
+            <p className="text-xs text-brand-cream/70">Ask me anything about your meals or portions!</p>
           </div>
         )}
         {messages.map((message) => (
