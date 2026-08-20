@@ -125,7 +125,11 @@ export default function ChatPage() {
       }
     }
 
-    loadPastMeals();
+    // Check if chat was cleared - if so, don't load past meals
+    const chatCleared = sessionStorage.getItem(`chat_cleared_${user.id}`);
+    if (!chatCleared) {
+      loadPastMeals();
+    }
 
     setLoading(false);
   }, [router]);
@@ -417,12 +421,11 @@ export default function ChatPage() {
   function clearChat() {
     if (!client) return;
     const chatKey = `chat_history_${client.id}`;
-    setMessages([{
-      id: 'welcome',
-      role: 'coach',
-      content: "Chat cleared! What do you need? Ask me about meals, portions, your progress, or just chat! 💪",
-      timestamp: new Date(),
-    }]);
+    // Mark chat as cleared so past meals won't load on next visit
+    sessionStorage.setItem(`chat_cleared_${client.id}`, Date.now().toString());
+    // Clear messages and sessionStorage
+    setMessages([]);
+    setShowWelcome(false);
     sessionStorage.removeItem(chatKey);
   }
 
