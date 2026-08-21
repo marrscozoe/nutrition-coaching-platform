@@ -401,7 +401,7 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
   // Only show event info to event_ready clients — never leak event data to other programs
   const isEventClient = context.programType === 'event_ready' && context.eventDate;
   const weeksUntilEvent = isEventClient
-    ? Math.ceil((new Date(context.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000))
+    ? Math.ceil((new Date(context.eventDate!).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000))
     : null;
 
   const lowerMessage = message.toLowerCase();
