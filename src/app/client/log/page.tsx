@@ -303,6 +303,7 @@ export default function LogMealPage() {
         portionAdvice,
         onPhase,
         messedUp,
+        coachMessage: saveData.coachMessage || null,
       };
 
       // Store pending meal data in sessionStorage for chat page to display
@@ -382,6 +383,7 @@ export default function LogMealPage() {
           portionAdvice,
           onPhase,
           messedUp,
+          coachMessage: data.coachMessage || null,
         };
 
         // Store pending meal data in sessionStorage for chat page to pick up

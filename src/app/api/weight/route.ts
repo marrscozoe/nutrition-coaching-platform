@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db_all, db_run, getAdminClient } from '@/lib/db';
+import { db_all, db_run, getAdminClient, insertCoachMessage, hasRecentCoachMessage } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
 // GET - Fetch weight history for a client
@@ -80,8 +80,8 @@ export async function POST(request: NextRequest) {
           let newPhase = currentPhase;
           let resetPhaseStart = false;
 
-          // GOAL ATTAINED - check FIRST (except for muscle_gain which has its own logic)
-          if (goalWeight && currentPhase !== 4 && currentPhase !== 6) {
+          // GOAL ATTAINED - check FIRST (except for muscle_gain which handles Phase 6 → Phase 4 via this check)
+          if (goalWeight && currentPhase !== 4) {
             const atGoal = (programType === 'muscle_gain')
               ? (weight >= goalWeight)
               : (weight <= goalWeight);
@@ -99,10 +99,16 @@ export async function POST(request: NextRequest) {
             if (currentPhase === 1 && daysInPhase >= 14) {
               newPhase = 5;
               resetPhaseStart = true;
+              // Store phase2_start_weight for EVENT_READY (Phase 2 duration tracking)
+              // Note: Phase 2 is only for EVENT_READY, not GET_SHREDDED
             }
-            // Phase 5 → Phase 1: After 14 days
+            // Phase 5 → Phase 1 OR Phase 4 (goal attained): After 14 days
             else if (currentPhase === 5 && daysInPhase >= 14) {
-              newPhase = 1;
+              if (goalWeight && weight <= goalWeight) {
+                newPhase = 4; // Goal attained → maintenance
+              } else {
+                newPhase = 1; // Goal not attained → restart
+              }
               resetPhaseStart = true;
             }
             // Phase 4: If 4+ lbs over goal → Phase 1
@@ -112,16 +118,25 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // EVENT_READY: Phase 1 → Phase 2 (14 days), Phase 2 → Phase 1 (7 days), Phase 4 when 4+ lbs over goal
+          // EVENT_READY: Phase 1 → Phase 2 (14 days), Phase 2 → Phase 1/4 (7 days), Phase 4 when 4+ lbs over goal
           else if (programType === 'event_ready' && newPhase === currentPhase) {
             // Phase 1 → Phase 2: After 14 days
             if (currentPhase === 1 && daysInPhase >= 14) {
               newPhase = 2;
               resetPhaseStart = true;
+              // Store current weight as phase2_start_weight for duration extension tracking
+              await db_run(
+                `UPDATE clients SET phase2_start_weight = ?, updated_at = ? WHERE id = ?`,
+                weight, now, clientId
+              );
             }
-            // Phase 2 → Phase 1: After 7 days
+            // Phase 2 → Phase 1 or Phase 4 (goal attained): 7 days
             else if (currentPhase === 2 && daysInPhase >= 7) {
-              newPhase = 1;
+              if (goalWeight && weight <= goalWeight) {
+                newPhase = 4; // Goal attained → maintenance
+              } else {
+                newPhase = 1; // Goal not attained → restart
+              }
               resetPhaseStart = true;
             }
             // Phase 4: If 4+ lbs over goal → Phase 1
@@ -131,35 +146,13 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // GENERAL_HEALTH: Phase 4 ↔ Phase 1 (4+ lbs gain triggers Phase 1, 7 days returns to Phase 4)
-          else if (programType === 'general_health' && newPhase === currentPhase) {
-            // Phase 4 → Phase 1: If client GAINS 4+ lbs over goal
-            if (currentPhase === 4 && goalWeight && weight > goalWeight + 4) {
-              newPhase = 1;
-              resetPhaseStart = true;
-            }
-            // Phase 1 → Phase 4: After 7 days
-            else if (currentPhase === 1 && daysInPhase >= 7) {
-              newPhase = 4;
-              resetPhaseStart = true;
-            }
-          }
+          // GENERAL_HEALTH: Phase 4 ONLY — if 4+ lbs over goal, AI/trainer advises to switch programs or adjust goal, no phase change
 
-          // MUSCLE_GAIN: Phase 6 ↔ Phase 4 (at goal = Phase 4, 4+ lbs below = Phase 6)
+          // MUSCLE_GAIN: Phase 4 → Phase 6 when 4+ lbs below goal (Phase 6 → Phase 4 handled by early goal check)
           else if (programType === 'muscle_gain' && newPhase === currentPhase) {
-            // At goal → Phase 4
-            if (goalWeight && weight >= goalWeight) {
-              newPhase = 4;
-              resetPhaseStart = true;
-            }
             // Weight drops 4+ lbs below goal → Phase 6
-            else if (currentPhase === 4 && goalWeight && weight < goalWeight - 4) {
+            if (currentPhase === 4 && goalWeight && weight < goalWeight - 4) {
               newPhase = 6;
-              resetPhaseStart = true;
-            }
-            // At goal again → Phase 4 (from Phase 6)
-            else if (currentPhase === 6 && goalWeight && weight >= goalWeight) {
-              newPhase = 4;
               resetPhaseStart = true;
             }
           }
@@ -246,12 +239,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ===== GENERAL_HEALTH: Check if 4+ lbs over goal and send coach message =====
+    let coachMessage: { id: string; content: string; message_type: string; created_at: string } | null = null;
+    if (client?.program_type === 'general_health' && client?.goal_weight && weight > client.goal_weight + 4) {
+      // Only send if we haven't sent a recent goal_alert message (within 24 hours)
+      const hasRecent = await hasRecentCoachMessage(clientId, 'goal_alert', 24);
+      if (!hasRecent) {
+        const clientName = client.name || 'there';
+        const messageContent = `Hey ${clientName}! I noticed you're 4+ lbs over your goal weight. You're on the General Health (maintenance) program. Want to keep making progress? Consider switching to EVENT READY or GET SHREDDED to lose that weight. Or if you're happy with where you're at, we can adjust your goal weight. Just let me know!`;
+        const result = await insertCoachMessage(clientId, messageContent, 'goal_alert');
+        if (result.success && result.messageId) {
+          coachMessage = {
+            id: result.messageId,
+            content: messageContent,
+            message_type: 'goal_alert',
+            created_at: now,
+          };
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       weighInId,
       weightLost: Math.round(weightLost * 10) / 10,
       milestones,
       message: 'Weight logged successfully',
+      coachMessage,
     });
   } catch (error) {
     console.error('Log weight error:', error);

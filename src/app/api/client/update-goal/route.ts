@@ -37,18 +37,39 @@ export async function POST(request: NextRequest) {
       const programType = oldClient.program_type;
       const currentPhase = oldClient.current_phase || 1;
 
-      // Phase 4 check: if weight exceeds threshold, go to Phase 1
-      // (GET_SHREDDED, EVENT_READY, GENERAL_HEALTH: over goal + 4 lbs = Phase 1)
-      if (currentPhase === 4 && currentWeight && currentWeight > goal_weight + 4) {
+      // ===== MUSCLE_GAIN: goal raised above current weight → Phase 6 (needs to gain) =====
+      // This must come BEFORE the general "at goal" check to override it
+      if (programType === 'muscle_gain' && currentPhase !== 6 && currentWeight) {
+        if (goal_weight > currentWeight) {
+          newPhase = 6; // Goal is now above current weight → needs to gain
+          phaseChanged = true;
+        }
+      }
+      // ===== GET_SHREDDED Phase 5: goal attained → Phase 4, otherwise restart =====
+      if (programType === 'get_shredded' && currentPhase === 5 && currentWeight) {
+        if (goal_weight && currentWeight <= goal_weight) {
+          newPhase = 4; // Goal attained → maintenance
+          phaseChanged = true;
+        }
+        // Note: no 'else' - Phase 5 stays in Phase 5 until daysInPhase check triggers restart
+      }
+      // ===== EVENT_READY Phase 2: goal check before transition =====
+      else if (programType === 'event_ready' && currentPhase === 2 && currentWeight) {
+        // Phase 2 → Phase 4 if goal attained, otherwise stays in Phase 2 (duration check)
+        if (goal_weight && currentWeight <= goal_weight) {
+          newPhase = 4; // Goal attained → maintenance
+          phaseChanged = true;
+        }
+        // Otherwise stays in Phase 2 until duration check triggers restart to Phase 1
+      }
+      // ===== Phase 4 check: if weight exceeds threshold, go to Phase 1 =====
+      else if (currentPhase === 4 && currentWeight && currentWeight > goal_weight + 4) {
         newPhase = 1;
         phaseChanged = true;
       }
-      // GOAL ATTAINED - check if at goal, go to Phase 4
-      // (except for Phase 6 which has special logic)
-      else if (currentPhase !== 6 && currentWeight) {
-        const atGoal = (programType === 'muscle_gain')
-          ? (currentWeight >= goal_weight)
-          : (currentWeight <= goal_weight);
+      // ===== GOAL ATTAINED - check if at goal, go to Phase 4 (skip for muscle_gain, handled above) =====
+      else if (currentPhase !== 6 && programType !== 'muscle_gain' && currentWeight) {
+        const atGoal = (currentWeight <= goal_weight);
         if (atGoal) {
           newPhase = 4;
           phaseChanged = true;

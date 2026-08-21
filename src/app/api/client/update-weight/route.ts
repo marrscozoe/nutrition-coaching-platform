@@ -78,10 +78,15 @@ export async function POST(request: NextRequest) {
         if (currentPhase === 1 && daysInPhase >= 14) {
           newPhase = 5;
           resetPhaseStart = true;
+          // Note: Phase 2 is only for EVENT_READY, not GET_SHREDDED
         }
-        // Phase 5 → Phase 1: After 14 days
+        // Phase 5 → Phase 1 OR Phase 4 (goal attained): After 14 days
         else if (currentPhase === 5 && daysInPhase >= 14) {
-          newPhase = 1;
+          if (goalWeight && current_weight <= goalWeight) {
+            newPhase = 4; // Goal attained → maintenance
+          } else {
+            newPhase = 1; // Goal not attained → restart
+          }
           resetPhaseStart = true;
         }
         // Phase 4: If 4+ lbs over goal → Phase 1
@@ -91,17 +96,32 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // EVENT_READY: Phase 1 → Phase 2 (14 days), Phase 2 → Phase 1 (7 days), Phase 4 when 4+ lbs over goal
+      // EVENT_READY: Phase 1 → Phase 2 (14 days), Phase 2 → Phase 1/4 (7-14 days based on weight loss), Phase 4 when 4+ lbs over goal
       else if (programType === 'event_ready' && newPhase === currentPhase) {
         // Phase 1 → Phase 2: After 14 days
         if (currentPhase === 1 && daysInPhase >= 14) {
           newPhase = 2;
           resetPhaseStart = true;
+          // Store current weight as phase2_start_weight for duration extension tracking
+          await db_run(
+            `UPDATE clients SET phase2_start_weight = ?, updated_at = ? WHERE id = ?`,
+            current_weight, now, clientId
+          );
         }
-        // Phase 2 → Phase 1: After 7 days
+        // Phase 2 → Phase 1 or Phase 4 (goal attained): weight-based duration
+        // Get phase2_start_weight to determine if we should extend to 14 days
         else if (currentPhase === 2 && daysInPhase >= 7) {
-          newPhase = 1;
-          resetPhaseStart = true;
+          const phase2StartWeight = oldClient?.phase2_start_weight;
+          const weightLostInPhase2 = phase2StartWeight ? phase2StartWeight - current_weight : 0;
+          const phase2Duration = weightLostInPhase2 > 2 ? 14 : 7;
+          if (daysInPhase >= phase2Duration) {
+            if (goalWeight && current_weight <= goalWeight) {
+              newPhase = 4; // Goal attained → maintenance
+            } else {
+              newPhase = 1; // Goal not attained → restart
+            }
+            resetPhaseStart = true;
+          }
         }
         // Phase 4: If 4+ lbs over goal → Phase 1
         else if (currentPhase === 4 && goalWeight && current_weight > goalWeight + 4) {

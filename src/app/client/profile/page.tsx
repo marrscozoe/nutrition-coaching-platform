@@ -168,8 +168,11 @@ case 'get_shredded': return 'Get Shredded';
               <span className="text-brand-cream/60">Program</span>
               <button
                 onClick={() => {
+                  // Read fresh client data directly from sessionStorage to ensure we have the latest
+                  const storedUser = sessionStorage.getItem('client_user');
+                  const freshClient = storedUser ? JSON.parse(storedUser) : null;
                   setSelectedProgram(client.program_type || 'general_health');
-                  setEditEventDate(client.event_date || '');
+                  setEditEventDate(freshClient?.event_date || client.event_date || '');
                   setShowEditProgram(true);
                 }}
                 className="text-brand-orange text-sm hover:underline"
@@ -189,6 +192,10 @@ case 'get_shredded': return 'Get Shredded';
                 {client.starting_weight || '--'} lbs ✏️
               </button>
             </div>
+            <div className="flex justify-between">
+              <span className="text-brand-cream/60">Current Weight</span>
+              <span className="text-brand-cream">{client.current_weight || '--'} lbs</span>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-brand-cream/60">Goal Weight</span>
               <button
@@ -202,11 +209,18 @@ case 'get_shredded': return 'Get Shredded';
               </button>
             </div>
             {client.event_date && (
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-brand-cream/60">Event Date</span>
-                <span className="text-brand-cream">
-                  {new Date(client.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                </span>
+                <button
+                  onClick={() => {
+                    setSelectedProgram('event_ready');
+                    setEditEventDate(client.event_date ? client.event_date.split('T')[0] : '');
+                    setShowEditProgram(true);
+                  }}
+                  className="text-brand-orange text-sm hover:underline"
+                >
+                  {new Date(client.event_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} ✏️
+                </button>
               </div>
             )}
           </div>
@@ -476,10 +490,22 @@ case 'get_shredded': return 'Get Shredded';
                 </div>
               ))}
             </div>
-            {selectedProgram === 'event_ready' && !client.event_date && (
-              <p className="text-xs text-brand-orange mt-3">
-                ⚠️ You will be asked to set your event date after saving.
-              </p>
+            {selectedProgram === 'event_ready' && (
+              <div className="mt-4">
+                <label className="block text-sm text-brand-cream/80 mb-2">Event Date</label>
+                <input
+                  type="date"
+                  value={editEventDate}
+                  onChange={(e) => setEditEventDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream focus:outline-none focus:border-brand-orange"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                {!client.event_date && !editEventDate && (
+                  <p className="text-xs text-brand-orange/70 mt-2">
+                    Set your event date to get the right timeline.
+                  </p>
+                )}
+              </div>
             )}
             <div className="flex gap-3 mt-6">
               <button
@@ -492,10 +518,9 @@ case 'get_shredded': return 'Get Shredded';
               <button
                 type="button"
                 onClick={async () => {
-                  // If Event Ready without event date, open event date modal
-                  if (selectedProgram === 'event_ready' && !editEventDate && !client.event_date) {
-                    setShowEditProgram(false);
-                    setShowEventDateModal(true);
+                  // Require event date when Event Ready is selected
+                  if (selectedProgram === 'event_ready' && !editEventDate) {
+                    setToast({ message: 'Please set an event date', type: 'error' });
                     return;
                   }
                   setSubmitting(true);

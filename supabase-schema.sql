@@ -291,6 +291,30 @@ CREATE INDEX IF NOT EXISTS idx_food_corrections_submitted_by ON food_corrections
 CREATE INDEX IF NOT EXISTS idx_food_corrections_food_name ON food_corrections(food_name);
 CREATE INDEX IF NOT EXISTS idx_food_corrections_approved ON food_corrections(approved);
 
+-- =============================================
+-- COACH MESSAGES TABLE (for in-app coach-to-client messages)
+-- =============================================
+CREATE TABLE IF NOT EXISTS coach_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID REFERENCES clients(id) ON DELETE CASCADE NOT NULL,
+  content TEXT NOT NULL,
+  message_type TEXT DEFAULT 'general' CHECK (message_type IN ('general', 'goal_alert', 'program_switch', 'milestone')),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS for coach_messages
+ALTER TABLE coach_messages ENABLE ROW LEVEL SECURITY;
+
+-- Public can insert coach_messages (for API routes)
+CREATE POLICY "Public can insert coach_messages" ON coach_messages FOR INSERT WITH CHECK (true);
+
+-- Public can view coach_messages (for client chat)
+CREATE POLICY "Public can view coach_messages" ON coach_messages FOR SELECT USING (true);
+
+-- Index for coach_messages
+CREATE INDEX IF NOT EXISTS idx_coach_messages_client_id ON coach_messages(client_id);
+CREATE INDEX IF NOT EXISTS idx_coach_messages_created_at ON coach_messages(created_at);
+
 -- Allow public operations on meals, weigh_ins, feedback for now
 -- (RLS will restrict based on user ID once auth is properly set up)
 CREATE POLICY "Public can insert meals" ON meals FOR INSERT WITH CHECK (true);

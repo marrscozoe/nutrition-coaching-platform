@@ -458,4 +458,172 @@ export interface Feedback {
   resolved_at?: string;
 }
 
+export interface CoachMessage {
+  id: string;
+  client_id: string;
+  content: string;
+  message_type: 'general' | 'goal_alert' | 'program_switch' | 'milestone';
+  created_at: string;
+}
+
 export type { MealLog as MealLogRow };
+
+// ============================================
+// Coach Message Functions
+// ============================================
+
+/**
+ * Insert a coach message for a client
+ */
+export async function insertCoachMessage(
+  clientId: string,
+  content: string,
+  messageType: 'general' | 'goal_alert' | 'program_switch' | 'milestone' = 'general'
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
+  try {
+    const supabase = getAdminClient();
+    const messageId = uuidv4();
+    const now = new Date().toISOString();
+
+    const { error } = await supabase.from('coach_messages').insert({
+      id: messageId,
+      client_id: clientId,
+      content,
+      message_type: messageType,
+      created_at: now,
+    });
+
+    if (error) {
+      console.error('[insertCoachMessage] Error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, messageId };
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error('[insertCoachMessage] Error:', e);
+    return { success: false, error: errMsg };
+  }
+}
+
+/**
+ * Get coach messages for a client
+ * @param clientId - The client ID
+ * @param since - Optional ISO timestamp to get messages since a certain time
+ */
+export async function getCoachMessages(
+  clientId: string,
+  since?: string
+): Promise<CoachMessage[]> {
+  try {
+    const supabase = getAdminClient();
+    let query = supabase
+      .from('coach_messages')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: true });
+
+    if (since) {
+      query = query.gte('created_at', since);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('[getCoachMessages] Error:', error);
+      return [];
+    }
+
+    return (data as CoachMessage[]) || [];
+  } catch (e) {
+    console.error('[getCoachMessages] Error:', e);
+    return [];
+  }
+}
+
+/**
+ * Delete all coach messages for a client (used when user clears chat)
+ */
+export async function deleteCoachMessages(clientId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = getAdminClient();
+    const { error } = await supabase
+      .from('coach_messages')
+      .delete()
+      .eq('client_id', clientId);
+
+    if (error) {
+      console.error('[deleteCoachMessages] Error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error('[deleteCoachMessages] Error:', e);
+    return { success: false, error: errMsg };
+  }
+}
+
+/**
+ * Check if a coach message of a specific type was already sent to a client recently
+ * (to avoid spamming the same message)
+ */
+export async function hasRecentCoachMessage(
+  clientId: string,
+  messageType: 'goal_alert' | 'program_switch' | 'milestone' | 'general',
+  withinHours: number = 24
+): Promise<boolean> {
+  try {
+    const supabase = getAdminClient();
+    const since = new Date(Date.now() - withinHours * 60 * 60 * 1000).toISOString();
+
+    const { data, error } = await supabase
+      .from('coach_messages')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('message_type', messageType)
+      .gte('created_at', since)
+      .limit(1);
+
+    if (error) {
+      console.error('[hasRecentCoachMessage] Error:', error);
+      return false;
+    }
+
+    return (data && data.length > 0) || false;
+  } catch (e) {
+    console.error('[hasRecentCoachMessage] Error:', e);
+    return false;
+  }
+}
+
+/**
+ * Get the chat_cleared_at timestamp for a client (returns null if not set)
+ * Used to persist the "chat cleared" state across login sessions
+ */
+export async function getChatClearedAt(clientId: string): Promise<string | null> {
+  try {
+    const result = await redis_get<string>(`chat_cleared_at:${clientId}`);
+    return result;
+  } catch (e) {
+    console.error('[getChatClearedAt] Error:', e);
+    return null;
+  }
+}
+
+/**
+ * Set the chat_cleared_at timestamp for a client
+ * Called when user clears their chat to persist the cleared state
+ */
+export async function setChatClearedAt(clientId: string): Promise<void> {
+  await redis_set(`chat_cleared_at:${clientId}`, new Date().toISOString());
+}
+
+/**
+ * Clear the chat_cleared_at flag for a client
+ * Called when user logs a meal or weight (so chat history can be shown)
+ */
+export async function clearChatClearedAt(clientId: string): Promise<void> {
+  await redis_del(`chat_cleared_at:${clientId}`);
+}

@@ -11,6 +11,20 @@ export async function logout(): Promise<void> {
     localStorage.removeItem('user'); // Legacy key cleanup
     localStorage.removeItem('userType'); // Legacy key cleanup
     
+    // Clear sessionStorage (per-tab session - this is where the app actually stores user data!)
+    sessionStorage.removeItem('trainer_user');
+    sessionStorage.removeItem('trainer_user_type');
+    sessionStorage.removeItem('client_user');
+    sessionStorage.removeItem('client_user_type');
+    sessionStorage.removeItem('user'); // Legacy key cleanup
+    sessionStorage.removeItem('userType'); // Legacy key cleanup
+    // Clear chat history keys
+    sessionStorage.removeItem('pending_meal_data');
+    sessionStorage.removeItem('pending_weight_data');
+    // Clear chat cleared flags
+    const keysToRemove = Object.keys(sessionStorage).filter(k => k.startsWith('chat_cleared_'));
+    keysToRemove.forEach(k => sessionStorage.removeItem(k));
+    
     // Clear chat history for the current user type
     const trainerData = localStorage.getItem('trainer_user');
     const trainerType = localStorage.getItem('trainer_user_type');

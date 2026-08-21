@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db_all, db_get, db_run, getAdminClient, MealLog } from '@/lib/db';
+import { db_all, db_get, db_run, getAdminClient, MealLog, insertCoachMessage, hasRecentCoachMessage } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { generatePhase5Plan, getTomorrowPhase, getTomorrowStarchMessage } from '@/lib/ai-coach';
 
@@ -89,6 +89,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to log meal' }, { status: 500 });
     }
 
+    // ===== GENERAL_HEALTH: Check if 4+ lbs over goal and send coach message =====
+    // Declare at function scope so it's visible to all return statements (including Phase 5 early return)
+    let coachMessage: { id: string; content: string; message_type: string; created_at: string } | null = null;
+
     // Phase progression: update streak and check phase transitions
     try {
       const { data: client, error: clientError } = await supabase
@@ -113,6 +117,8 @@ export async function POST(request: NextRequest) {
         const goalWeight = client.goal_weight;
         const currentWeight = client.current_weight;
 
+        let coachMessage: { id: string; content: string; message_type: string; created_at: string } | null = null;
+
         // GET_SHREDDED: Phase 1 ↔ Phase 5 (14 days each)
         if (programType === 'get_shredded' && newPhase === currentPhase) {
           // Phase 1 → Phase 5: After 14 days
@@ -120,13 +126,17 @@ export async function POST(request: NextRequest) {
             newPhase = 5;
             resetStreak = true;
           }
-          // Phase 5 → Phase 1: After 14 days
+          // Phase 5 → Phase 1 OR Phase 4 (goal attained): After 14 days
           else if (currentPhase === 5 && daysInPhase >= 14) {
-            newPhase = 1;
+            if (goalWeight && currentWeight && currentWeight <= goalWeight) {
+              newPhase = 4; // Goal attained → maintenance
+            } else {
+              newPhase = 1; // Goal not attained → restart
+            }
             resetStreak = true;
           }
-          // Phase 4: If 5+ lbs over goal → Phase 1
-          else if (currentPhase === 4 && goalWeight && currentWeight && currentWeight > goalWeight + 5) {
+          // Phase 4: If 4+ lbs over goal → Phase 1
+          else if (currentPhase === 4 && goalWeight && currentWeight && currentWeight > goalWeight + 4) {
             newPhase = 1;
             resetStreak = true;
           }
@@ -145,44 +155,22 @@ export async function POST(request: NextRequest) {
                 .eq('id', clientId);
             }
           }
-          // Phase 2 → Phase 1 or Phase 4 (goal): weight-based duration
+          // Phase 2 → Phase 1 or Phase 4 (goal): 7 days
           else if (currentPhase === 2 && daysInPhase >= 7) {
-            const { data: clientForPhase2 } = await supabase
-              .from('clients')
-              .select('current_weight, phase2_start_weight, goal_weight')
-              .eq('id', clientId)
-              .single();
-            const phase2StartWeight = clientForPhase2?.phase2_start_weight;
-            const weightLostInPhase2 = phase2StartWeight && currentWeight ? phase2StartWeight - currentWeight : 0;
-            const phase2Duration = weightLostInPhase2 > 2 ? 14 : 7;
-            if (daysInPhase >= phase2Duration) {
-              if (goalWeight && currentWeight && currentWeight <= goalWeight) {
-                newPhase = 4;
-              } else {
-                newPhase = 1;
-              }
-              resetStreak = true;
+            if (goalWeight && currentWeight && currentWeight <= goalWeight) {
+              newPhase = 4;
+            } else {
+              newPhase = 1;
             }
+            resetStreak = true;
           }
-          // Phase 4: If 5+ lbs over goal → Phase 1
-          else if (currentPhase === 4 && goalWeight && currentWeight && currentWeight > goalWeight + 5) {
+          // Phase 4: If 4+ lbs over goal → Phase 1
+          else if (currentPhase === 4 && goalWeight && currentWeight && currentWeight > goalWeight + 4) {
             newPhase = 1;
             resetStreak = true;
           }
         }
-        // GENERAL_HEALTH: Phase 4 ↔ Phase 1 (4+ lbs gain triggers Phase 1, 7 days returns to Phase 4)
-        else if (programType === 'general_health' && newPhase === currentPhase) {
-          // Phase 4 → Phase 1: If client GAINS 4+ lbs over goal
-          if (currentPhase === 4 && goalWeight && currentWeight && currentWeight > goalWeight + 4) {
-            newPhase = 1;
-            resetStreak = true;
-          }
-          // Phase 1 → Phase 4: After 7 days
-          else if (currentPhase === 1 && daysInPhase >= 7) {
-            newPhase = 4;
-            resetStreak = true;
-          }
-        }
+        // GENERAL_HEALTH: Phase 4 ONLY — if 4+ lbs over goal, AI/trainer advises to switch programs or adjust goal, no phase change
         // MUSCLE_GAIN: Phase 6 ↔ Phase 4 (at goal = Phase 4, 4+ lbs below = Phase 6)
         else if (programType === 'muscle_gain' && newPhase === currentPhase) {
           // Phase 4 → Phase 6: If weight drops 4+ lbs below goal (independent check)
@@ -232,6 +220,7 @@ export async function POST(request: NextRequest) {
               message: tomorrowsPlanForRegen ? `Meal logged. ${tomorrowsPlanForRegen}` : 'Meal logged successfully',
               tomorrowsPlan: tomorrowsPlanForRegen,
               phase5PlanRegenerated: true,
+              coachMessage,
             });
           }
         }
@@ -261,6 +250,38 @@ export async function POST(request: NextRequest) {
     } catch (phaseErr) {
       console.error('Phase progression error:', phaseErr);
       // Don't fail meal logging if phase logic fails
+    }
+
+    // ===== GENERAL_HEALTH: Check if 4+ lbs over goal and send coach message =====
+    try {
+      const { data: clientForCoach } = await supabase
+        .from('clients')
+        .select('id, name, program_type, goal_weight, current_weight')
+        .eq('id', clientId)
+        .single();
+
+      if (clientForCoach && clientForCoach.program_type === 'general_health' && 
+          clientForCoach.goal_weight && clientForCoach.current_weight && 
+          clientForCoach.current_weight > clientForCoach.goal_weight + 4) {
+        // Only send if we haven't sent a recent goal_alert message (within 24 hours)
+        const hasRecent = await hasRecentCoachMessage(clientId, 'goal_alert', 24);
+        if (!hasRecent) {
+          const clientName = clientForCoach.name || 'there';
+          const messageContent = `Hey ${clientName}! I noticed you're 4+ lbs over your goal weight. You're on the General Health (maintenance) program. Want to keep making progress? Consider switching to EVENT READY or GET SHREDDED to lose that weight. Or if you're happy with where you're at, we can adjust your goal weight. Just let me know!`;
+          const result = await insertCoachMessage(clientId, messageContent, 'goal_alert');
+          if (result.success && result.messageId) {
+            coachMessage = {
+              id: result.messageId,
+              content: messageContent,
+              message_type: 'goal_alert',
+              created_at: now,
+            };
+          }
+        }
+      }
+    } catch (coachMsgErr) {
+      console.error('Coach message error:', coachMsgErr);
+      // Don't fail meal logging if coach message fails
     }
 
     // Check if this is the last meal of the day (dinner) and compute tomorrow's plan message
@@ -311,6 +332,7 @@ export async function POST(request: NextRequest) {
       mealId,
       message: tomorrowsPlanMessage ? `Meal logged successfully. ${tomorrowsPlanMessage}` : 'Meal logged successfully',
       tomorrowsPlan: tomorrowsPlanMessage,
+      coachMessage,
     });
   } catch (error) {
     console.error('Log meal error:', error);

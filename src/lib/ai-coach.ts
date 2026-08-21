@@ -398,7 +398,9 @@ export { LEAN_PROTEINS, STARCHY_CARBOHYDRATES, HEALTHY_FATS, FIBROUS_VEGETABLES 
 
 export function getCoachPrompt(context: CoachContext, message: string): string {
   const portions = getPortions(context.gender, context.currentPhase);
-  const weeksUntilEvent = context.eventDate 
+  // Only show event info to event_ready clients — never leak event data to other programs
+  const isEventClient = context.programType === 'event_ready' && context.eventDate;
+  const weeksUntilEvent = isEventClient
     ? Math.ceil((new Date(context.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000))
     : null;
 
@@ -457,7 +459,7 @@ Example: ${mealExample}
 3. When you respond about portions, ALWAYS specify "of olive oil" after the fat amount
 4. AVOCADO IS A HEALTHY FAT - encourage it!
 
-${context.eventDate ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
+${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
 
 Ask me anything about specific foods!`;
   }
@@ -532,7 +534,7 @@ CLIENT CONTEXT:
 - Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 4 = maintenance${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 14-day rotating plan (3-day blocks)${context.currentPhase === 5 && context.phase5Plan ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})
 - Gender: ${context.gender} (${context.gender === 'male' ? 'MALE — use MALE portions only' : 'FEMALE — use FEMALE portions only'})
 - Goal: ${context.goalWeight}lbs, Started: ${context.startingWeight}lbs, Current: ${context.currentWeight}lbs
-${context.eventDate ? `- Event in ${weeksUntilEvent} weeks` : ''}
+${isEventClient ? `- Event in ${weeksUntilEvent} weeks` : ''}
 
 PHASE RULES (for YOUR reference only — give personalized advice for THIS client, not generic phase descriptions):
 - Phase 1: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, NO starch, NO dairy, NO sugar, ${context.gender === 'male' ? '128' : '80'}oz water
@@ -580,7 +582,7 @@ ${goalDiff > 0 ? `- ${goalDiff.toFixed(1)} lbs to go!` : '🎯 AT GOAL!'}
 CLIENT CONTEXT:
 - Name: ${context.clientName || 'Client'}
 - Phase: ${context.currentPhase}
-- Event: ${context.eventDate ? `In ${Math.ceil((new Date(context.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000))} weeks` : 'None'}
+- Event: ${context.programType === 'event_ready' && context.eventDate ? `In ${Math.ceil((new Date(context.eventDate).getTime() - Date.now()) / (7 * 24 * 60 * 60 * 1000))} weeks` : 'None'}
 
 COACHING STYLE:
 - 1-3 sentences ONLY

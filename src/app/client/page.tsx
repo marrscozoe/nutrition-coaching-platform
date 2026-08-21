@@ -39,7 +39,7 @@ export default function ClientDashboard() {
   const [recentMeals, setRecentMeals] = useState<MealLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Handle returning to the dashboard (e.g., after logging a meal)
+  // Handle returning to the dashboard (e.g., after logging a meal or switching programs)
   // This catches cases where client-side navigation brings user back without pathname changing
   useEffect(() => {
     function handleVisibilityChange() {
@@ -47,6 +47,8 @@ export default function ClientDashboard() {
         const userData = sessionStorage.getItem('client_user');
         if (userData) {
           const user = JSON.parse(userData);
+          // Fetch BOTH fresh client data and meals to ensure we have latest program/event info
+          fetchClientData(user.id);
           fetchRecentMeals(user.id);
         }
       }

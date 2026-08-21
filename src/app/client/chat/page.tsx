@@ -35,6 +35,12 @@ interface PendingMealData {
   portionAdvice?: string;
   onPhase: boolean;
   messedUp?: boolean;
+  coachMessage?: {
+    id: string;
+    content: string;
+    message_type: string;
+    created_at: string;
+  } | null;
 }
 
 interface PendingWeightData {
@@ -54,6 +60,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [chatClearedAt, setChatClearedAt] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -125,13 +132,59 @@ export default function ChatPage() {
       }
     }
 
-    // Check if chat was cleared - if so, don't load past meals
-    const chatCleared = sessionStorage.getItem(`chat_cleared_${user.id}`);
-    if (!chatCleared) {
-      loadPastMeals();
+    // Fetch coach messages from database and add to chat history
+    async function loadCoachMessages() {
+      try {
+        const res = await fetch(`/api/coach-messages`, {
+          headers: { 'x-client-id': user.id },
+        });
+        const data = await res.json();
+        const coachMsgs = data.messages || [];
+
+        // Convert coach messages to chat messages
+        const coachChatMessages: ChatMessage[] = coachMsgs.map((msg: any) => ({
+          id: `coach-msg-${msg.id}`,
+          role: 'coach' as const,
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+        }));
+
+        if (coachChatMessages.length > 0) {
+          // Add to beginning of chat history (oldest first)
+          setMessages(prev => [...coachChatMessages, ...prev]);
+        }
+      } catch (err) {
+        console.error('Failed to load coach messages:', err);
+      }
     }
 
-    setLoading(false);
+    // Check if chat was cleared - check both sessionStorage (current session) and DB (persisted)
+    const chatClearedSession = sessionStorage.getItem(`chat_cleared_${user.id}`);
+
+    // Also check DB for persisted chat_cleared_at flag
+    async function loadChatClearedFlag() {
+      try {
+        const res = await fetch(`/api/chat-clear`, {
+          headers: { 'x-client-id': user.id },
+        });
+        const data = await res.json();
+        return data.clearedAt || null;
+      } catch (err) {
+        console.error('Failed to load chat cleared flag:', err);
+        return null;
+      }
+    }
+
+    // Load chat cleared flag from DB and then conditionally load past data
+    loadChatClearedFlag().then(clearedAt => {
+      setChatClearedAt(clearedAt);
+      // Only load past meals and coach messages if chat was NOT cleared
+      if (!chatClearedSession && !clearedAt) {
+        loadPastMeals();
+        loadCoachMessages();
+      }
+      setLoading(false);
+    });
   }, [router]);
 
   // Process pending meal/weight data from sessionStorage
@@ -181,20 +234,37 @@ export default function ChatPage() {
     setMessages(updatedMessages);
     saveHistory(updatedMessages);
 
+    // Helper to add coach messages and optionally the GENERAL_HEALTH alert
+    const addCoachMessages = (coachContent: string, isError = false) => {
+      let allMessages = [...updatedMessages];
+      const coachMsg: ChatMessage = {
+        id: isError ? `coach_error_${Date.now()}` : `coach_meal_${Date.now()}`,
+        role: 'coach',
+        content: coachContent,
+        timestamp: new Date(),
+      };
+      allMessages.push(coachMsg);
+
+      // Add GENERAL_HEALTH alert if present
+      if (mealData.coachMessage) {
+        const alertMsg: ChatMessage = {
+          id: `coach_alert_${mealData.coachMessage.id || Date.now()}`,
+          role: 'coach',
+          content: mealData.coachMessage.content,
+          timestamp: new Date(new Date(mealData.coachMessage.created_at).getTime() + 1000),
+        };
+        allMessages.push(alertMsg);
+      }
+
+      setMessages(allMessages);
+      saveHistory(allMessages);
+    };
+
     try {
       // If meal has coaching advice from the analyze endpoint (photo meals), use it
       // portionAdvice contains Chat AI's coaching analysis via getCoachPrompt (same as chat!)
       if (mealData.portionAdvice) {
-        const coachMessage: ChatMessage = {
-          id: `coach_meal_${Date.now()}`,
-          role: 'coach',
-          content: mealData.portionAdvice,
-          timestamp: new Date(),
-        };
-
-        const allMessages = [...updatedMessages, coachMessage];
-        setMessages(allMessages);
-        saveHistory(allMessages);
+        addCoachMessages(mealData.portionAdvice);
         setAnalyzing(false);
         return;
       }
@@ -218,27 +288,9 @@ export default function ChatPage() {
       });
 
       const data = await res.json();
-
-      const coachMessage: ChatMessage = {
-        id: `coach_meal_${Date.now()}`,
-        role: 'coach',
-        content: data.response || "Got your meal! Stay on track! 💪",
-        timestamp: new Date(),
-      };
-
-      const allMessages = [...updatedMessages, coachMessage];
-      setMessages(allMessages);
-      saveHistory(allMessages);
+      addCoachMessages(data.response || "Got your meal! Stay on track! 💪");
     } catch (err) {
-      const errorMessage: ChatMessage = {
-        id: `coach_error_${Date.now()}`,
-        role: 'coach',
-        content: "Got your meal logged! Keep crushing it! 💪",
-        timestamp: new Date(),
-      };
-      const allMessages = [...updatedMessages, errorMessage];
-      setMessages(allMessages);
-      saveHistory(allMessages);
+      addCoachMessages("Got your meal logged! Keep crushing it! 💪", true);
     } finally {
       setAnalyzing(false);
     }
@@ -276,7 +328,7 @@ export default function ChatPage() {
 
     try {
       // First, save the weight to the database (same as Weight tab does)
-      await fetch('/api/weight', {
+      const weightRes = await fetch('/api/weight', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -290,6 +342,7 @@ export default function ChatPage() {
           weighDay: weightData.weighDay || null,
         }),
       });
+      const weightDataRes = await weightRes.json();
 
       // Then, call chat API with weight data for AI commentary
       const res = await fetch('/api/ai/chat', {
@@ -303,24 +356,38 @@ export default function ChatPage() {
 
       const data = await res.json();
 
+      let allMessages = [...updatedMessages];
+
       const coachMessage: ChatMessage = {
         id: `coach_weight_${Date.now()}`,
         role: 'coach',
         content: data.response || "Weight logged! Keep going! 💪",
         timestamp: new Date(),
       };
+      allMessages.push(coachMessage);
 
-      const allMessages = [...updatedMessages, coachMessage];
+      // Add GENERAL_HEALTH alert if present
+      if (weightDataRes.coachMessage) {
+        const alertMsg: ChatMessage = {
+          id: `coach_alert_${weightDataRes.coachMessage.id || Date.now()}`,
+          role: 'coach',
+          content: weightDataRes.coachMessage.content,
+          timestamp: new Date(new Date(weightDataRes.coachMessage.created_at).getTime() + 1000),
+        };
+        allMessages.push(alertMsg);
+      }
+
       setMessages(allMessages);
       saveHistory(allMessages);
     } catch (err) {
+      let allMessages = [...updatedMessages];
       const errorMessage: ChatMessage = {
         id: `coach_error_${Date.now()}`,
         role: 'coach',
         content: "Weight recorded! You've got this! 💪",
         timestamp: new Date(),
       };
-      const allMessages = [...updatedMessages, errorMessage];
+      allMessages.push(errorMessage);
       setMessages(allMessages);
       saveHistory(allMessages);
     } finally {
@@ -334,10 +401,49 @@ export default function ChatPage() {
     sessionStorage.setItem(chatKey, JSON.stringify(allMessages));
   }
 
-  // Auto-scroll to bottom
+  // Scroll to bottom helper - uses requestAnimationFrame to ensure DOM is updated
+  const scrollToBottom = (behavior: ScrollBehavior = 'instant') => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior });
+    });
+  };
+
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0) {
+      scrollToBottom('instant');
+    }
   }, [messages]);
+
+  // Auto-scroll to bottom when component mounts AND loading is complete
+  useEffect(() => {
+    if (!loading && messages.length > 0) {
+      // Wait for DOM to fully render before scrolling
+      requestAnimationFrame(() => {
+        scrollToBottom('instant');
+      });
+    }
+  }, [loading, messages.length]);
+
+  // Auto-scroll when tab becomes visible again (user returns to chat)
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Wait for next paint cycle to ensure DOM is updated
+        timeoutId = setTimeout(() => {
+          scrollToBottom('instant');
+        }, 50);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   async function handleSend(quickMessage?: string) {
     const messageContent = quickMessage || input.trim();
@@ -418,15 +524,38 @@ export default function ChatPage() {
     }
   }
 
-  function clearChat() {
+  async function clearChat() {
     if (!client) return;
     const chatKey = `chat_history_${client.id}`;
     // Mark chat as cleared so past meals won't load on next visit
     sessionStorage.setItem(`chat_cleared_${client.id}`, Date.now().toString());
+    // Set chat_cleared_at in database (persists across login sessions)
+    try {
+      await fetch(`/api/chat-clear`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-id': client.id,
+        },
+      });
+    } catch (err) {
+      console.error('Failed to set chat cleared flag:', err);
+    }
+    // Delete coach messages from database
+    try {
+      await fetch(`/api/coach-messages`, {
+        method: 'DELETE',
+        headers: { 'x-client-id': client.id },
+      });
+    } catch (err) {
+      console.error('Failed to delete coach messages:', err);
+    }
     // Clear messages and sessionStorage
     setMessages([]);
     setShowWelcome(false);
     sessionStorage.removeItem(chatKey);
+    // Update local state to reflect cleared status
+    setChatClearedAt(new Date().toISOString());
   }
 
   if (loading || !client) {

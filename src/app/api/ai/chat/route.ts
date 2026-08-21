@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       currentWeight: client.current_weight || client.starting_weight || 0,
       startingWeight: client.starting_weight || client.current_weight || 0,
       programType: client.program_type || 'general_health',
-      eventDate: client.event_date,
+      eventDate: client.program_type === 'event_ready' ? client.event_date : undefined,
       weekNumber: (() => {
         if (!client.goal_start_date) return 1;
         const start = new Date(client.goal_start_date + 'T12:00:00');
