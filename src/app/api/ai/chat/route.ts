@@ -447,8 +447,8 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
       response += `✅ STARCHES (every meal):\n• ${STARCHY_CARBOHYDRATES.join('\n• ')}\n\n`;
       response += `💪 SUPPLEMENTS:\n`;
       response += context.gender === 'male' 
-        ? `• Whey protein: 40g × 2/day\n• Creatine: Daily\n\n❌ No processed foods (dairy and natural sugar allowed — portion control)`
-        : `• Whey protein: 20g × 2/day\n• Creatine: Daily\n\n❌ No processed foods (dairy and natural sugar allowed — portion control)`;
+        ? `• Whey protein: 40g × 2/day\n• Creatine: Daily\n\n❌ No processed foods (dairy, honey, maple syrup, raw sugar, agave, and other natural sugars allowed — portion control)`
+        : `• Whey protein: 20g × 2/day\n• Creatine: Daily\n\n❌ No processed foods (dairy, honey, maple syrup, raw sugar, agave, and other natural sugars allowed — portion control)`;
     }
     
     return response;
