@@ -5,7 +5,7 @@
 export const LEAN_PROTEINS = [
   'Chicken breast',
   'White fish', 'Tuna', 'Salmon', 'Redfish',
-  'Whole eggs', 'Egg whites',
+  'Eggs (2-3 for men, 1-2 for women)', 'Egg whites',
   'Lean beef', 'Lean pork', 'Turkey breast', 'Shrimp',
   'Plain non-fat Greek yogurt',
   'Tilapia', 'Cod', 'Halibut', 'Trout', 'Catfish', 'Scallops', 'Crab', 'Lobster',
