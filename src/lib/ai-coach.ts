@@ -1335,7 +1335,10 @@ export function getMealEvaluationPrompt(
   prompt += `\nPhase ${phase} rules:\n- ${phaseRulesDesc}\n`;
   prompt += `\nYour job:\n`;
   prompt += `1. For each UNRECOGNIZED item: use your knowledge to tell client what's in it and if it violates phase rules. Be specific about what ingredient is the problem (e.g. "tacos have a tortilla = starch").\n`;
-  prompt += `2. For MISSING categories: tell client what's missing and the portion size for their phase (Protein: ${proteinPortion}, Veg: ${vegPortion}, Fat: ${fatPortion}).\n`;
+  // For snacks, partial meals are fine - don't give advice about missing categories
+  if (context.mealType !== 'snack') {
+    prompt += `2. For MISSING categories: tell client what's missing and the portion size for their phase (Protein: ${proteinPortion}, Veg: ${vegPortion}, Fat: ${fatPortion}).\n`;
+  }
   prompt += `3. For DISALLOWED items: tell client to remove/replace it.\n`;
   prompt += `4. Keep response SHORT — 1-3 sentences per issue. Allen's coaching voice.\n`;
   prompt += `5. If everything looks good: "Nice! You're on track! 💪"\n`;
