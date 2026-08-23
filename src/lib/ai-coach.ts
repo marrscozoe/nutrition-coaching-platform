@@ -408,10 +408,10 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
   const asksAboutPlan = lowerMessage.includes('what can i eat') || lowerMessage.includes('my plan') || lowerMessage.includes('show me') || lowerMessage.includes('what am i') || lowerMessage.includes('meal example') || lowerMessage.includes('example meal') || lowerMessage.includes('phase') || lowerMessage.includes('portion') || lowerMessage.includes('categories') || lowerMessage.includes('what to eat') || lowerMessage.includes('swap') || lowerMessage.includes('exchange');
 
   // Build dynamic food examples from the actual food lists
-  const proteinList = LEAN_PROTEINS.slice(0, 10).join(', ');
-  const veggieList = FIBROUS_VEGETABLES.slice(0, 12).join(', ');
-  const starchList = STARCHY_CARBOHYDRATES.slice(0, 10).join(', ');
-  const fatList = HEALTHY_FATS.slice(0, 6).join(', ');
+  const proteinList = LEAN_PROTEINS.join(', ');
+  const veggieList = FIBROUS_VEGETABLES.join(', ');
+  const starchList = STARCHY_CARBOHYDRATES.join(', ');
+  const fatList = HEALTHY_FATS.join(', ');
 
   if (asksAboutPlan) {
     // Build Phase 5 plan description if applicable
@@ -465,10 +465,10 @@ Ask me anything about specific foods!`;
   }
 
   // Build dynamic food lists for the evaluation protocol
-  const evalProteinExamples = LEAN_PROTEINS.slice(0, 8).join(', ');
-  const evalVegExamples = FIBROUS_VEGETABLES.slice(0, 10).join(', ');
-  const evalStarchExamples = STARCHY_CARBOHYDRATES.slice(0, 8).join(', ');
-  const evalFatExamples = HEALTHY_FATS.slice(0, 6).join(', ');
+  const evalProteinExamples = LEAN_PROTEINS.join(', ');
+  const evalVegExamples = FIBROUS_VEGETABLES.join(', ');
+  const evalStarchExamples = STARCHY_CARBOHYDRATES.join(', ');
+  const evalFatExamples = HEALTHY_FATS.join(', ');
 
   return `You are ALLEN'S AI NUTRITION COACH. You act exactly like Allen would in a text conversation with a client.
 
