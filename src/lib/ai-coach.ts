@@ -1344,9 +1344,8 @@ export function getMealEvaluationPrompt(
     prompt += `6. If client asks about supplements: give advice. Otherwise stay silent on supplements.\n`;
     prompt += `7. If water not mentioned: remind about water (${gender === 'male' ? '32oz per meal' : '20oz per meal'}).\n`;
   } else {
-    // SNACKS: Only flag disallowed items, don't give portion advice or full meal structure
-    prompt += `2. For DISALLOWED items: tell client to remove/replace it. Otherwise just say "Good snack! 💪"\n`;
-    prompt += `3. Keep response SHORT — 1-2 sentences. Allen's coaching voice.\n`;
+    // SNACKS: Very simple response - only say something if there's a serious issue
+    prompt += `2. IMPORTANT: This is a SNACK. Only tell client to remove/replace if it's a serious phase violation (like alcohol, candy, or major disallowed items). Otherwise just say "Good snack! 💪" - do NOT give portion advice, do NOT tell them to add protein/veg/starch, do NOT give full meal structure advice.\n`;
   }
 
   return prompt;
