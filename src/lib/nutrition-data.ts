@@ -36,7 +36,7 @@ export const FIBROUS_VEGETABLES = [
   'Mushrooms', 'Green beans', 'Cauliflower',
   'Tomatoes', 'Cucumbers', 'Celery', 'Cabbage', 'Onions',
   'Kale', 'Bok choy', 'Radishes', 'Turnips', 'Beets', 'Jicama',
-  'Artichoke', 'Brussels sprouts', 'Eggplant',
+  'Artichoke', 'Brussels sprouts', 'Carrots', 'Eggplant',
   'Anaheim peppers', 'Poblano peppers', 'Jalapeño peppers', 'Serrano peppers',
   'Celery root', 'Fennel', 'Leeks', 'Water chestnuts', 'Bean sprouts', 'Alfalfa sprouts',
 ];
