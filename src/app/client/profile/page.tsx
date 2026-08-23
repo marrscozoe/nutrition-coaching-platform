@@ -219,7 +219,7 @@ case 'get_shredded': return 'Get Shredded';
                   }}
                   className="text-brand-orange text-sm hover:underline"
                 >
-                  {new Date(client.event_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} ✏️
+                  {new Date(client.event_date.split('T')[0] + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} ✏️
                 </button>
               </div>
             )}

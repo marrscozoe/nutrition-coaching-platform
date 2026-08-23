@@ -59,9 +59,9 @@ export async function POST(request: NextRequest) {
     const updates: string[] = ['program_type = ?', 'current_phase = ?'];
     const values: any[] = [program_type, newPhase];
 
-    // If event_ready program, require event_date
+    // If event_ready program, require event_date (but not empty string)
     if (program_type === 'event_ready') {
-      if (!event_date) {
+      if (!event_date || event_date === '') {
         return NextResponse.json(
           { error: 'Event date is required for Event Ready program' },
           { status: 400 }
@@ -78,10 +78,18 @@ export async function POST(request: NextRequest) {
     values.push(now);
     values.push(clientId);
 
-    await db_run(
+    const updateResult = await db_run(
       `UPDATE clients SET ${updates.join(', ')} WHERE id = ?`,
       ...values
     );
+    
+    if (!updateResult.success) {
+      console.error('Database update failed:', updateResult.error);
+      return NextResponse.json(
+        { error: `Database update failed: ${updateResult.error}` },
+        { status: 500 }
+      );
+    }
 
     // Fetch updated client to return
     const clients = await db_all(
@@ -96,6 +104,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Update program error:', error);
-    return NextResponse.json({ error: 'Failed to update program' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Failed to update program: ${errorMessage}` }, { status: 500 });
   }
 }
