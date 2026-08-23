@@ -24,7 +24,7 @@ export const STARCHY_CARBOHYDRATES = [
   'Barley', 'Bulgur', 'Buckwheat', 'Millet', 'Spelt',
   'Peas', 'Corn', 'Beans', 'Legumes',
   'Lentils', 'Cannellini beans', 'Navy beans', 'Lima beans', 'Butter beans',
-  'Berries', 'Cantaloupe', 'Black Eyed Peas', 'Grapefruit',
+  'Berries', 'Banana', 'Granny smith apple', 'Cantaloupe', 'Black Eyed Peas', 'Grapefruit',
   'Plantain', 'Parsnips', 'Acorn squash', 'Delicata squash',
 ];
 // Fresh or frozen, NO CANS
