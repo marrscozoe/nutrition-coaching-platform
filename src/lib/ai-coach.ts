@@ -1099,6 +1099,12 @@ export async function analyzeMealPortion(
   const missingCategories: string[] = [];
   let onPhase = true;
 
+  // Water check - per meal requirement: 32oz for men, 20oz for women
+  const waterRequired = context.gender === 'male' ? 32 : 20;
+  if (loggedWaterOz < waterRequired) {
+    missingCategories.push('water');
+  }
+
   // Phase 1: NO starch
   if (phase === 1) {
     if (hasStarch) {
