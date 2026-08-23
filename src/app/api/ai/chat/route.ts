@@ -10,6 +10,7 @@ import {
   getWeightResponse,
   extractMealData,
   getMealEvaluationPrompt,
+  getSnackEvaluationPrompt,
   LEAN_PROTEINS,
   STARCHY_CARBOHYDRATES,
   FIBROUS_VEGETABLES,
@@ -79,7 +80,13 @@ export async function POST(request: NextRequest) {
       const analysis = await analyzeMealPortion(foodDescription, mealContext, mealData.mealType);
 
       // Step 3: getMealEvaluationPrompt - generate MiniMax prompt
-      const evalPrompt = getMealEvaluationPrompt(mealDataStructured, analysis, mealContext);
+      // Use simpler snack prompt for snacks
+      let evalPrompt: string;
+      if (mealContext.mealType === 'snack') {
+        evalPrompt = getSnackEvaluationPrompt(mealDataStructured, mealContext);
+      } else {
+        evalPrompt = getMealEvaluationPrompt(mealDataStructured, analysis, mealContext);
+      }
 
       // Step 4: Send to MiniMax with structured prompt
       const systemMessage: AIMessage = { role: 'system', content: evalPrompt };

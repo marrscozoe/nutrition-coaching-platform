@@ -1357,3 +1357,27 @@ export function getMealEvaluationPrompt(
 
   return prompt;
 }
+
+export function getSnackEvaluationPrompt(
+  snackData: MealData,
+  context: CoachContext
+): string {
+  // Simple, SHORT snack prompt - just 4-5 lines!
+  const phaseAdvice = getPhaseAdvice(context.currentPhase);
+  
+  // Build lists of recognized, unrecognized, and disallowed items
+  const recognizedList = snackData.recognizedItems.map(i => `${i.item}`).join(', ');
+  const unrecognizedList = snackData.unrecognizedItems.join(', ');
+  const disallowedList = snackData.disallowedItems.join(', ');
+
+  return `*** THIS IS A SNACK - EVALUATE AS SNACK ONLY ***
+Phase: ${context.currentPhase} (${phaseAdvice})
+
+Recognized items: ${recognizedList || 'none'}
+Unrecognized items: ${unrecognizedList || 'none'}
+Disallowed items: ${disallowedList || 'none'}
+
+If all items are allowed (no disallowed, no unrecognized that are problems): say "Good snack! 💪"
+If there are problems (disallowed or unrecognized items that violate phase): explain what's wrong
+Keep response SHORT - 1-2 sentences max. Allen's coaching voice.`;
+}
