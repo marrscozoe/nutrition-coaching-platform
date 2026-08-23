@@ -58,6 +58,7 @@ export const SUPPLEMENTS = [
   'Protein drink',
   'Meal replacement',
   'Vitamin',
+  'Coffee (20oz or less, breakfast only)',
 ];
 
 // ============================================
