@@ -208,7 +208,7 @@ case 'get_shredded': return 'Get Shredded';
                 {client.goal_weight || '--'} lbs ✏️
               </button>
             </div>
-            {client.event_date && (
+            {client.event_date && client.program_type === 'event_ready' && (
               <div className="flex justify-between items-center">
                 <span className="text-brand-cream/60">Event Date</span>
                 <button

@@ -167,7 +167,7 @@ export default function ClientDashboard() {
       </header>
 
       {/* Event Countdown Banner */}
-      {weeksUntilEvent !== null && (
+      {weeksUntilEvent !== null && client.program_type === 'event_ready' && (
         <div className="mx-4 mt-4 p-4 rounded-xl bg-gradient-to-r from-brand-orange to-brand-orange-dark">
           <p className="text-white/80 text-sm font-medium">🎯 {weeksUntilEvent} days until your event!</p>
           <p className="text-white text-xs mt-1">Keep pushing — you've got this!</p>
