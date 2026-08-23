@@ -1335,15 +1335,19 @@ export function getMealEvaluationPrompt(
   prompt += `\nPhase ${phase} rules:\n- ${phaseRulesDesc}\n`;
   prompt += `\nYour job:\n`;
   prompt += `1. For each UNRECOGNIZED item: use your knowledge to tell client what's in it and if it violates phase rules. Be specific about what ingredient is the problem (e.g. "tacos have a tortilla = starch").\n`;
-  // For snacks, partial meals are fine - don't give advice about missing categories
+  // For snacks, partial meals are fine - don't give advice about missing categories or portions
   if (context.mealType !== 'snack') {
     prompt += `2. For MISSING categories: tell client what's missing and the portion size for their phase (Protein: ${proteinPortion}, Veg: ${vegPortion}, Fat: ${fatPortion}).\n`;
+    prompt += `3. For DISALLOWED items: tell client to remove/replace it.\n`;
+    prompt += `4. Keep response SHORT — 1-3 sentences per issue. Allen's coaching voice.\n`;
+    prompt += `5. If everything looks good: "Nice! You're on track! 💪"\n`;
+    prompt += `6. If client asks about supplements: give advice. Otherwise stay silent on supplements.\n`;
+    prompt += `7. If water not mentioned: remind about water (${gender === 'male' ? '32oz per meal' : '20oz per meal'}).\n`;
+  } else {
+    // SNACKS: Only flag disallowed items, don't give portion advice or full meal structure
+    prompt += `2. For DISALLOWED items: tell client to remove/replace it. Otherwise just say "Good snack! 💪"\n`;
+    prompt += `3. Keep response SHORT — 1-2 sentences. Allen's coaching voice.\n`;
   }
-  prompt += `3. For DISALLOWED items: tell client to remove/replace it.\n`;
-  prompt += `4. Keep response SHORT — 1-3 sentences per issue. Allen's coaching voice.\n`;
-  prompt += `5. If everything looks good: "Nice! You're on track! 💪"\n`;
-  prompt += `6. If client asks about supplements: give advice. Otherwise stay silent on supplements.\n`;
-  prompt += `7. If water not mentioned: remind about water (${gender === 'male' ? '32oz per meal' : '20oz per meal'}).\n`;
 
   return prompt;
 }
