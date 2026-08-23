@@ -63,6 +63,9 @@ export async function POST(request: NextRequest) {
     // Handle meal analysis request - HYBRID FLOW (code + AI)
     if (mealData) {
       const foodDescription = mealData.foodDescription || mealData.description || '';
+      // DEBUG: Log mealData.mealType
+      console.log('[DEBUG chat route] mealData.mealType:', JSON.stringify(mealData.mealType), 'typeof:', typeof mealData.mealType);
+      
       const mealContext: CoachContext = {
         ...context,
         mealType: mealData.mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
