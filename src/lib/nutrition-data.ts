@@ -48,6 +48,7 @@ export const HEALTHY_FATS = [
   'Almonds (3 small handfuls male, 2 small handfuls female)', 'Walnuts (3 small handfuls male, 2 small handfuls female)', 'Mixed nuts (3 small handfuls male, 2 small handfuls female)',
   'Kerrygold gold butter',
   'Heavy cream',
+  'Eggs with yolks (healthy fat source)',
   'Safflower oil', 'Coconut oil',
   'MCT oil (in coffee)',
 ];
