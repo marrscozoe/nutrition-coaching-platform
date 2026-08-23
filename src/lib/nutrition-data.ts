@@ -286,10 +286,10 @@ export function getPhaseGuidance(
   const starchPortion = p.starch;
 
   // Build food lists from actual food lists
-  const proteinList = LEAN_PROTEINS.slice(0, 10).join(', ');
-  const veggieList = FIBROUS_VEGETABLES.slice(0, 12).join(', ');
-  const starchList = STARCHY_CARBOHYDRATES.slice(0, 10).join(', ');
-  const fatList = HEALTHY_FATS.slice(0, 6).join(', ');
+  const proteinList = LEAN_PROTEINS.join(', ');
+  const veggieList = FIBROUS_VEGETABLES.join(', ');
+  const starchList = STARCHY_CARBOHYDRATES.join(', ');
+  const fatList = HEALTHY_FATS.join(', ');
 
   switch (phase) {
     case 1:
