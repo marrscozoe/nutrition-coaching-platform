@@ -238,6 +238,7 @@ export default function LogMealPage() {
           'x-client-id': client!.id,
         },
         body: JSON.stringify({
+          mealType,
           foodDescription,
           photoBase64,
           mealDate: selectedDate,
