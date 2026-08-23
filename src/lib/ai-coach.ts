@@ -1274,6 +1274,9 @@ export function getMealEvaluationPrompt(
   },
   context: CoachContext
 ): string {
+  // DEBUG: Log mealType for debugging
+  console.log('[DEBUG getMealEvaluationPrompt] context.mealType:', JSON.stringify(context.mealType), 'typeof:', typeof context.mealType);
+  
   const { currentPhase: phase, gender, programType } = context;
   const portions = getPortions(gender, phase);
 
