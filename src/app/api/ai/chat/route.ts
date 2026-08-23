@@ -478,11 +478,11 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
   if ((lower.includes('portion') || lower.includes('size') ||
       lower.includes('ounce') || lower.includes('cup') || lower.includes('tablespoon') ||
       lower.includes('how much') || lower.includes('amount')) && !lower.includes('phase')) {
-    const waterAmount = context.gender === 'male' ? '128oz' : '80oz';
+    const waterAmount = context.gender === 'male' ? '32oz per meal' : '20oz per meal';
     const portions = context.gender === 'male'
       ? '6oz protein, 2 cups veggies, 2 tbsp fat per meal. No starch in Phase 1!'
       : '4oz protein, 1-2 cups veggies, 1 tbsp fat per meal. No starch in Phase 1!';
-    return `Phase ${context.currentPhase} portions: ${portions} ${waterAmount} water daily. Keep crushing it! 💪`;
+    return `Phase ${context.currentPhase} portions: ${portions} ${waterAmount} water. Keep crushing it! 💪`;
   }
 
   // PHASE tips queries

@@ -537,7 +537,7 @@ CLIENT CONTEXT:
 ${isEventClient ? `- Event in ${weeksUntilEvent} weeks` : ''}
 
 PHASE RULES (for YOUR reference only — give personalized advice for THIS client, not generic phase descriptions):
-- Phase 1: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, NO starch, NO dairy, NO sugar, ${context.gender === 'male' ? '128' : '80'}oz water
+- Phase 1: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, NO starch, NO dairy, NO sugar, ${context.gender === 'male' ? '32oz per meal' : '20oz per meal'} water
 - Phase 2: Same as Phase 1 + starch for BREAKFAST & LUNCH ONLY on Wed/Sat/Sun. Dinner and snack NEVER get starch in Phase 2!
 - Phase 4: Add starch every meal, weigh Fri only
 - Phase 5: 14-day plan with 3-day blocks rotating through strict/strict/lenient rules. Same portions as other phases.
@@ -1340,7 +1340,7 @@ export function getMealEvaluationPrompt(
   prompt += `4. Keep response SHORT — 1-3 sentences per issue. Allen's coaching voice.\n`;
   prompt += `5. If everything looks good: "Nice! You're on track! 💪"\n`;
   prompt += `6. If client asks about supplements: give advice. Otherwise stay silent on supplements.\n`;
-  prompt += `7. If water not mentioned: remind about water (${gender === 'male' ? '128oz daily' : '80oz daily'}).\n`;
+  prompt += `7. If water not mentioned: remind about water (${gender === 'male' ? '32oz per meal' : '20oz per meal'}).\n`;
 
   return prompt;
 }
