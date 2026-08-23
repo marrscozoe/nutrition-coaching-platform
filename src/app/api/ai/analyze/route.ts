@@ -12,6 +12,7 @@ import {
   Phase5Day,
   extractMealData,
   getMealEvaluationPrompt,
+  getSnackEvaluationPrompt,
 } from '@/lib/ai-coach';
 import { initializeCorrectionsCache } from '@/lib/food-corrections-cache';
 import { existsSync, unlinkSync, mkdirSync } from 'fs';
@@ -250,8 +251,13 @@ export async function POST(request: NextRequest) {
       // Step 2: analyzeMealPortion
       const analysis = await analyzeMealPortion(identifiedFood, evalContext, mealType);
       
-      // Step 3: getMealEvaluationPrompt
-      const evalPrompt = getMealEvaluationPrompt(mealDataStructured, analysis, evalContext);
+      // Step 3: getMealEvaluationPrompt - use simpler snack prompt for snacks
+      let evalPrompt: string;
+      if (evalContext.mealType === 'snack') {
+        evalPrompt = getSnackEvaluationPrompt(mealDataStructured, evalContext);
+      } else {
+        evalPrompt = getMealEvaluationPrompt(mealDataStructured, analysis, evalContext);
+      }
       
       // Step 4: Send to MiniMax
       const systemMessage: AIMessage = { role: 'system', content: evalPrompt };
@@ -285,8 +291,13 @@ export async function POST(request: NextRequest) {
     // Step 2: analyzeMealPortion
     const analysis = await analyzeMealPortion(foodDescription || '', evalContext, mealType);
     
-    // Step 3: getMealEvaluationPrompt
-    const evalPrompt = getMealEvaluationPrompt(mealDataStructured, analysis, evalContext);
+    // Step 3: getMealEvaluationPrompt - use simpler snack prompt for snacks
+    let evalPrompt: string;
+    if (evalContext.mealType === 'snack') {
+      evalPrompt = getSnackEvaluationPrompt(mealDataStructured, evalContext);
+    } else {
+      evalPrompt = getMealEvaluationPrompt(mealDataStructured, analysis, evalContext);
+    }
     
     // Step 4: Send to MiniMax
     const systemMessage: AIMessage = { role: 'system', content: evalPrompt };
