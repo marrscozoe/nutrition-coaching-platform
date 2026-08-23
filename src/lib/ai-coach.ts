@@ -1336,9 +1336,10 @@ export function getMealEvaluationPrompt(
     prompt += `- Disallowed items: ${analysis.disallowedItems.join(', ')}\n`;
   }
   prompt += `\nPhase ${phase} rules:\n- ${phaseRulesDesc}\n`;
-  prompt += `\nIMPORTANT SELF-CHECK: Before responding, read your instructions below and make sure your response matches the correct type:\n`;
-  prompt += `- If this is a SNACK: Only warn about serious violations (alcohol, candy). Otherwise say "Good snack! 💪" - do NOT give portion advice or tell them to add protein/veg/starch.\n`;
-  prompt += `- If this is a MEAL: Check missing categories, portions, phase rules, and give structured advice.\n`;
+  // EXPLICIT meal type declaration - AI must see this!
+  const mealTypeLabel = context.mealType === 'snack' ? '*** THIS IS A SNACK - GIVE SNACK ADVICE ONLY ***' : '*** THIS IS A MEAL - GIVE MEAL ADVICE ***';
+  prompt += `\n${mealTypeLabel}\n`;
+  prompt += `\nIMPORTANT: The user labeled this as "${context.mealType}". Follow the instructions for ${context.mealType} only!\n`;
   prompt += `\nYour job:\n`;
   prompt += `1. For each UNRECOGNIZED item: use your knowledge to tell client what's in it and if it violates phase rules. Be specific about what ingredient is the problem (e.g. "tacos have a tortilla = starch").\n`;
   // For snacks, partial meals are fine - don't give advice about missing categories or portions
