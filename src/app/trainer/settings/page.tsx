@@ -12,14 +12,6 @@ interface TrainerData {
   brand_color: string;
 }
 
-interface ClientData {
-  id: string;
-  name: string;
-  email: string;
-  is_tester?: boolean;
-  created_at: string;
-}
-
 export default function TrainerSettingsPage() {
   const router = useRouter();
   const [trainer, setTrainer] = useState<TrainerData | null>(null);
@@ -34,11 +26,7 @@ export default function TrainerSettingsPage() {
   const [email, setEmail] = useState('');
   const [copiedMessage, setCopiedMessage] = useState('');
   
-  // Correction feature state
-  const [correctionFeatureEnabled, setCorrectionFeatureEnabled] = useState(false);
-  const [trainerId, setTrainerId] = useState<string>('');
-  const [clients, setClients] = useState<ClientData[]>([]);
-  const [loadingClients, setLoadingClients] = useState(false);
+
 
   useEffect(() => {
     const userData = sessionStorage.getItem('trainer_user');
@@ -55,89 +43,8 @@ export default function TrainerSettingsPage() {
     setBusinessName(user.business_name || '');
     setBrandColor(user.brand_color || '#f97316');
     setEmail(user.email || '');
-    setTrainerId(user.id);
     setLoading(false);
-    
-    // Load correction feature settings and clients
-    loadCorrectionSettings(user.id);
-    loadClients(user.id);
   }, [router]);
-  
-  async function loadCorrectionSettings(trainerId: string) {
-    try {
-      // Get correction_feature_enabled from kv_store
-      const res = await fetch('/api/admin/settings', {
-        headers: { 'x-trainer-id': trainerId }
-      });
-      const data = await res.json();
-      if (data.settings?.correction_feature_enabled) {
-        setCorrectionFeatureEnabled(true);
-      }
-    } catch (e) {
-      console.error('Error loading correction settings:', e);
-    }
-  }
-  
-  async function loadClients(trainerId: string) {
-    setLoadingClients(true);
-    try {
-      const res = await fetch(`/api/admin/testers?trainer_id=${trainerId}`, {
-        headers: { 'x-trainer-id': trainerId }
-      });
-      const data = await res.json();
-      if (Array.isArray(data.clients)) {
-        setClients(data.clients);
-      }
-    } catch (e) {
-      console.error('Error loading clients:', e);
-    } finally {
-      setLoadingClients(false);
-    }
-  }
-
-  async function handleToggleCorrectionFeature(enabled: boolean) {
-    try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-trainer-id': trainerId
-        },
-        body: JSON.stringify({
-          settings: { correction_feature_enabled: enabled },
-        }),
-      });
-      if (res.ok) {
-        setCorrectionFeatureEnabled(enabled);
-      }
-    } catch (e) {
-      console.error('Error toggling correction feature:', e);
-    }
-  }
-
-  async function handleToggleTesterStatus(clientId: string, isTester: boolean) {
-    try {
-      const res = await fetch('/api/admin/testers', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-trainer-id': trainerId
-        },
-        body: JSON.stringify({
-          clientId,
-          isTester,
-        }),
-      });
-      if (res.ok) {
-        // Update the client in the local state
-        setClients(clients.map(c => 
-          c.id === clientId ? { ...c, is_tester: isTester } : c
-        ));
-      }
-    } catch (e) {
-      console.error('Error toggling tester status:', e);
-    }
-  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -257,70 +164,6 @@ export default function TrainerSettingsPage() {
           </form>
         </div>
 
-        {/* AI Correction Feature Section */}
-        <div className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
-          <h2 className="text-sm font-semibold text-brand-cream/60 uppercase tracking-wider mb-4">🤖 AI Corrections</h2>
-          
-          {/* Feature Toggle */}
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-brand-cream font-medium">Enable Correction Feature</p>
-              <p className="text-xs text-brand-cream/50">Let testers report AI food classification mistakes</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleToggleCorrectionFeature(!correctionFeatureEnabled)}
-              className={`relative w-12 h-6 rounded-full transition-colors ${
-                correctionFeatureEnabled ? 'bg-brand-orange' : 'bg-brand-cream/20'
-              }`}
-            >
-              <span
-                className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                  correctionFeatureEnabled ? 'left-7' : 'left-1'
-                }`}
-              />
-            </button>
-          </div>
-          
-          {/* Tester Management */}
-          <div className="mt-4 pt-4 border-t border-brand-cream/10">
-            <h3 className="text-sm font-medium text-brand-cream mb-3">Testers</h3>
-            <p className="text-xs text-brand-cream/50 mb-3">
-              Testers can report when the AI misclassifies foods. You review and approve their corrections.
-            </p>
-            
-            {loadingClients ? (
-              <p className="text-sm text-brand-cream/50">Loading clients...</p>
-            ) : clients.length === 0 ? (
-              <p className="text-sm text-brand-cream/50">No clients found.</p>
-            ) : (
-              <div className="space-y-2">
-                {clients.map((client) => (
-                  <div key={client.id} className="flex items-center justify-between py-2">
-                    <div>
-                      <p className="text-brand-cream text-sm">{client.name}</p>
-                      <p className="text-xs text-brand-cream/40">{client.email}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleTesterStatus(client.id, !client.is_tester)}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        client.is_tester ? 'bg-brand-orange' : 'bg-brand-cream/20'
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                          client.is_tester ? 'left-7' : 'left-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Referral Link Section */}
         <div className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
           <h2 className="text-sm font-semibold text-brand-cream/60 uppercase tracking-wider mb-4">Client Signup Link</h2>
@@ -396,10 +239,6 @@ export default function TrainerSettingsPage() {
           <Link href="/trainer/clients" className="flex flex-col items-center text-brand-cream/50 hover:text-brand-cream">
             <span className="text-xl">👥</span>
             <span className="text-xs mt-1">Clients</span>
-          </Link>
-          <Link href="/trainer/corrections" className="flex flex-col items-center text-brand-cream/50 hover:text-brand-cream">
-            <span className="text-xl">🤖</span>
-            <span className="text-xs mt-1">Corrections</span>
           </Link>
           <Link href="/trainer/settings" className="flex flex-col items-center text-brand-orange">
             <span className="text-xl">⚙️</span>
