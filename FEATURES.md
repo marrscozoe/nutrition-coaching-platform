@@ -88,6 +88,131 @@
 
 ---
 
+## 5. Progress Photos
+
+**Overview:** Allow clients to upload progress photos that trainers can review.
+
+**What's Needed:**
+- Clients can upload photos (front, side, back views)
+- Photos stored securely
+- Trainer can view client's photo history
+- Timeline view to compare progress over time
+
+**Implementation Tasks:**
+1. Add photo upload UI to client app
+2. Set up photo storage (Supabase storage)
+3. Create photo gallery/timeline view
+4. Trainer can view client photos
+
+---
+
+## 6. Weekly Digest for Trainer
+
+**Overview:** Automated weekly summary showing each client's progress, compliance, and issues.
+
+**What's Needed:**
+- Weekly email or in-app digest for trainer
+- Shows: weight changes, meal log compliance, violations, at-risk clients
+- Flag clients who are struggling or falling off
+
+**Implementation Tasks:**
+1. Build weekly summary logic
+2. Create digest template
+3. Email delivery system (or in-app notification)
+4. Flag at-risk clients automatically
+
+---
+
+## 7. Push Notifications
+
+**Overview:** Remind clients to log meals, weigh-ins, and drink water.
+
+**What's Needed:**
+- Configurable reminders (client chooses what to enable)
+- Meal logging reminders (before/after meals)
+- Weigh-in reminders (Mon/Fri mornings)
+- Water reminders throughout the day
+
+**Implementation Tasks:**
+1. Set up push notification service (Firebase, OneSignal, etc.)
+2. Add notification preferences to client settings
+3. Create reminder triggers based on schedule
+4. Track notification delivery and open rates
+
+---
+
+## 8. Exercise/Workout Logging
+
+**Overview:** Allow clients to log workouts alongside their nutrition.
+
+**What's Needed:**
+- Log workout type, duration, intensity
+- Link workouts to nutrition timing (pre/post workout meals)
+- Trainer can review workout history
+- Track consistency over time
+
+**Implementation Tasks:**
+1. Add workout log entry to client app
+2. Workout types: cardio, weights, HIIT, etc.
+3. Link workouts to meal timing recommendations
+4. Trainer view of client workout history
+
+---
+
+## 9. Grocery List Generator
+
+**Overview:** Generate a weekly grocery list based on client's allowed foods and meal plans.
+
+**What's Needed:**
+- Based on client's phase and allowed food lists
+- Generate shopping list by category (protein, veg, starch, fat)
+- Check off items as shopper buys them
+- Share list with others (family, spouse)
+
+**Implementation Tasks:**
+1. Create grocery list generation algorithm
+2. Categorize by food type
+3. Add check-off functionality
+4. Share/export list
+
+---
+
+## 10. Client Messaging
+
+**Overview:** Trainer can send messages/updates to clients directly from the app.
+
+**What's Needed:**
+- Trainer sends message to individual or all clients
+- Client receives in-app notification
+- Optional SMS or email fallback
+- Message history preserved
+
+**Implementation Tasks:**
+1. Build messaging UI in trainer dashboard
+2. Store messages in database
+3. In-app notification for clients
+4. Optional SMS/email integration
+
+---
+
+## 11. Measurements Tracking
+
+**Overview:** Track body measurements beyond just weight.
+
+**What's Needed:**
+- Track: waist, hips, chest, arms, thighs
+- Body fat percentage (manual entry)
+- Progress photos alongside measurements
+- Visual progress charts over time
+
+**Implementation Tasks:**
+1. Add measurements entry form
+2. Store measurement history
+3. Show progress charts over time
+4. Compare measurements to weight/progress photos
+
+---
+
 ## Completed Features
 
 - Phase 2 violation logic (dairy/sugar checks active)
