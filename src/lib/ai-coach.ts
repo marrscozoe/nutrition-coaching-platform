@@ -1206,6 +1206,9 @@ export async function analyzeMealPortion(
         missingCategories.push('fat');
         corrections.push(`💡 Add ${portions.fat} olive oil or ${portions.avocado} avocado for healthy fat.`);
       }
+    }
+  } else if (phase === 4) {
+    if (!hasProtein) corrections.push(`💡 Notice: Consider adding some lean protein to round out your meal.`);
     if (!hasVeg) corrections.push(`💡 Notice: Adding some fibrous vegetables would be great for your meal.`);
     if (!hasFat) corrections.push(`💡 Notice: Don't forget healthy fat like olive oil, avocado, or nuts. Stay hydrated with water too!`);
   }
