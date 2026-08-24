@@ -4,7 +4,26 @@
 
 ---
 
-## 1. Bacon Tracking
+## 1. Client & Trainer Account Management
+
+**Overview:** Allow clients and trainers to change their own login (email) and password.
+
+**What's Needed:**
+- Both clients and trainers can update their own email/password
+- Secure password change flow (verify current password first)
+- Email change requires verification (send confirmation link)
+- Trainer settings page has profile edit options
+- Client settings page has profile edit options
+
+**Implementation Tasks:**
+1. Add change password flow to trainer settings
+2. Add change password flow to client settings
+3. Add change email flow (with verification)
+4. Secure password hashing (bcrypt)
+
+---
+
+## 2. Bacon Tracking
 
 **Overview:** Bacon is only allowed if it is **low sodium AND nitrate-free**. Only then is it allowed twice per week as a protein + fat source.
 
@@ -24,7 +43,7 @@
 
 ---
 
-## 2. Stripe Billing
+## 3. Stripe Billing
 
 **Overview:** Enable real payment processing for the nutrition coaching platform.
 
@@ -50,7 +69,7 @@
 
 ---
 
-## 3. White Label
+## 4. White Label
 
 **Overview:** Allow trainers to have their own branded subdomain and custom pricing.
 
