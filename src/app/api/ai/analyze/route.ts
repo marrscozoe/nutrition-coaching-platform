@@ -13,6 +13,8 @@ import {
   extractMealData,
   getMealEvaluationPrompt,
   getSnackEvaluationPrompt,
+  getPhase5DayNumber,
+  typeToNumericPhase,
 } from '@/lib/ai-coach';
 import { initializeCorrectionsCache } from '@/lib/food-corrections-cache';
 import { existsSync, unlinkSync, mkdirSync } from 'fs';
@@ -70,6 +72,51 @@ function deletePhotoServerSide(photoPath: string | undefined): void {
   }
 }
 
+// BUG #4 FIX: Helper to compute messed_up field
+function computeMessUp(
+  analysis: { onPhase: boolean; disallowedItems: string[]; hasStarch: boolean; hasProcessedFood?: boolean },
+  context: CoachContext,
+  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined
+): boolean {
+  if (analysis.onPhase) return false;
+  
+  const { currentPhase: phase, programType, phase5Plan, phase5StartDate, mealDate, mealsLoggedToday } = context;
+  
+  // Has disallowed items (e.g., junk food, processed food)
+  if (analysis.disallowedItems.length > 0) return true;
+  
+  // Phase 1: any starch is a violation
+  if (phase === 1 && analysis.hasStarch) return true;
+  
+  // Phase 5: check the rotating plan's rule phase
+  if (phase === 5 && analysis.hasStarch) {
+    const dayNum = phase5StartDate ? getPhase5DayNumber(phase5StartDate) : 1;
+    const currentDayRule = phase5Plan?.find(d => d.day === dayNum);
+    const rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
+    // Phase 1 rule days have no starch allowed
+    if (rulePhase === 1) return true;
+  }
+  
+  // Phase 2: starch only allowed on Wed/Sat/Sun breakfast/lunch
+  if (phase === 2 && analysis.hasStarch) {
+    const isBreakfastOrLunch = mealType === 'breakfast' || mealType === 'lunch';
+    const isDinnerOrSnack = mealType === 'dinner' || mealType === 'snack';
+    
+    if (isDinnerOrSnack) return true;
+    
+    if (mealDate) {
+      const mealDateObj = new Date(mealDate + 'T12:00:00');
+      const dayOfWeek = mealDateObj.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+      const allowedDays = [0, 3, 6]; // Sun (0), Wed (3), Sat (6)
+      if (!allowedDays.includes(dayOfWeek)) return true;
+    }
+    
+    if ((mealsLoggedToday || 0) >= 2) return true;
+  }
+  
+  return false;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const clientId = request.headers.get('x-client-id');
@@ -96,6 +143,13 @@ export async function POST(request: NextRequest) {
       phase5StartDate, // YYYY-MM-DD when Phase 5 started
     } = body;
     
+    // BUG #6 FIX: Validate mealType - only allow valid values, default to undefined otherwise
+    const validMealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
+    const validatedMealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined = 
+      mealType && validMealTypes.includes(mealType) 
+        ? mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' 
+        : undefined;
+    
     // NOTE: Photo deletion is ALWAYS enforced server-side.
     // The client cannot override this for privacy/security reasons.
 
@@ -119,7 +173,7 @@ export async function POST(request: NextRequest) {
         eventDate,
         weekNumber: weekNumber || 1,
         trainerNotes,
-        mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
+        mealType: validatedMealType,
         phase5Plan: phase5Plan as Phase5Day[] | undefined,
         phase5StartDate,
       };
@@ -145,7 +199,7 @@ export async function POST(request: NextRequest) {
             return Math.max(1, diffDays + 1);
           })(),
           trainerNotes: clientData.notes,
-          mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
+          mealType: validatedMealType,
         };
       } else {
         // Default context
@@ -160,7 +214,7 @@ export async function POST(request: NextRequest) {
           eventDate,
           weekNumber: weekNumber || 1,
           trainerNotes,
-          mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
+          mealType: validatedMealType,
           phase5Plan: phase5Plan as Phase5Day[] | undefined,
           phase5StartDate,
         };
@@ -214,6 +268,7 @@ export async function POST(request: NextRequest) {
           analysis: visionResult.error,
           portionAdvice,
           onPhase: analysis.onPhase,
+          messed_up: computeMessUp(analysis, context, validatedMealType),
           corrections: analysis.corrections,
           aiError: visionResult.error,
           provider: visionResult.provider || 'none',
@@ -232,6 +287,7 @@ export async function POST(request: NextRequest) {
           analysis: 'I cannot identify this food from the photo. Please describe what you are eating and I\'ll give you portion advice.',
           portionAdvice: 'Please describe your meal so I can help with portions.',
           onPhase: false,
+          messed_up: false, // Cannot identify = not a mess-up per se
           corrections: [],
           provider: visionResult.provider,
           photoDeleted: true,
@@ -242,7 +298,7 @@ export async function POST(request: NextRequest) {
       const identifiedFood = visionResult.text;
       const evalContext: CoachContext = {
         ...context,
-        mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
+        mealType: validatedMealType,
       };
       
       // Step 1: extractMealData
@@ -273,6 +329,7 @@ export async function POST(request: NextRequest) {
         analysis: visionResult.text, // Vision AI's food identification (for reference)
         portionAdvice, // Chat AI's coaching advice
         onPhase: analysis.onPhase,
+        messed_up: computeMessUp(analysis, context, validatedMealType),
         corrections: analysis.corrections,
         provider: visionResult.provider,
         photoDeleted: true,
@@ -282,7 +339,7 @@ export async function POST(request: NextRequest) {
     // Text-based analysis - HYBRID FLOW
     const evalContext: CoachContext = {
       ...context,
-      mealType: mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
+      mealType: validatedMealType,
     };
     
     // Step 1: extractMealData
@@ -313,6 +370,7 @@ export async function POST(request: NextRequest) {
         analysis: aiResult.text,
         portionAdvice,
         onPhase: analysis.onPhase,
+        messed_up: computeMessUp(analysis, context, validatedMealType),
         corrections: analysis.corrections,
         provider: aiResult.provider || 'ai',
       });
@@ -327,6 +385,7 @@ export async function POST(request: NextRequest) {
       analysis: portionAdvice,
       portionAdvice,
       onPhase: analysis.onPhase,
+      messed_up: computeMessUp(analysis, context, validatedMealType),
       corrections: analysis.corrections,
       provider: 'rule-based',
       aiError: aiResult.error,

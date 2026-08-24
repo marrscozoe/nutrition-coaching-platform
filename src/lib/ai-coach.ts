@@ -385,7 +385,7 @@ export function getPhase5CurrentRule(phase5Plan: Phase5Day[], phase5StartDate: s
 }
 
 // Helper: convert type string to numeric phase
-function typeToNumericPhase(type: 'phase1' | 'phase2' | 'phase4' | undefined): 1 | 2 | 4 {
+export function typeToNumericPhase(type: 'phase1' | 'phase2' | 'phase4' | undefined): 1 | 2 | 4 {
   if (type === 'phase1') return 1;
   if (type === 'phase2') return 2;
   return 4;
@@ -1142,8 +1142,8 @@ export async function analyzeMealPortion(
       onPhase = false;
     }
   }
-  // Phase 5: Uses 3-day rotating rules
-  else if (phase === 5 && context.programType !== 'event_ready' && hasStarch) {
+  // Phase 5: Uses 3-day rotating rules (applies to ALL Phase 5 clients including event_ready)
+  else if (phase === 5 && hasStarch) {
     const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
     const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
     const rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
@@ -1208,9 +1208,23 @@ export async function analyzeMealPortion(
       }
     }
   } else if (phase === 4) {
-    if (!hasProtein) corrections.push(`💡 Notice: Consider adding some lean protein to round out your meal.`);
-    if (!hasVeg) corrections.push(`💡 Notice: Adding some fibrous vegetables would be great for your meal.`);
-    if (!hasFat) corrections.push(`💡 Notice: Don't forget healthy fat like olive oil, avocado, or nuts. Stay hydrated with water too!`);
+    // Phase 4 maintenance: all 3 categories (protein, veg, fat) needed to be "on phase"
+    if (!hasProtein) {
+      missingCategories.push('protein');
+      corrections.push(`💡 Notice: Consider adding some lean protein to round out your meal.`);
+    }
+    if (!hasVeg) {
+      missingCategories.push('vegetable');
+      corrections.push(`💡 Notice: Adding some fibrous vegetables would be great for your meal.`);
+    }
+    if (!hasFat) {
+      missingCategories.push('fat');
+      corrections.push(`💡 Notice: Don't forget healthy fat like olive oil, avocado, or nuts. Stay hydrated with water too!`);
+    }
+    // If ANY major category is missing, meal is off-phase
+    if (!hasProtein || !hasVeg || !hasFat) {
+      onPhase = false;
+    }
   }
 
   // =============================================
