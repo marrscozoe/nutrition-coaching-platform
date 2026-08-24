@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, db_all, getAdminClient } from '@/lib/db';
 
+// Force dynamic rendering - this route uses request headers and Supabase admin client
+export const dynamic = 'force-dynamic';
+
 // GET - Fetch all clients for a trainer
 export async function GET(request: NextRequest) {
   try {
