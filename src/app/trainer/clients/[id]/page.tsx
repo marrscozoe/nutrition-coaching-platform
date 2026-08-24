@@ -192,7 +192,7 @@ export default function ClientDetailPage() {
               <p className="text-sm text-brand-cream/70 mt-1">
                 {getProgramLabel(client.program_type || '')} • {client.gender || 'Not set'}
               </p>
-              {client.event_date && (
+              {client.event_date && client.program_type === 'event_ready' && (
                 <p className="text-sm text-brand-orange mt-1">
                   Event: {new Date(client.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </p>
