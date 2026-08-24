@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     // NOTE: All clients have trainer_id=NULL (single-trainer app). Do NOT filter by trainer_id.
     const { data: clients, error } = await supabase
       .from('clients')
-      .select('id, name, email, gender, program_type, starting_weight, current_weight, goal_weight, event_date, current_phase, current_week, subscription_status, waiver_signed, notes, lead_source, created_at, updated_at, phase5_plan, phase5_start_date, is_tester')
+      .select('id, name, email, gender, program_type, starting_weight, current_weight, goal_weight, event_date, current_phase, current_week, subscription_status, waiver_signed, notes, lead_source, created_at, updated_at, is_tester')
       .order('created_at', { ascending: false });
 
     if (error) {
