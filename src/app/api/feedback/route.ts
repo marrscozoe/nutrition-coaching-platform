@@ -6,9 +6,10 @@ import { v4 as uuidv4 } from 'uuid';
 const NUTRITION_APP_GROUP_ID = '-5427254371';
 
 // Build the bug report message text
-function buildBugReportText(clientName: string, message: string, feedbackId: string): string {
+function buildBugReportText(clientName: string, message: string, feedbackId: string, userType: 'client' | 'trainer'): string {
   const timestamp = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' });
-  return `🐛 *Bug Report*
+  const title = userType === 'client' ? '🐛 *Bug Report (Client)*' : '🐛 *Bug Report (Trainer)*';
+  return `${title}
 
 *From:* ${clientName}
 *Time:* ${timestamp}
@@ -95,8 +96,8 @@ async function sendViaBotApi(messageText: string): Promise<void> {
 }
 
 // Main send function: gateway first, then Bot API
-async function sendFeedbackNotification(clientName: string, message: string, feedbackId: string) {
-  const messageText = buildBugReportText(clientName, message, feedbackId);
+async function sendFeedbackNotification(clientName: string, message: string, feedbackId: string, userType: 'client' | 'trainer') {
+  const messageText = buildBugReportText(clientName, message, feedbackId, userType);
 
   const ok = await sendViaGateway(messageText);
   if (!ok) {
@@ -125,6 +126,8 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
     let senderName = 'Unknown';
 
+    const userType: 'client' | 'trainer' = clientId ? 'client' : 'trainer';
+
     if (clientId) {
       // Client submitting feedback
       const client = await db_get('SELECT trainer_id, name FROM clients WHERE id = ?', clientId) as any;
@@ -149,7 +152,7 @@ export async function POST(request: NextRequest) {
 
     // Send Telegram notification to Nutrition App group
     try {
-      await sendFeedbackNotification(senderName, message.trim(), feedbackId);
+      await sendFeedbackNotification(senderName, message.trim(), feedbackId, userType);
     } catch (e) {
       console.error('[Feedback] Notification error:', e);
     }

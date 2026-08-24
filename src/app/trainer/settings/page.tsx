@@ -210,6 +210,13 @@ export default function TrainerSettingsPage() {
         <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
           <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wider mb-4">Account</h2>
           <button
+            type="button"
+            onClick={() => setShowBugReport(true)}
+            className="w-full py-3 rounded-xl bg-brand-charcoal/80 text-brand-cream/80 font-medium hover:bg-brand-charcoal/60 transition-colors mb-3"
+          >
+            🐛 Report a Problem
+          </button>
+          <button
             onClick={() => {
               sessionStorage.removeItem('trainer_user');
               sessionStorage.removeItem('trainer_user_type');
@@ -231,14 +238,7 @@ export default function TrainerSettingsPage() {
           </p>
         </div>
 
-        {/* Report a Problem */}
-        <button
-          type="button"
-          onClick={() => setShowBugReport(true)}
-          className="w-full p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 text-left hover:bg-brand-charcoal/60 transition-colors"
-        >
-          <span className="text-brand-cream/80">🐛 Report a Problem</span>
-        </button>
+
       </div>
 
       {/* Bug Report Modal */}
