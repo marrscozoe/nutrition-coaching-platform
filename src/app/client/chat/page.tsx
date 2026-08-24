@@ -534,36 +534,51 @@ export default function ChatPage() {
 
   async function clearChat() {
     if (!client) return;
+    
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      '⚠️ Clear All Data?\n\n' +
+      'This will permanently delete:\n' +
+      '• All chat messages\n' +
+      '• All meal logs\n' +
+      '• All weight entries\n' +
+      '• All coach messages\n\n' +
+      'This cannot be undone!'
+    );
+    
+    if (!confirmed) return;
+    
     const chatKey = `chat_history_${client.id}`;
-    // Mark chat as cleared so past meals won't load on next visit
-    sessionStorage.setItem(`chat_cleared_${client.id}`, Date.now().toString());
-    // Set chat_cleared_at in database (persists across login sessions)
+    
+    // Call the clear-user-data API to delete everything from the database
     try {
-      await fetch(`/api/chat-clear`, {
+      const res = await fetch(`/api/clear-user-data`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-client-id': client.id,
-        },
-      });
-    } catch (err) {
-      console.error('Failed to set chat cleared flag:', err);
-    }
-    // Delete coach messages from database
-    try {
-      await fetch(`/api/coach-messages`, {
-        method: 'DELETE',
         headers: { 'x-client-id': client.id },
       });
+      
+      if (!res.ok) {
+        console.error('Failed to clear user data from API');
+        alert('Failed to clear some data. Please try again.');
+        return;
+      }
     } catch (err) {
-      console.error('Failed to delete coach messages:', err);
+      console.error('Failed to clear user data:', err);
+      alert('Failed to clear data. Please check your connection and try again.');
+      return;
     }
+    
     // Clear messages and sessionStorage
     setMessages([]);
     setShowWelcome(false);
     sessionStorage.removeItem(chatKey);
+    // Clear session flag
+    sessionStorage.removeItem(`chat_cleared_${client.id}`);
     // Update local state to reflect cleared status
     setChatClearedAt(new Date().toISOString());
+    
+    // Reload page to get fresh state
+    window.location.reload();
   }
 
   if (loading || !client) {
