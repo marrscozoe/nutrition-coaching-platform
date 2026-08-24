@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Toast from '@/components/Toast';
 
 interface TrainerData {
   id: string;
@@ -18,6 +19,10 @@ export default function TrainerSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [showBugReport, setShowBugReport] = useState(false);
+  const [bugMessage, setBugMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -25,8 +30,6 @@ export default function TrainerSettingsPage() {
   const [brandColor, setBrandColor] = useState('#f97316');
   const [email, setEmail] = useState('');
   const [copiedMessage, setCopiedMessage] = useState('');
-  
-
 
   useEffect(() => {
     const userData = sessionStorage.getItem('trainer_user');
@@ -227,7 +230,85 @@ export default function TrainerSettingsPage() {
             Stripe billing is disabled. All accounts have free access during testing.
           </p>
         </div>
+
+        {/* Report a Problem */}
+        <button
+          type="button"
+          onClick={() => setShowBugReport(true)}
+          className="w-full p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 text-left hover:bg-brand-charcoal/60 transition-colors"
+        >
+          <span className="text-brand-cream/80">🐛 Report a Problem</span>
+        </button>
       </div>
+
+      {/* Bug Report Modal */}
+      {showBugReport && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md bg-brand-charcoal/95 rounded-2xl border border-brand-cream/20 p-6">
+            <h3 className="text-lg font-bold text-brand-cream mb-2">Report a Problem</h3>
+            <p className="text-sm text-brand-cream/60 mb-4">
+              Found a bug or have an issue? Let us know!
+            </p>
+            <textarea
+              value={bugMessage}
+              onChange={(e) => setBugMessage(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream placeholder-brand-cream/40 focus:outline-none focus:border-brand-orange resize-none"
+              placeholder="Describe the problem..."
+              rows={4}
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={() => { setShowBugReport(false); setBugMessage(''); }}
+                className="flex-1 py-3 rounded-lg bg-brand-charcoal/80 text-brand-cream font-medium hover:bg-brand-charcoal/60 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!bugMessage.trim()) return;
+                  setSubmitting(true);
+                  try {
+                    const res = await fetch('/api/feedback', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'x-trainer-id': trainer!.id,
+                      },
+                      body: JSON.stringify({ message: bugMessage }),
+                    });
+                    if (res.ok) {
+                      setToast({ message: 'Thanks for your feedback!', type: 'success' });
+                      setShowBugReport(false);
+                      setBugMessage('');
+                    } else {
+                      setToast({ message: 'Failed to submit. Please try again.', type: 'error' });
+                    }
+                  } catch (err) {
+                    setToast({ message: 'Failed to submit. Please try again.', type: 'error' });
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                disabled={submitting || !bugMessage.trim()}
+                className="flex-1 py-3 rounded-lg bg-brand-orange text-white font-semibold hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
+              >
+                {submitting ? 'Sending...' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-brand-charcoal/95 backdrop-blur-sm border-t border-brand-cream/10 safe-bottom">

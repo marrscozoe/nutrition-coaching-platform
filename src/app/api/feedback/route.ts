@@ -108,8 +108,10 @@ async function sendFeedbackNotification(clientName: string, message: string, fee
 export async function POST(request: NextRequest) {
   try {
     const clientId = request.headers.get('x-client-id');
-    if (!clientId) {
-      return NextResponse.json({ error: 'Client ID required' }, { status: 401 });
+    const trainerId = request.headers.get('x-trainer-id');
+
+    if (!clientId && !trainerId) {
+      return NextResponse.json({ error: 'Client ID or Trainer ID required' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -121,21 +123,33 @@ export async function POST(request: NextRequest) {
 
     const feedbackId = uuidv4();
     const now = new Date().toISOString();
+    let senderName = 'Unknown';
 
-    // Get client's trainer_id and name
-    const client = await db_get('SELECT trainer_id, name FROM clients WHERE id = ?', clientId) as any;
+    if (clientId) {
+      // Client submitting feedback
+      const client = await db_get('SELECT trainer_id, name FROM clients WHERE id = ?', clientId) as any;
+      senderName = client?.name || 'Unknown Client';
 
-    // Save bug report to feedback table
-    await db_run(
-      `INSERT INTO feedback (id, client_id, trainer_id, message, status, created_at)
-       VALUES (?, ?, ?, ?, 'pending', ?)`,
-      feedbackId, clientId, client?.trainer_id || null, message.trim(), now
-    );
+      await db_run(
+        `INSERT INTO feedback (id, client_id, trainer_id, message, status, created_at)
+         VALUES (?, ?, ?, ?, 'pending', ?)`,
+        feedbackId, clientId, client?.trainer_id || null, message.trim(), now
+      );
+    } else {
+      // Trainer submitting feedback
+      const trainer = await db_get('SELECT name FROM trainers WHERE id = ?', trainerId) as any;
+      senderName = trainer?.name || 'Unknown Trainer';
+
+      await db_run(
+        `INSERT INTO feedback (id, client_id, trainer_id, message, status, created_at)
+         VALUES (?, ?, ?, ?, 'pending', ?)`,
+        feedbackId, null, trainerId, message.trim(), now
+      );
+    }
 
     // Send Telegram notification to Nutrition App group
-    const clientName = client?.name || 'Unknown Client';
     try {
-      await sendFeedbackNotification(clientName, message.trim(), feedbackId);
+      await sendFeedbackNotification(senderName, message.trim(), feedbackId);
     } catch (e) {
       console.error('[Feedback] Notification error:', e);
     }
