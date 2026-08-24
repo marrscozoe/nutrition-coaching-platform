@@ -71,19 +71,20 @@
 
 ## 4. White Label
 
-**Overview:** Allow trainers to have their own branded subdomain and custom pricing.
+**Overview:** Allow trainers AND gems to have their own branded subdomain and custom pricing.
 
 **What's Needed:**
-- Custom subdomain: `trainername.nutrition.amarsbody.com`
-- Trainer sets their own brand color
-- Trainer sets their own pricing (above floor)
-- Each trainer sees their own branding throughout the app
+- Custom subdomain: `trainername.nutrition.amarsbody.com` or `gemname.nutrition.amarsbody.com`
+- Each partner sets their own brand color
+- Each partner sets their own pricing (above floor)
+- Each partner sees their own branding throughout the app
+- Both trainers and gems can have white label accounts
 
 **Implementation Tasks:**
 1. Set up subdomain routing for white label accounts
 2. Add custom branding settings (color, business name)
-3. Trainer can set their own monthly price
-4. Apply trainer branding throughout client experience
+3. Partner can set their own monthly price
+4. Apply partner branding throughout client experience
 5. Contact amarsbody@gmail.com to set up subdomain
 
 ---
