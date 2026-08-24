@@ -179,14 +179,16 @@ export default function ChatPage() {
     // Use Promise.all to properly await both async functions and avoid race conditions
     loadChatClearedFlag().then(async (clearedAt: string | null) => {
       setChatClearedAt(clearedAt);
-      // Only load past meals and coach messages if chat was NOT cleared
+      // Past meals are historical record - ALWAYS load them regardless of clear status
+      await loadPastMeals();
+      // Only load coach messages if chat was NOT cleared (coach messages are conversation, not history)
       if (!chatClearedSession && !clearedAt) {
-        await Promise.all([loadPastMeals(), loadCoachMessages()]);
-        // Clear the sessionStorage flag after successful load so future visits WILL load meals
+        await loadCoachMessages();
+        // Clear the sessionStorage flag after successful load so future visits WILL load coach messages
         sessionStorage.removeItem(`chat_cleared_${user.id}`);
       } else if (chatClearedSession) {
         // Chat was cleared in this session - clear the sessionStorage flag
-        // so future visits WILL load past meals (unless DB flag is also set)
+        // so future visits WILL load coach messages (unless DB flag is also set)
         sessionStorage.removeItem(`chat_cleared_${user.id}`);
       }
       setLoading(false);
