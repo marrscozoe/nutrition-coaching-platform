@@ -213,6 +213,26 @@
 
 ---
 
+## 12. Allergy/Intolerance Detection
+
+**Overview:** Help clients figure out what foods disagree with their system.
+
+**What's Needed:**
+- Client flags foods that cause issues (bloating, stomach pain, etc.)
+- Track reactions over time
+- AI looks for patterns: "You logged cheese 3 times this week and felt bloated after each time"
+- Suggest elimination trial for suspected problem foods
+- Build personal "avoid" list over time
+
+**Implementation Tasks:**
+1. Add "reaction" button when client logs meals
+2. Track: food, symptoms (bloating, headache, stomach pain, etc.), severity
+3. AI analyzes patterns in meal logs vs reactions
+4. Generate personal avoid list based on data
+5. Warn client when logging foods from their avoid list
+
+---
+
 ## Completed Features
 
 - Phase 2 violation logic (dairy/sugar checks active)
