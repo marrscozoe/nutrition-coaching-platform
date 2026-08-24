@@ -243,7 +243,16 @@ export default function TrainerSettingsPage() {
 
       {/* Bug Report Modal */}
       {showBugReport && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4"
+          onClick={(e) => {
+            // Close modal when clicking backdrop
+            if (e.target === e.currentTarget) {
+              setShowBugReport(false);
+              setBugMessage('');
+            }
+          }}
+        >
           <div className="w-full max-w-md bg-brand-charcoal/95 rounded-2xl border border-brand-cream/20 p-6">
             <h3 className="text-lg font-bold text-brand-cream mb-2">Report a Problem</h3>
             <p className="text-sm text-brand-cream/60 mb-4">
@@ -259,14 +268,21 @@ export default function TrainerSettingsPage() {
             <div className="flex gap-3 mt-4">
               <button
                 type="button"
-                onClick={() => { setShowBugReport(false); setBugMessage(''); }}
-                className="flex-1 py-3 rounded-lg bg-brand-charcoal/80 text-brand-cream font-medium hover:bg-brand-charcoal/60 transition-colors"
+                onClick={() => {
+                  setShowBugReport(false);
+                  setBugMessage('');
+                }}
+                className="flex-1 py-3 rounded-lg bg-brand-charcoal/80 text-brand-cream font-medium hover:bg-brand-charcoal/60 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={async () => {
+                  if (!trainer) {
+                    setToast({ message: 'Session expired. Please reload.', type: 'error' });
+                    return;
+                  }
                   if (!bugMessage.trim()) return;
                   setSubmitting(true);
                   try {
@@ -274,7 +290,7 @@ export default function TrainerSettingsPage() {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
-                        'x-trainer-id': trainer!.id,
+                        'x-trainer-id': trainer.id,
                       },
                       body: JSON.stringify({ message: bugMessage }),
                     });
@@ -292,7 +308,7 @@ export default function TrainerSettingsPage() {
                   }
                 }}
                 disabled={submitting || !bugMessage.trim()}
-                className="flex-1 py-3 rounded-lg bg-brand-orange text-white font-semibold hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
+                className="flex-1 py-3 rounded-lg bg-brand-orange text-white font-semibold hover:bg-brand-orange-dark transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? 'Sending...' : 'Send'}
               </button>
