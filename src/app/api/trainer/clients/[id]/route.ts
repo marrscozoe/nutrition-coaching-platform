@@ -84,7 +84,13 @@ export async function PUT(
     }
 
     // Use admin client to bypass RLS
-    const supabase = getAdminClient();
+    let supabase;
+    try {
+      supabase = getAdminClient();
+    } catch (e) {
+      console.error('[PUT] Failed to initialize admin client:', e);
+      return NextResponse.json({ error: 'Server configuration error - please contact support' }, { status: 500 });
+    }
     
     // Verify client exists
     const { data: client, error: verifyError } = await supabase

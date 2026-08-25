@@ -59,6 +59,7 @@ export default function ClientDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Edit form state
   const [notes, setNotes] = useState('');
@@ -107,6 +108,7 @@ export default function ClientDetailPage() {
 
   async function handleSaveChanges() {
     setSaving(true);
+    setErrorMessage('');
     try {
       const res = await fetch(`/api/trainer/clients/${clientId}`, {
         method: 'PUT',
@@ -125,9 +127,15 @@ export default function ClientDetailPage() {
         setSavedMessage('Changes saved!');
         setTimeout(() => setSavedMessage(''), 3000);
         fetchClientData(clientId, trainer!.id);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setErrorMessage(data.error || `Save failed (${res.status})`);
+        setTimeout(() => setErrorMessage(''), 5000);
       }
     } catch (err) {
       console.error('Failed to save:', err);
+      setErrorMessage('Network error - please try again');
+      setTimeout(() => setErrorMessage(''), 5000);
     } finally {
       setSaving(false);
     }
@@ -286,6 +294,11 @@ export default function ClientDetailPage() {
           {savedMessage && (
             <div className="mb-2 p-2 rounded-lg bg-green-500/20 border border-green-500/40 text-green-400 text-sm text-center">
               ✓ {savedMessage}
+            </div>
+          )}
+          {errorMessage && (
+            <div className="mb-2 p-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 text-sm text-center">
+              ✗ {errorMessage}
             </div>
           )}
 
