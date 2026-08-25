@@ -393,7 +393,7 @@ export interface Client {
   password_hash: string;
   name: string;
   gender?: 'male' | 'female';
-  program_type?: 'event_ready' | 'muscle_gain' | 'general_health';
+  program_type?: 'event_ready' | 'muscle_gain' | 'general_health' | 'get_shredded';
   starting_weight?: number;
   current_weight?: number;
   goal_weight?: number;

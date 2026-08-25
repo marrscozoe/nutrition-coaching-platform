@@ -99,8 +99,6 @@ export async function POST(request: NextRequest) {
             if (currentPhase === 1 && daysInPhase >= 14) {
               newPhase = 5;
               resetPhaseStart = true;
-              // Store phase2_start_weight for EVENT_READY (Phase 2 duration tracking)
-              // Note: Phase 2 is only for EVENT_READY, not GET_SHREDDED
             }
             // Phase 5 → Phase 1 OR Phase 4 (goal attained): After 14 days
             else if (currentPhase === 5 && daysInPhase >= 14) {
@@ -124,11 +122,6 @@ export async function POST(request: NextRequest) {
             if (currentPhase === 1 && daysInPhase >= 14) {
               newPhase = 2;
               resetPhaseStart = true;
-              // Store current weight as phase2_start_weight for duration extension tracking
-              await db_run(
-                `UPDATE clients SET phase2_start_weight = ?, updated_at = ? WHERE id = ?`,
-                weight, now, clientId
-              );
             }
             // Phase 2 → Phase 1 or Phase 4 (goal attained): 7 days
             else if (currentPhase === 2 && daysInPhase >= 7) {
@@ -188,7 +181,6 @@ export async function POST(request: NextRequest) {
     }
 
     const startingWeight = client?.starting_weight || weight;
-    const goalWeight = client?.goal_weight;
     // For muscle_gain, positive = weight gained; for others, positive = weight lost
     const isMuscleGain = client?.program_type === 'muscle_gain';
     const weightChange = startingWeight - weight; // positive = lost, negative = gained
@@ -198,9 +190,9 @@ export async function POST(request: NextRequest) {
 
     // Goal check: for muscle_gain, goal is HIGHER weight (weight >= goalWeight)
     // For other programs, goal is LOWER weight (weight <= goalWeight)
-    const atGoal = isMuscleGain ? (weight >= goalWeight) : (weight <= goalWeight);
+    const atGoal = isMuscleGain ? (weight >= client?.goal_weight) : (weight <= client?.goal_weight);
 
-    if (goalWeight && atGoal) {
+    if (client?.goal_weight && atGoal) {
       // Check if goal milestone already exists (don't duplicate)
       const { data: existingGoal } = await supabase.from('milestones').select('id').eq('client_id', clientId).eq('milestone_type', 'goal').single();
       if (!existingGoal) {

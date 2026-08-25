@@ -145,13 +145,6 @@ export async function POST(request: NextRequest) {
           if (currentPhase === 1 && daysInPhase >= 14) {
             newPhase = 2;
             resetStreak = true;
-            // Store current weight as phase2_start_weight for weight-based Phase 2 duration
-            if (currentWeight) {
-              await supabase
-                .from('clients')
-                .update({ phase2_start_weight: currentWeight })
-                .eq('id', clientId);
-            }
           }
           // Phase 2 → Phase 1 or Phase 4 (goal): 7 days
           else if (currentPhase === 2 && daysInPhase >= 7) {

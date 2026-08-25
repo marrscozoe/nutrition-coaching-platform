@@ -95,8 +95,7 @@ export default function ProfilePage() {
       case 'event_ready': return 'Event Ready';
       case 'muscle_gain': return 'Gain Muscle';
       case 'general_health': return 'General Health';
-case 'get_shredded': return 'Get Shredded';
-      case 'lose_body_fat': return 'Get Shredded';
+      case 'get_shredded': return 'Get Shredded';
       default: return type;
     }
   }
