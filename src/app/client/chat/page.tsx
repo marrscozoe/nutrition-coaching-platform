@@ -183,22 +183,56 @@ export default function ChatPage() {
         // (newest at bottom of chat), so reverse the array
         const reversedMeals = [...meals].reverse();
         
+        // Build set of meal IDs already in sessionStorage to avoid duplicates
+        const chatKey = `chat_history_${user.id}`;
+        const storedHistory = sessionStorage.getItem(chatKey);
+        let existingMealIds = new Set<string>();
+        if (storedHistory) {
+          try {
+            const parsed = JSON.parse(storedHistory);
+            // Extract meal IDs from sessionStorage messages (format: meal-{id}-user)
+            parsed.forEach((m: any) => {
+              if (m.isMealLog && m.id && m.id.startsWith('meal-')) {
+                // ID format: meal-{id}-user or meal_{id}_{timestamp}
+                const parts = m.id.replace('meal-', 'meal_').split('_');
+                if (parts.length >= 2) existingMealIds.add(parts[1]);
+              }
+            });
+          } catch (e) { /* ignore */ }
+        }
+        
         // Convert past meals to chat messages and add to history
-        const pastMessages: ChatMessage[] = reversedMeals.map((meal: any) => [
-          {
+        // Skip meals already in sessionStorage to prevent duplicates
+        const pastMessages: ChatMessage[] = [];
+        reversedMeals.forEach((meal: any) => {
+          // Skip if this meal is already in sessionStorage
+          if (existingMealIds.has(String(meal.id))) return;
+          
+          // Format the meal with proper display (same formatting as processMealData)
+          const dateStr = new Date(meal.logged_at).toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+          });
+          const status = meal.messed_up ? '⚠️ Off Phase' : meal.on_phase ? '✅ On Phase' : '❓ Review';
+          // Derive meal type from food description if not available
+          const mealType = meal.meal_type || 'MEAL';
+          const mealContent = `📸 ${mealType.toUpperCase()} — ${dateStr}\n${meal.food_description || 'Logged a meal'}\n${status}`;
+          
+          pastMessages.push({
             id: `meal-${meal.id}-user`,
             role: 'user' as const,
-            content: meal.food_description || 'Logged a meal',
+            content: mealContent,
             timestamp: new Date(meal.logged_at),
             isMealLog: true,
-          },
-          {
+          });
+          pastMessages.push({
             id: `meal-${meal.id}-coach`,
             role: 'coach' as const,
             content: meal.portion_advice || (meal.on_phase ? "Nice! You're on track! 💪" : "Keep pushing! You've got this! 💪"),
             timestamp: new Date(new Date(meal.logged_at).getTime() + 1000),
-          }
-        ]).flat();
+          });
+        });
         
         // Return past messages to be prepended by the caller
         return { mode: 'prepend', messages: pastMessages };
