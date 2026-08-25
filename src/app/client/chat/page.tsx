@@ -172,7 +172,8 @@ export default function ChatPage() {
           }
 
           setMessages(prev => {
-            const updated = [...newMessages, ...prev];
+            // Append new meal to the END (bottom of chat) for normal chat behavior
+            const updated = [...prev, ...newMessages];
             saveHistory(updated);
             return updated;
           });
