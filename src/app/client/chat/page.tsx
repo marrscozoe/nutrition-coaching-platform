@@ -100,11 +100,18 @@ export default function ChatPage() {
     // Fetch past meals from database and add to chat history
     async function loadPastMeals() {
       try {
+        // Get pending meal ID to exclude (prevents duplicate with processMealData)
+        const pendingMeal = sessionStorage.getItem('pending_meal_data');
+        const pendingMealId = pendingMeal ? JSON.parse(pendingMeal).id : null;
+
         const res = await fetch(`/api/meals?limit=20`, {
           headers: { 'x-client-id': user.id },
         });
         const data = await res.json();
-        const meals = data.meals || [];
+        // Filter out the pending meal to prevent duplicate from race condition
+        const meals = (data.meals || []).filter(
+          (meal: any) => meal.id !== pendingMealId
+        );
         
         // Convert past meals to chat messages and add to history
         const pastMessages: ChatMessage[] = meals.map((meal: any) => [

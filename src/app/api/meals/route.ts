@@ -117,8 +117,6 @@ export async function POST(request: NextRequest) {
         const goalWeight = client.goal_weight;
         const currentWeight = client.current_weight;
 
-        let coachMessage: { id: string; content: string; message_type: string; created_at: string } | null = null;
-
         // GET_SHREDDED: Phase 1 ↔ Phase 5 (14 days each)
         if (programType === 'get_shredded' && newPhase === currentPhase) {
           // Phase 1 → Phase 5: After 14 days
