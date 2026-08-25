@@ -1183,6 +1183,10 @@ export async function analyzeMealPortion(
     if (!hasStarch) {
       corrections.push(`💡 Notice: Starch is allowed every meal in Phase 6 — add ${context.gender === 'male' ? '3 cups' : '2 cups'} if you'd like.`);
     }
+    // If ANY major category is missing, meal is off-phase
+    if (!hasProtein || !hasVeg || !hasFat) {
+      onPhase = false;
+    }
   } else if (phase === 1 || phase === 2 || (phase === 5 && context.programType !== 'event_ready')) {
     let rulePhase = phase;
     if (phase === 5) {
