@@ -98,20 +98,90 @@ export default function ChatPage() {
     }
 
     // Fetch past meals from database and add to chat history
-    async function loadPastMeals() {
+    async function loadPastMeals(pendingMealData: PendingMealData | null) {
       try {
-        // Get pending meal ID to exclude (prevents duplicate with processMealData)
-        const pendingMeal = sessionStorage.getItem('pending_meal_data');
-        const pendingMealId = pendingMeal ? JSON.parse(pendingMeal).id : null;
-
         const res = await fetch(`/api/meals?limit=20`, {
           headers: { 'x-client-id': user.id },
         });
         const data = await res.json();
-        // Filter out the pending meal to prevent duplicate from race condition
-        const meals = (data.meals || []).filter(
-          (meal: any) => meal.id !== pendingMealId
-        );
+        
+        // If we have a pending meal (just logged), add it to chat with proper formatting
+        // instead of letting processMealData add it (which causes duplicates)
+        if (pendingMealData) {
+          const dateStr = new Date(pendingMealData.mealDate + 'T12:00:00').toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+          });
+          const status = pendingMealData.messedUp ? '⚠️ Off Phase' : pendingMealData.onPhase ? '✅ On Phase' : '❓ Review';
+          const mealContent = `📸 ${pendingMealData.mealType.toUpperCase()} — ${dateStr}\n${pendingMealData.foodDescription}\n${status}`;
+
+          const userMessage: ChatMessage = {
+            id: `meal_${pendingMealData.id}_${Date.now()}`,
+            role: 'user',
+            content: mealContent,
+            timestamp: new Date(),
+            isMealLog: true,
+          };
+
+          // Get coach message content
+          let coachContent = pendingMealData.portionAdvice || "Got your meal! Stay on track! 💪";
+          // If no portionAdvice, we need to call the AI
+          if (!pendingMealData.portionAdvice) {
+            try {
+              const aiRes = await fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-client-id': user.id,
+                },
+                body: JSON.stringify({
+                  mealData: {
+                    mealType: pendingMealData.mealType,
+                    foodDescription: pendingMealData.foodDescription,
+                    onPhase: pendingMealData.onPhase,
+                    messedUp: pendingMealData.messedUp,
+                  }
+                }),
+              });
+              const aiData = await aiRes.json();
+              coachContent = aiData.response || "Got your meal! Stay on track! 💪";
+            } catch (err) {
+              coachContent = "Got your meal logged! Keep crushing it! 💪";
+            }
+          }
+
+          const coachMessage: ChatMessage = {
+            id: `coach_meal_${Date.now()}`,
+            role: 'coach',
+            content: coachContent,
+            timestamp: new Date(new Date().getTime() + 1000),
+          };
+
+          const newMessages = [userMessage, coachMessage];
+
+          // Add GENERAL_HEALTH alert if present
+          if (pendingMealData.coachMessage) {
+            const alertMsg: ChatMessage = {
+              id: `coach_alert_${pendingMealData.coachMessage.id || Date.now()}`,
+              role: 'coach',
+              content: pendingMealData.coachMessage.content,
+              timestamp: new Date(new Date(pendingMealData.coachMessage.created_at).getTime() + 2000),
+            };
+            newMessages.push(alertMsg);
+          }
+
+          setMessages(prev => {
+            const updated = [...newMessages, ...prev];
+            saveHistory(updated);
+            return updated;
+          });
+          // Return early - don't also load from DB (which would cause duplicate)
+          return;
+        }
+
+        // No pending meal - load from database as usual
+        const meals = data.meals || [];
         
         // Convert past meals to chat messages and add to history
         const pastMessages: ChatMessage[] = meals.map((meal: any) => [
@@ -184,10 +254,19 @@ export default function ChatPage() {
 
     // Load chat cleared flag from DB and then conditionally load past data
     // Use Promise.all to properly await both async functions and avoid race conditions
+    // IMPORTANT: Read pending_meal_data BEFORE loadPastMeals runs to avoid duplicate
+    const pendingMeal = sessionStorage.getItem('pending_meal_data');
+    const pendingMealData = pendingMeal ? JSON.parse(pendingMeal) : null;
+    // Clear it early so processMealData won't also add it (we'll add it via loadPastMeals with proper formatting)
+    if (pendingMeal) {
+      sessionStorage.removeItem('pending_meal_data');
+    }
+
     loadChatClearedFlag().then(async (clearedAt: string | null) => {
       setChatClearedAt(clearedAt);
       // Past meals are historical record - ALWAYS load them regardless of clear status
-      await loadPastMeals();
+      // Pass pendingMealData so loadPastMeals can properly format and add the just-logged meal
+      await loadPastMeals(pendingMealData);
       // Only load coach messages if chat was NOT cleared (coach messages are conversation, not history)
       if (!chatClearedSession && !clearedAt) {
         await loadCoachMessages();
