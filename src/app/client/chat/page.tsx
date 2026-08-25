@@ -98,6 +98,7 @@ export default function ChatPage() {
     }
 
     // Fetch past meals from database and add to chat history
+    // Returns the messages to be prepended/appended by the caller (to avoid race conditions)
     async function loadPastMeals(pendingMealData: PendingMealData | null) {
       try {
         const res = await fetch(`/api/meals?limit=20`, {
@@ -171,21 +172,19 @@ export default function ChatPage() {
             newMessages.push(alertMsg);
           }
 
-          setMessages(prev => {
-            // Append new meal to the END (bottom of chat) for normal chat behavior
-            const updated = [...prev, ...newMessages];
-            saveHistory(updated);
-            return updated;
-          });
-          // Return early - don't also load from DB (which would cause duplicate)
-          return;
+          // Return the new messages to be appended by the caller
+          return { mode: 'append', messages: newMessages };
         }
 
         // No pending meal - load from database as usual
         const meals = data.meals || [];
         
+        // API returns meals newest-first (ascending: false), but we want oldest first
+        // (newest at bottom of chat), so reverse the array
+        const reversedMeals = [...meals].reverse();
+        
         // Convert past meals to chat messages and add to history
-        const pastMessages: ChatMessage[] = meals.map((meal: any) => [
+        const pastMessages: ChatMessage[] = reversedMeals.map((meal: any) => [
           {
             id: `meal-${meal.id}-user`,
             role: 'user' as const,
@@ -201,16 +200,16 @@ export default function ChatPage() {
           }
         ]).flat();
         
-        if (pastMessages.length > 0) {
-          // Add to beginning of chat history (oldest first)
-          setMessages(prev => [...pastMessages, ...prev]);
-        }
+        // Return past messages to be prepended by the caller
+        return { mode: 'prepend', messages: pastMessages };
       } catch (err) {
         console.error('Failed to load past meals:', err);
+        return { mode: 'none', messages: [] };
       }
     }
 
-    // Fetch coach messages from database and add to chat history
+    // Fetch coach messages from database
+    // Returns the messages to be appended by the caller (to avoid race conditions)
     async function loadCoachMessages() {
       try {
         const res = await fetch(`/api/coach-messages`, {
@@ -227,12 +226,11 @@ export default function ChatPage() {
           timestamp: new Date(msg.created_at),
         }));
 
-        if (coachChatMessages.length > 0) {
-          // Add to beginning of chat history (oldest first)
-          setMessages(prev => [...coachChatMessages, ...prev]);
-        }
+        // Return coach messages to be appended by the caller
+        return coachChatMessages;
       } catch (err) {
         console.error('Failed to load coach messages:', err);
+        return [];
       }
     }
 
@@ -265,12 +263,14 @@ export default function ChatPage() {
 
     loadChatClearedFlag().then(async (clearedAt: string | null) => {
       setChatClearedAt(clearedAt);
-      // Past meals are historical record - ALWAYS load them regardless of clear status
-      // Pass pendingMealData so loadPastMeals can properly format and add the just-logged meal
-      await loadPastMeals(pendingMealData);
-      // Only load coach messages if chat was NOT cleared (coach messages are conversation, not history)
+      
+      // Load past meals - returns { mode, messages } to avoid race conditions
+      const mealResult = await loadPastMeals(pendingMealData);
+      
+      // Load coach messages if chat was NOT cleared
+      let coachMessages: ChatMessage[] = [];
       if (!chatClearedSession && !clearedAt) {
-        await loadCoachMessages();
+        coachMessages = await loadCoachMessages();
         // Clear the sessionStorage flag after successful load so future visits WILL load coach messages
         sessionStorage.removeItem(`chat_cleared_${user.id}`);
       } else if (chatClearedSession) {
@@ -278,6 +278,44 @@ export default function ChatPage() {
         // so future visits WILL load coach messages (unless DB flag is also set)
         sessionStorage.removeItem(`chat_cleared_${user.id}`);
       }
+      
+      // Build the final message array with a single setMessages call to avoid race conditions
+      // Read current messages from sessionStorage (already saved before this useEffect ran)
+      const chatKey = `chat_history_${user.id}`;
+      const storedHistory = sessionStorage.getItem(chatKey);
+      let currentMessages: ChatMessage[] = [];
+      if (storedHistory) {
+        try {
+          currentMessages = JSON.parse(storedHistory).map((m: any) => ({
+            ...m,
+            timestamp: new Date(m.timestamp),
+          }));
+        } catch (e) {
+          // Invalid history, start fresh
+        }
+      }
+      
+      // Apply meal messages (prepend or append based on mode)
+      let allMessages: ChatMessage[];
+      if (mealResult.mode === 'prepend' && mealResult.messages.length > 0) {
+        allMessages = [...mealResult.messages, ...currentMessages];
+      } else if (mealResult.mode === 'append' && mealResult.messages.length > 0) {
+        allMessages = [...currentMessages, ...mealResult.messages];
+      } else {
+        allMessages = currentMessages;
+      }
+      
+      // Append coach messages
+      if (coachMessages.length > 0) {
+        allMessages = [...allMessages, ...coachMessages];
+      }
+      
+      // Set messages and save to sessionStorage in a single operation
+      if (allMessages.length > 0) {
+        setMessages(allMessages);
+        sessionStorage.setItem(chatKey, JSON.stringify(allMessages));
+      }
+      
       setLoading(false);
     });
   }, [router]);
