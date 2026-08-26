@@ -54,12 +54,12 @@ export const HEALTHY_FATS = [
 ];
 
 export const SUPPLEMENTS = [
-  'Whey protein',
-  'Creatine',
-  'Protein drink',
-  'Meal replacement',
-  'Vitamin',
-  'Coffee (unsweetened, breakfast only)',
+  'Whey protein powder — 40g (male) / 20g (female) — 1st thing AM & last thing PM (NOT with meals)',
+  'Creatine-(follow container directions)',
+  'Whey protein drink (Premier Protein Drink) — No more than 1 per day',
+  'Vitamin (Centrum with dinner)',
+  'Coffee — unsweetened, breakfast only',
+  'MCT oil — follow directions',
 ];
 
 // ============================================
@@ -396,8 +396,10 @@ export function getPhaseGuidance(
         ],
         water: p.water,
         supplements: [
-          `Whey protein: ${isMale ? '40g' : '20g'} — 1st thing AM & last thing PM (NOT with meals)`,
+          `Whey protein powder: ${isMale ? '40g' : '20g'} — 1st thing AM & last thing PM (NOT with meals)`,
           'Creatine: Daily (follow container directions)',
+          'Whey protein drink (Wright Premier Protein Drink): As needed',
+          'Vitamin (Centrum with dinner)',
         ],
         exampleMeal: `${proteinOz} grilled chicken, ${starchPortion} rice, ${vegPortion} broccoli, ${fatPortion} olive oil, water`,
       };
