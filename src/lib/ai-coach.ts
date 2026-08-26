@@ -1090,11 +1090,13 @@ export async function analyzeMealPortion(
   // Phase 1: NO starch
   if (phase === 1) {
     if (hasStarch) {
-      disallowedItems.push(...unrecognizedItems.filter((_, i) => {
-        // Find which unrecognized items are starch-related
+      // Check both recognized and unrecognized starch items
+      const recognizedStarchItems = recognizedItems.filter(i => i.category === 'starch').map(i => i.item);
+      const unrecognizedStarchItems = unrecognizedItems.filter((_, i) => {
         const itemLower = unrecognizedItems[i]?.toLowerCase() || '';
         return STARCHY_CARBOHYDRATES.some(s => itemLower.includes(s.toLowerCase()));
-      }));
+      });
+      disallowedItems.push(...recognizedStarchItems, ...unrecognizedStarchItems);
       corrections.push(`⚠️ Phase 1 - NO starch! Skip the starch completely.`);
       onPhase = false;
     }
@@ -1131,6 +1133,13 @@ export async function analyzeMealPortion(
     const rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
 
     if (rulePhase === 1) {
+      // Check both recognized and unrecognized starch items (same as Phase 1)
+      const recognizedStarchItems = recognizedItems.filter(i => i.category === 'starch').map(i => i.item);
+      const unrecognizedStarchItems = unrecognizedItems.filter((_, i) => {
+        const itemLower = unrecognizedItems[i]?.toLowerCase() || '';
+        return STARCHY_CARBOHYDRATES.some(s => itemLower.includes(s.toLowerCase()));
+      });
+      disallowedItems.push(...recognizedStarchItems, ...unrecognizedStarchItems);
       corrections.push(`⚠️ Phase 5 Day ${dayNum} (strict phase) - NO starch! Skip the starch completely.`);
       onPhase = false;
     } else if (rulePhase === 2) {
@@ -1143,7 +1152,20 @@ export async function analyzeMealPortion(
       }
     }
   }
-  // Phase 4 and Phase 6: starch allowed every meal - no violation
+  // Phase 4 and Phase 6: starch allowed every meal - no violation EXCEPT for processed starches like tortillas
+  // Phase 6 specifically prohibits processed foods, and tortillas (flour/corn) are processed
+  if (phase === 6) {
+    const tortillaKeywords = ['flour tortilla', 'corn tortilla', 'tortillas', 'tortilla'];
+    const hasTortilla = tortillaKeywords.some(t => foodLower.includes(t));
+    if (hasTortilla) {
+      // Find which recognized/unrecognized items contain tortilla
+      const recognizedTortillaItems = recognizedItems.filter(i => i.item.toLowerCase().includes('tortilla')).map(i => i.item);
+      const unrecognizedTortillaItems = unrecognizedItems.filter(item => item.toLowerCase().includes('tortilla'));
+      disallowedItems.push(...recognizedTortillaItems, ...unrecognizedTortillaItems);
+      corrections.push(`⚠️ Phase 6 - tortillas are NOT allowed! They're processed. Swap for sweet potato or rice.`);
+      onPhase = false;
+    }
+  }
 
   // =============================================
   // CHECK MISSING CATEGORIES
@@ -1294,8 +1316,17 @@ export function getMealEvaluationPrompt(
     phaseRulesDesc = 'Starch every meal. Higher carbs and fats. Whey: 1st AM & last PM (NOT with meals). Creatine: Daily (follow container directions).';
   }
 
+  // Check if eggs are in the meal - eggs have DIFFERENT portion sizes than meat
+  const hasEggs = proteinItems.some(item => 
+    item.toLowerCase().includes('egg') && !item.toLowerCase().includes('egg whites')
+  );
+  
   // Portions for this phase/gender
-  const proteinPortion = gender === 'male' ? '6oz' : '4oz';
+  // IMPORTANT: Eggs use whole egg count, not ounces!
+  // Men: 3 eggs, Women: 2 eggs
+  const proteinPortion = hasEggs 
+    ? (gender === 'male' ? '3 eggs' : '2 eggs')
+    : (gender === 'male' ? '6oz' : '4oz');
   const vegPortion = gender === 'male' ? '2 cups' : '1-2 cups';
   const fatPortion = phase === 6 ? (gender === 'male' ? '3 tbsp' : '3 tbsp') : portions.fat;
   const starchPortion = phase === 6 ? (gender === 'male' ? '3 cups' : '2 cups') : portions.starch;
