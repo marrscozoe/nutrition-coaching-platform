@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
     // Check if this is the last meal of the day (dinner) and compute tomorrow's plan message
     // Also handle "lunch with no dinner" case by checking today's meals
     let tomorrowsPlanMessage = '';
-    if (mealType === 'dinner' || mealType === 'lunch') {
+    if (mealType === 'dinner') {
       // For lunch, check if dinner exists for today
       let isLastMealOfDay = mealType === 'dinner';
       if (mealType === 'lunch' && !isLastMealOfDay) {
@@ -310,10 +310,16 @@ export async function POST(request: NextRequest) {
           } catch (e) {
             console.error('Error computing tomorrow plan:', e);
           }
-        } else if (clientForPlan && clientForPlan.program_type === 'get_shredded') {
-          // get_shredded clients not in Phase 5 yet - show generic tomorrow message
-          // They're likely in Phase 1 (no starch)
-          tomorrowsPlanMessage = getTomorrowStarchMessage('phase1', false);
+        } else if (clientForPlan) {
+          // Non-Phase 5 clients - use their actual current_phase
+          const actualPhase = clientForPlan.current_phase;
+          const typeMap: Record<number, 'phase1' | 'phase2' | 'phase4'> = {
+            1: 'phase1',
+            2: 'phase2',
+            4: 'phase4',
+            6: 'phase4'  // Phase 6 also allows starch every meal (same as phase4)
+          };
+          tomorrowsPlanMessage = getTomorrowStarchMessage(typeMap[actualPhase] || 'phase1', false);
         }
       }
     }
