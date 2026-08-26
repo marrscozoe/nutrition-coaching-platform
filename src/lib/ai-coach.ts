@@ -1090,13 +1090,14 @@ export async function analyzeMealPortion(
   // Phase 1: NO starch
   if (phase === 1) {
     if (hasStarch) {
-      // Check both recognized and unrecognized starch items
-      const recognizedStarchItems = recognizedItems.filter(i => i.category === 'starch').map(i => i.item);
-      const unrecognizedStarchItems = unrecognizedItems.filter((_, i) => {
-        const itemLower = unrecognizedItems[i]?.toLowerCase() || '';
+      // Find which starch items from STARCHY_CARBOHYDRATES are in the food
+      const foundStarchItems = STARCHY_CARBOHYDRATES.filter(starch => foodLower.includes(starch.toLowerCase()));
+      // Also check unrecognized items for starch-related content
+      const unrecognizedStarchItems = unrecognizedItems.filter(item => {
+        const itemLower = item.toLowerCase();
         return STARCHY_CARBOHYDRATES.some(s => itemLower.includes(s.toLowerCase()));
       });
-      disallowedItems.push(...recognizedStarchItems, ...unrecognizedStarchItems);
+      disallowedItems.push(...foundStarchItems, ...unrecognizedStarchItems);
       corrections.push(`⚠️ Phase 1 - NO starch! Skip the starch completely.`);
       onPhase = false;
     }
@@ -1133,13 +1134,13 @@ export async function analyzeMealPortion(
     const rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
 
     if (rulePhase === 1) {
-      // Check both recognized and unrecognized starch items (same as Phase 1)
-      const recognizedStarchItems = recognizedItems.filter(i => i.category === 'starch').map(i => i.item);
-      const unrecognizedStarchItems = unrecognizedItems.filter((_, i) => {
-        const itemLower = unrecognizedItems[i]?.toLowerCase() || '';
+      // Find which starch items from STARCHY_CARBOHYDRATES are in the food (same as Phase 1)
+      const foundStarchItems = STARCHY_CARBOHYDRATES.filter(starch => foodLower.includes(starch.toLowerCase()));
+      const unrecognizedStarchItems = unrecognizedItems.filter(item => {
+        const itemLower = item.toLowerCase();
         return STARCHY_CARBOHYDRATES.some(s => itemLower.includes(s.toLowerCase()));
       });
-      disallowedItems.push(...recognizedStarchItems, ...unrecognizedStarchItems);
+      disallowedItems.push(...foundStarchItems, ...unrecognizedStarchItems);
       corrections.push(`⚠️ Phase 5 Day ${dayNum} (strict phase) - NO starch! Skip the starch completely.`);
       onPhase = false;
     } else if (rulePhase === 2) {
@@ -1158,10 +1159,11 @@ export async function analyzeMealPortion(
     const tortillaKeywords = ['flour tortilla', 'corn tortilla', 'tortillas', 'tortilla'];
     const hasTortilla = tortillaKeywords.some(t => foodLower.includes(t));
     if (hasTortilla) {
-      // Find which recognized/unrecognized items contain tortilla
-      const recognizedTortillaItems = recognizedItems.filter(i => i.item.toLowerCase().includes('tortilla')).map(i => i.item);
+      // Find which items in the food description contain tortilla
+      const foundTortillaItems = tortillaKeywords.filter(t => foodLower.includes(t));
+      // Also check unrecognized items for tortilla content
       const unrecognizedTortillaItems = unrecognizedItems.filter(item => item.toLowerCase().includes('tortilla'));
-      disallowedItems.push(...recognizedTortillaItems, ...unrecognizedTortillaItems);
+      disallowedItems.push(...foundTortillaItems, ...unrecognizedTortillaItems);
       corrections.push(`⚠️ Phase 6 - tortillas are NOT allowed! They're processed. Swap for sweet potato or rice.`);
       onPhase = false;
     }
