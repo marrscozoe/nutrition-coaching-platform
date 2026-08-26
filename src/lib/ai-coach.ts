@@ -1328,12 +1328,15 @@ export function getMealEvaluationPrompt(
   }
   prompt += `\nPhase ${phase} rules:\n- ${phaseRulesDesc}\n`;
   // EXPLICIT meal type declaration - AI must see this!
-  const mealTypeLabel = context.mealType === 'snack' ? '*** THIS IS A SNACK - GIVE SNACK ADVICE ONLY ***' : '*** THIS IS A MEAL - GIVE MEAL ADVICE ***';
+  const mealTypeLabel = context.mealType === 'snack' ? '*** THIS IS A SNACK - GIVE SNACK ADVICE ONLY ***' : '*** THIS IS A MEAL - GIVE MEAL FEEDBACK ONLY ***';
   prompt += `\n${mealTypeLabel}\n`;
   prompt += `\nIMPORTANT: The user labeled this as "${context.mealType}". Follow the instructions for ${context.mealType} only!\n`;
-  // BUG FIX: Only give tomorrow's advice for DINNER - the last meal of the day
+  // IMPORTANT: Tomorrow's advice is added AFTER this response in the route handler.
+  // Give ONLY meal feedback now - do NOT include tomorrow's advice in your response.
   if (context.mealType !== 'dinner') {
-    prompt += `\n⚠️ CRITICAL: Do NOT give tomorrow's advice or mention next day's eating plan unless this is a DINNER meal. If this is breakfast or lunch, do NOT mention tomorrow's starches, tomorrow's plan, or what to eat tomorrow.\n`;
+    prompt += `\n⚠️ CRITICAL: Do NOT give tomorrow's advice, next day's plan, or what to eat tomorrow. Only give feedback about THIS meal.\n`;
+  } else {
+    prompt += `\n⚠️ IMPORTANT: Give your meal feedback NOW. Tomorrow's advice will be added separately - do NOT include it in your response.\n`;
   }
   prompt += `\nYour job:\n`;
   prompt += `1. For each UNRECOGNIZED item: use your knowledge to tell client what's in it and if it violates phase rules. Be specific about what ingredient is the problem (e.g. "tacos have a tortilla = starch").\n`;
