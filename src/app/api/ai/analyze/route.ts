@@ -221,11 +221,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Helper to get tomorrow's starch message (for after last meal of the day)
+    // Helper to get tomorrow's starch message (only for dinner - the last meal of the day)
     // For Phase 5: use the plan to get tomorrow's type
     // For other phases: pass the current phase as the "tomorrow" type
     const getAfterDinnerMessage = (): string => {
-      if (mealType !== 'dinner' && mealType !== 'lunch') return '';
+      if (mealType !== 'dinner') return '';
       
       const isPhase5 = context.currentPhase === 5;
       
