@@ -1317,7 +1317,7 @@ export function getMealEvaluationPrompt(
     const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
     phaseRulesDesc = `Phase 5 Day ${dayNum}: ${currentDayRule?.label || 'rotating plan'}`;
   } else if (phase === 6) {
-    phaseRulesDesc = 'Starch every meal. Higher carbs and fats. Whey + Creatine required.';
+    phaseRulesDesc = 'Starch every meal. Higher carbs and fats. Whey: 1st AM & last PM (NOT with meals). Creatine: Daily (follow container directions).';
   }
 
   // Portions for this phase/gender

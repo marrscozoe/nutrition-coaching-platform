@@ -395,7 +395,10 @@ export function getPhaseGuidance(
           'No cans or boxes (fresh or frozen only)',
         ],
         water: p.water,
-        supplements: [],
+        supplements: [
+          `Whey protein: ${isMale ? '40g' : '20g'} — 1st thing AM & last thing PM (NOT with meals)`,
+          'Creatine: Daily (follow container directions)',
+        ],
         exampleMeal: `${proteinOz} grilled chicken, ${starchPortion} rice, ${vegPortion} broccoli, ${fatPortion} olive oil, water`,
       };
     default:
