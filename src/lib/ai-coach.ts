@@ -1331,12 +1331,16 @@ export function getMealEvaluationPrompt(
   const mealTypeLabel = context.mealType === 'snack' ? '*** THIS IS A SNACK - GIVE SNACK ADVICE ONLY ***' : '*** THIS IS A MEAL - GIVE MEAL ADVICE ***';
   prompt += `\n${mealTypeLabel}\n`;
   prompt += `\nIMPORTANT: The user labeled this as "${context.mealType}". Follow the instructions for ${context.mealType} only!\n`;
+  // BUG FIX: Only give tomorrow's advice for DINNER - the last meal of the day
+  if (context.mealType !== 'dinner') {
+    prompt += `\n⚠️ CRITICAL: Do NOT give tomorrow's advice or mention next day's eating plan unless this is a DINNER meal. If this is breakfast or lunch, do NOT mention tomorrow's starches, tomorrow's plan, or what to eat tomorrow.\n`;
+  }
   prompt += `\nYour job:\n`;
   prompt += `1. For each UNRECOGNIZED item: use your knowledge to tell client what's in it and if it violates phase rules. Be specific about what ingredient is the problem (e.g. "tacos have a tortilla = starch").\n`;
   // For snacks, partial meals are fine - don't give advice about missing categories or portions
   if (context.mealType !== 'snack') {
-    prompt += `2. For MISSING categories: tell client what's missing and the portion size for their phase (Protein: ${proteinPortion}, Veg: ${vegPortion}, Fat: ${fatPortion}).\n`;
-    prompt += `3. For DISALLOWED items: tell client to remove/replace it.\n`;
+    prompt += `2. For MISSING categories: tell client what's missing and the portion size for their phase (Protein: ${proteinPortion}, Veg: ${vegPortion}, Fat: ${fatPortion}). NOTE: Missing categories means portions are short - this is OK, just tell client to add more. This does NOT make the meal OFF PHASE.\n`;
+    prompt += `3. For DISALLOWED items: This meal is OFF PHASE. Tell client to remove/replace it. Only DISALLOWED items (forbidden foods like alcohol, candy, pasta, bread, ice cream, chips, etc. that are NOT on the approved food lists) make a meal OFF PHASE.\n`;
     prompt += `4. Keep response SHORT — 1-3 sentences per issue. Allen's coaching voice.\n`;
     prompt += `5. If everything looks good: "Nice! You're on track! 💪"\n`;
     prompt += `6. If client asks about supplements: give advice. Otherwise stay silent on supplements.\n`;
