@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
       // Phase 6 specific supplements
       if (isPhase6) {
         const whey = isMale ? '40g × 2/day' : '20g × 2/day';
-        response += `\n\nSupplements:\nWhey protein: ${whey}\nCreatine: Daily`;
+        response += `\n\nSupplements:\nWhey protein powder: ${whey} — 1st AM & last PM (NOT with meals)\nCreatine: Daily (follow container directions)\nWhey protein drink (Wright Premier Protein Drink): As needed\nVitamin (Centrum with dinner)`;
       }
       
       return NextResponse.json({

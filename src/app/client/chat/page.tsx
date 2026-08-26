@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { SUPPLEMENTS } from '@/lib/nutrition-data';
 
 interface ClientData {
   id: string;
@@ -60,6 +61,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showSupplements, setShowSupplements] = useState(false);
   const [chatClearedAt, setChatClearedAt] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -765,14 +767,22 @@ export default function ChatPage() {
 
       {/* Quick Actions */}
       <div className="px-4 py-2 pr-12 flex gap-2 overflow-x-auto bg-brand-charcoal/60 fixed top-[calc(64px+env(safe-area-inset-top))] left-0 right-0 z-40 scrollbar-hide">
-        {['What can I eat?', 'Portion sizes?', 'Tips?', 'Motivate me!'].map((q) => (
+        {['What can I eat?', 'Portion sizes?', 'Tips?', 'Motivate me!', '💊 Supplements'].map((q) => (
           <button
             key={q}
             onClick={() => {
-              setInput(q);
-              handleSend(q);
+              if (q === '💊 Supplements') {
+                setShowSupplements(true);
+              } else {
+                setInput(q);
+                handleSend(q);
+              }
             }}
-            className="flex-shrink-0 px-3 py-1.5 rounded-full bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream/70 text-xs hover:border-brand-orange/50 transition-colors"
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full bg-brand-charcoal/80 border text-xs hover:border-brand-orange/50 transition-colors ${
+              q === '💊 Supplements'
+                ? 'border-brand-orange/50 text-brand-orange'
+                : 'border-brand-cream/20 text-brand-cream/70'
+            }`}
           >
             {q}
           </button>
@@ -780,6 +790,33 @@ export default function ChatPage() {
         {/* Gradient fade scroll indicator */}
         <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-brand-charcoal/60 to-transparent pointer-events-none" />
       </div>
+
+      {/* Supplements Modal */}
+      {showSupplements && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowSupplements(false)} />
+          <div className="relative w-full sm:max-w-md bg-brand-charcoal border border-brand-cream/20 rounded-t-2xl sm:rounded-2xl p-5 pb-8 sm:pb-5 mb-[70px] sm:mb-0 max-h-[70vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-brand-cream">💊 Your Supplements</h2>
+              <button
+                onClick={() => setShowSupplements(false)}
+                className="text-brand-cream/50 hover:text-brand-cream text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <ul className="space-y-3">
+              {SUPPLEMENTS.map((supplement, i) => (
+                <li key={i} className="flex items-start gap-3 p-3 rounded-lg bg-brand-charcoal/60 border border-brand-cream/10">
+                  <span className="text-brand-orange mt-0.5">•</span>
+                  <span className="text-sm text-brand-cream/90 leading-relaxed">{supplement}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-brand-cream/40 text-center">Tap outside to close</p>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pt-[140px]">
