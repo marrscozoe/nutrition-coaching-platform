@@ -80,11 +80,11 @@ export async function POST(request: NextRequest) {
           let newPhase = currentPhase;
           let resetPhaseStart = false;
 
-          // GOAL ATTAINED - check FIRST (except for muscle_gain which handles Phase 6 → Phase 4 via this check)
-          if (goalWeight && currentPhase !== 4) {
-            const atGoal = (programType === 'muscle_gain')
-              ? (weight >= goalWeight)
-              : (weight <= goalWeight);
+          // GOAL ATTAINED - check FIRST (except for muscle_gain and general_health)
+          // muscle_gain handles Phase 6 → Phase 4 via its own check below
+          // general_health stays in maintenance phase only (no auto-transition to Phase 4)
+          if (goalWeight && currentPhase !== 4 && programType !== 'muscle_gain' && programType !== 'general_health') {
+            const atGoal = (weight <= goalWeight);
             if (atGoal) {
               newPhase = 4;
               resetPhaseStart = true;
@@ -163,10 +163,18 @@ export async function POST(request: NextRequest) {
           }
 
           if (newPhase !== currentPhase) {
-            await db_run(
-              `UPDATE clients SET current_phase = ?, phase_start_date = ?, current_week = ?, updated_at = ? WHERE id = ?`,
-              newPhase, resetPhaseStart ? now : phaseStartDate, newWeek, now, clientId
-            );
+            if (newPhase === 4) {
+              // Transitioning to Phase 4 (maintenance): reset streak
+              await db_run(
+                `UPDATE clients SET current_phase = ?, phase_start_date = ?, current_week = ?, good_meal_streak = 0, updated_at = ? WHERE id = ?`,
+                newPhase, resetPhaseStart ? now : phaseStartDate, newWeek, now, clientId
+              );
+            } else {
+              await db_run(
+                `UPDATE clients SET current_phase = ?, phase_start_date = ?, current_week = ?, updated_at = ? WHERE id = ?`,
+                newPhase, resetPhaseStart ? now : phaseStartDate, newWeek, now, clientId
+              );
+            }
           } else if (newWeek !== updatedClient.current_week) {
             // Update week even if phase didn't change
             await db_run(

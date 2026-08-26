@@ -67,8 +67,8 @@ export async function POST(request: NextRequest) {
         newPhase = 1;
         phaseChanged = true;
       }
-      // ===== GOAL ATTAINED - check if at goal, go to Phase 4 (skip for muscle_gain, handled above) =====
-      else if (currentPhase !== 6 && programType !== 'muscle_gain' && currentWeight) {
+      // ===== GOAL ATTAINED - check if at goal, go to Phase 4 (skip for muscle_gain, handled above; general_health stays in maintenance)
+      else if (currentPhase !== 6 && programType !== 'muscle_gain' && programType !== 'general_health' && currentWeight) {
         const atGoal = (currentWeight <= goal_weight);
         if (atGoal) {
           newPhase = 4;
@@ -78,10 +78,18 @@ export async function POST(request: NextRequest) {
 
       // If phase changed, update it
       if (phaseChanged) {
-        await db_run(
-          `UPDATE clients SET current_phase = ?, phase_start_date = ?, current_week = 4, updated_at = ? WHERE id = ?`,
-          newPhase, now, now, clientId
-        );
+        if (newPhase === 4) {
+          // Transitioning to Phase 4 (maintenance): reset streak
+          await db_run(
+            `UPDATE clients SET current_phase = ?, phase_start_date = ?, current_week = 4, good_meal_streak = 0, updated_at = ? WHERE id = ?`,
+            newPhase, now, now, clientId
+          );
+        } else {
+          await db_run(
+            `UPDATE clients SET current_phase = ?, phase_start_date = ?, current_week = 4, updated_at = ? WHERE id = ?`,
+            newPhase, now, now, clientId
+          );
+        }
       }
     }
 
