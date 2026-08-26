@@ -98,7 +98,7 @@ export function getPortions(gender: 'male' | 'female', phase: number): PortionSi
       return {
         protein: '4 ounces',
         fibrousVegetables: '1-2 cups',
-        fat: '3 tablespoons',
+        fat: '2 tablespoons',
         avocado: '3/4',
         starch: '2 cups',
         water: '80 oz daily (20 oz per meal)',
