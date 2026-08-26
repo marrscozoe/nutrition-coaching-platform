@@ -293,6 +293,16 @@ export default function LogMealPage() {
         return;
       }
 
+      // If meal was already logged (duplicate), don't re-add it to chat
+      // The API returns { duplicate: true, mealId: existingId } when a meal
+      // for the same type/date already exists. Skip pending_meal_data to prevent
+      // the meal from appearing twice in chat.
+      if (saveData.duplicate) {
+        setToast({ message: 'Meal already logged for this date! 📅', type: 'error' });
+        setSubmitting(false);
+        return;
+      }
+
       // Step 3: Prepare meal data for chat display
       const mealPayload = {
         id: saveData.mealId || `meal_${Date.now()}`,
@@ -373,6 +383,13 @@ export default function LogMealPage() {
       }
 
       if (data.success) {
+        // If meal was already logged (duplicate), don't re-add it to chat
+        if (data.duplicate) {
+          setToast({ message: 'Meal already logged for this date! 📅', type: 'error' });
+          setSubmitting(false);
+          return;
+        }
+
         // Prepare meal data to send to chat for AI analysis
         const mealPayload = {
           id: data.meal?.id || `meal_${Date.now()}`,
