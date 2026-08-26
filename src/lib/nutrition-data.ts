@@ -389,18 +389,13 @@ export function getPhaseGuidance(
           `FIBROUS VEGETABLES ${vegPortion}: ${veggieList}`,
           `HEALTHY FATS ${fatPortion}: ${fatList}`,
           `STARCHY CARBOHYDRATES ${starchPortion}: ${starchList}`,
-          `Whey protein: ${isMale ? '40g' : '20g'} 1st thing AM & last thing PM (NOT with meals)`,
-          `Creatine: Daily`,
         ],
         cannotEat: [
           'No processed foods',
           'No cans or boxes (fresh or frozen only)',
         ],
         water: p.water,
-        supplements: [
-          `Whey protein: ${isMale ? '40g' : '20g'} 1st thing AM & last thing PM`,
-          'Creatine: Daily (follow container directions)',
-        ],
+        supplements: [],
         exampleMeal: `${proteinOz} grilled chicken, ${starchPortion} rice, ${vegPortion} broccoli, ${fatPortion} olive oil, water`,
       };
     default:
