@@ -399,7 +399,7 @@ export function getPhaseGuidance(
         water: p.water,
         supplements: [
           `Whey protein: ${isMale ? '40g' : '20g'} 1st thing AM & last thing PM`,
-          'Creatine: Daily',
+          'Creatine: Daily (follow container directions)',
         ],
         exampleMeal: `${proteinOz} grilled chicken, ${starchPortion} rice, ${vegPortion} broccoli, ${fatPortion} olive oil, water`,
       };
