@@ -69,32 +69,6 @@ export async function POST(request: NextRequest) {
     const mealId = uuidv4();
     const now = new Date().toISOString();
 
-    // ===== DEDUPLICATION CHECK: Prevent duplicate meals for same client/type/date =====
-    // Use mealDate if provided, otherwise derive from now
-    const dateStr = mealDate || now.split('T')[0];
-    const startOfDay = `${dateStr}T00:00:00`;
-    const endOfDay = `${dateStr}T23:59:59`;
-
-    const { data: existingMeal } = await supabase
-      .from('meals')
-      .select('id, logged_at')
-      .eq('client_id', clientId)
-      .eq('meal_type', mealType)
-      .gte('logged_at', startOfDay)
-      .lte('logged_at', endOfDay)
-      .limit(1);
-
-    if (existingMeal && existingMeal.length > 0) {
-      // Meal already exists for this date - return existing ID instead of creating duplicate
-      console.log(`[Meal Deduplication] Duplicate detected for client ${clientId}, ${mealType}, ${dateStr}. Existing ID: ${existingMeal[0].id}`);
-      return NextResponse.json({
-        success: true,
-        mealId: existingMeal[0].id,
-        message: 'Meal already logged for this date',
-        duplicate: true,
-      });
-    }
-
     // Use admin client to insert meal (bypasses RLS)
     const { error: insertError } = await supabase.from('meals').insert({
       id: mealId,
