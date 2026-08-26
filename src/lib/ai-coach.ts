@@ -14,7 +14,14 @@ import {
   STARCHY_CARBOHYDRATES,
   HEALTHY_FATS,
   SUPPLEMENTS,
+  Phase5Day,
+  getPhase5DayNumber,
+  getPhase5CurrentRule,
 } from './nutrition-data';
+
+// Re-export Phase5Day and phase 5 helpers for backward compatibility
+export type { Phase5Day } from './nutrition-data';
+export { getPhase5DayNumber, getPhase5CurrentRule } from './nutrition-data';
 
 // Initialize corrections cache on module load (server-only)
 if (typeof process !== 'undefined' && process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -288,12 +295,6 @@ export interface CoachContext {
   phase5StartDate?: string; // YYYY-MM-DD when the current 14-day plan started
 }
 
-export interface Phase5Day {
-  day: number;
-  type: 'phase1' | 'phase2' | 'phase4';
-  label: string;
-}
-
 // Phase 5: 14-day plan where each day is randomly assigned ONE of three behaviors:
 // Type A (Phase 1 behavior): No starches all day. Protein + veg + fat only.
 // Type B (Phase 2 behavior): Starches with breakfast and lunch only. Dinner no starch.
@@ -313,16 +314,6 @@ export function generatePhase5Plan(): Phase5Day[] {
     plan.push({ day, type, label: typeLabels[type] });
   }
   return plan;
-}
-
-// Get current day of Phase 5 plan (1-14)
-export function getPhase5DayNumber(phase5StartDate: string): number {
-  if (!phase5StartDate) return 1;
-  const start = new Date(phase5StartDate + 'T12:00:00');
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-  // Day 1 = start date
-  return Math.min(14, Math.max(1, diffDays + 1));
 }
 
 // Check if Phase 5 plan needs regeneration (after 14 days)
@@ -373,15 +364,6 @@ export function getTomorrowStarchMessage(
     return '⏰ Tomorrow: starches with every meal. Add to all meals.';
   }
   return '';
-}
-
-// Get current phase's starch rule description
-export function getPhase5CurrentRule(phase5Plan: Phase5Day[], phase5StartDate: string): string {
-  if (!phase5Plan || phase5Plan.length === 0) return '';
-  
-  const currentDay = getPhase5DayNumber(phase5StartDate);
-  const currentEntry = phase5Plan.find(d => d.day === currentDay);
-  return currentEntry?.label || '';
 }
 
 // Helper: convert type string to numeric phase

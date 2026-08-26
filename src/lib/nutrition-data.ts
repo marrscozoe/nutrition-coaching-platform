@@ -273,7 +273,7 @@ export interface Phase5Day {
   label: string;
 }
 
-function getPhase5DayNumber(phase5StartDate: string): number {
+export function getPhase5DayNumber(phase5StartDate: string): number {
   if (!phase5StartDate) return 1;
   const start = new Date(phase5StartDate + 'T12:00:00');
   const now = new Date();
@@ -281,7 +281,7 @@ function getPhase5DayNumber(phase5StartDate: string): number {
   return Math.min(14, Math.max(1, diffDays + 1));
 }
 
-function getPhase5CurrentRule(phase5Plan: Phase5Day[], phase5StartDate: string): Phase5Day | null {
+export function getPhase5CurrentRule(phase5Plan: Phase5Day[], phase5StartDate: string): Phase5Day | null {
   if (!phase5Plan || phase5Plan.length === 0) return null;
   const currentDay = getPhase5DayNumber(phase5StartDate);
   return phase5Plan.find(d => d.day === currentDay) || null;
