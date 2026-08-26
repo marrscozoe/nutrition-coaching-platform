@@ -354,19 +354,13 @@ export default function ChatPage() {
     });
   }, [router]);
 
-  // Process pending meal/weight data from sessionStorage
+  // Process pending weight data from sessionStorage
+  // NOTE: pending meal data is handled by loadPastMeals in the first useEffect above
+  // to avoid duplicates (loadPastMeals runs in .then() after loadChatClearedFlag)
   useEffect(() => {
     if (!client || loading) return;
 
-    const pendingMeal = sessionStorage.getItem('pending_meal_data');
     const pendingWeight = sessionStorage.getItem('pending_weight_data');
-
-    if (pendingMeal) {
-      sessionStorage.removeItem('pending_meal_data');
-      const mealData: PendingMealData = JSON.parse(pendingMeal);
-      processMealData(mealData);
-      return;
-    }
 
     if (pendingWeight) {
       sessionStorage.removeItem('pending_weight_data');
