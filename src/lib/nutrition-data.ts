@@ -155,7 +155,12 @@ export interface MealSuggestion {
 }
 
 export function generateMealSuggestion(
-  context: { gender: 'male' | 'female'; currentPhase: number },
+  context: {
+    gender: 'male' | 'female';
+    currentPhase: number;
+    phase5StartDate?: string;
+    phase5Plan?: Phase5Day[];
+  },
   mealType: 'breakfast' | 'lunch' | 'dinner' = 'lunch'
 ): MealSuggestion {
   const { gender, currentPhase } = context;
@@ -191,6 +196,17 @@ export function generateMealSuggestion(
     const allowedDay = isPhase2AllowedDay();
     const isFirstTwoMeals = mealType === 'breakfast' || mealType === 'lunch';
     starchAllowed = allowedDay && isFirstTwoMeals;
+  } else if (currentPhase === 5) {
+    // Phase 5: check sub-phase for starch rules
+    // 'phase1' sub-phase: no starch
+    // 'phase2' sub-phase: starch at B/L only (but dinner suggestion = no starch)
+    // 'phase4' sub-phase: starch every meal
+    if (context.phase5StartDate && context.phase5Plan) {
+      const phase5Rule = getPhase5CurrentRule(context.phase5Plan, context.phase5StartDate);
+      starchAllowed = phase5Rule?.type === 'phase4';
+    } else {
+      starchAllowed = false; // Default to no starch if phase 5 data not available
+    }
   } else if (currentPhase >= 4) {
     starchAllowed = true;
   }
@@ -209,6 +225,22 @@ export function generateMealSuggestion(
     message = `Starch allowed today! ${portions.starch} — eat up! 🔥`;
   } else if (currentPhase === 4) {
     message = "Every meal gets starch — you're in maintenance mode! 🎉";
+  } else if (currentPhase === 5) {
+    // Phase 5 message depends on sub-phase
+    if (context.phase5StartDate && context.phase5Plan) {
+      const phase5Rule = getPhase5CurrentRule(context.phase5Plan, context.phase5StartDate);
+      if (phase5Rule?.type === 'phase1') {
+        message = 'Phase 5 (Phase 1 day) — no starch! Stick to protein, veggies & fat! 💪';
+      } else if (phase5Rule?.type === 'phase2') {
+        message = 'Phase 5 (Phase 2 day) — starch at breakfast/lunch only! 📅';
+      } else if (phase5Rule?.type === 'phase4') {
+        message = 'Phase 5 (Phase 4 day) — starch every meal! 🎉';
+      } else {
+        message = 'Phase 5 — check your plan for starch rules!';
+      }
+    } else {
+      message = 'Phase 5 — no starch today (plan data unavailable)! 💪';
+    }
   } else if (currentPhase === 6) {
     message = 'Higher carbs today — fuel up! 💪🔥';
   }
