@@ -1318,13 +1318,14 @@ export function getMealEvaluationPrompt(
     p += `\n⚠️ Remove: ${analysis.disallowedItems.join(', ')}\n`;
   }
 
-  // What to add — concise
+  // What to add — with portion sizes front and center
   if (!isSnack && analysis.missingCategories.length > 0) {
     const m = gender === 'male';
-    if (analysis.missingCategories.includes('protein')) p += `💡 Add ${m ? '6oz' : '4oz'} protein\n`;
-    if (analysis.missingCategories.includes('vegetable')) p += `💡 Add ${m ? '2 cups' : '1-2 cups'} veggies\n`;
-    if (analysis.missingCategories.includes('fat')) p += `💡 Add ${m ? '2 tbsp' : '1 tbsp'} olive oil or avocado\n`;
-    if (analysis.missingCategories.includes('water')) p += `💧 Drink ${m ? '32oz' : '20oz'} water\n`;
+    p += `\nMISSING (include portion in response):\n`;
+    if (analysis.missingCategories.includes('protein')) p += `- protein: ${m ? '6oz' : '4oz'}\n`;
+    if (analysis.missingCategories.includes('vegetable')) p += `- veggies: ${m ? '2 cups' : '1-2 cups'}\n`;
+    if (analysis.missingCategories.includes('fat')) p += `- fat: ${m ? '2 tbsp' : '1 tbsp'} olive oil or avocado\n`;
+    if (analysis.missingCategories.includes('water')) p += `- water: ${m ? '32oz' : '20oz'}\n`;
   }
 
   // Coaching rules — stripped way down
@@ -1336,7 +1337,7 @@ export function getMealEvaluationPrompt(
     p += `- MAX 3 sentences. Allen's voice — short, punchy, direct.\n`;
     p += `- Good meal: "Nice! You're on track! 💪"\n`;
     p += `- Off phase: "Drop the [item]." — one sentence.\n`;
-    p += `- Missing pieces: "Add [X]." — one sentence each, max 2.\n`;
+    p += `- Missing: state the food AND portion, e.g. "Add 6oz protein." — one sentence each, max 2.\n`;
     p += `- NEVER explain your thinking. Just the coaching response.\n`;
     p += `- Never start with "Phase X..." or "Your portions..."\n`;
     p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
