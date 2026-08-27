@@ -1270,124 +1270,82 @@ export async function analyzeMealPortion(
 // ============================================
 
 /**
- * Generate a prompt for MiniMax from structured meal data.
- * Takes the output of extractMealData() and analyzeMealPortion().
+ * Generate a SHORT coaching prompt for meal feedback — NO chain-of-thought.
+ * The prompt describes what was eaten and phase rules, then gets out of the way.
  */
 export function getMealEvaluationPrompt(
   mealData: MealData,
   analysis: {
-    hasProtein: boolean;
-    hasVeg: boolean;
-    hasStarch: boolean;
-    hasFat: boolean;
-    hasWater: boolean;
-    hasSupplement: boolean;
-    unrecognizedItems: string[];
-    missingCategories: string[];
-    disallowedItems: string[];
-    onPhase: boolean;
+    hasProtein: boolean; hasVeg: boolean; hasStarch: boolean;
+    hasFat: boolean; hasWater: boolean; hasSupplement: boolean;
+    unrecognizedItems: string[]; missingCategories: string[];
+    disallowedItems: string[]; onPhase: boolean;
   },
   context: CoachContext
 ): string {
-  // DEBUG: Log mealType for debugging
-  console.log('[DEBUG getMealEvaluationPrompt] context.mealType:', JSON.stringify(context.mealType), 'typeof:', typeof context.mealType);
-  
-  const { currentPhase: phase, gender, programType } = context;
-  const portions = getPortions(gender, phase);
+  const { currentPhase: phase, gender } = context;
 
-  // Build recognized foods list
+  const isSnack = context.mealType === 'snack';
+
+  // Phase rules (one line each)
+  const phaseRules: Record<number, string> = {
+    1: 'NO starch — protein, veggies, fat only',
+    2: 'Starch only Wed/Sat/Sun breakfast & lunch',
+    4: 'Starch every meal — maintenance',
+    5: `Phase 5 — rotating 3-day blocks`,
+    6: 'Starch every meal — no tortillas',
+  };
+
+  // Short prompt — describe the meal, give the rule, get out
+  let p = `ALLEN'S AI COACH — ${(context.mealType || 'meal').toUpperCase()} FEEDBACK\n`;
+  p += `Client: ${context.clientName || 'Client'} | Phase ${phase} | ${gender}\n`;
+  p += `Rule: ${phaseRules[phase] || ''}\n\n`;
+
+  // What they ate (clean description, not "code detected")
   const proteinItems = mealData.recognizedItems.filter(i => i.category === 'protein').map(i => i.item);
   const vegItems = mealData.recognizedItems.filter(i => i.category === 'vegetable').map(i => i.item);
   const starchItems = mealData.recognizedItems.filter(i => i.category === 'starch').map(i => i.item);
   const fatItems = mealData.recognizedItems.filter(i => i.category === 'fat').map(i => i.item);
-  const suppItems = mealData.recognizedItems.filter(i => i.category === 'supplement').map(i => i.item);
 
-  // Phase rules description
-  let phaseRulesDesc = '';
-  if (phase === 1) {
-    phaseRulesDesc = 'NO starch. Protein, veggies, and healthy fats only.';
-  } else if (phase === 2) {
-    phaseRulesDesc = 'Starch allowed at breakfast & lunch only on Wed, Sat, Sun. No starch at dinner or snacks.';
-  } else if (phase === 4) {
-    phaseRulesDesc = 'Starch every meal. Maintenance mode.';
-  } else if (phase === 5) {
-    const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
-    const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
-    phaseRulesDesc = `Phase 5 Day ${dayNum}: ${currentDayRule?.label || 'rotating plan'}`;
-  } else if (phase === 6) {
-    phaseRulesDesc = 'Starch every meal. Higher carbs and fats. Whey: 1st AM & last PM (NOT with meals). Creatine: Daily (follow container directions).';
-  }
+  if (proteinItems.length) p += `Protein: ${proteinItems.join(', ')}\n`;
+  if (vegItems.length) p += `Veggies: ${vegItems.join(', ')}\n`;
+  if (starchItems.length) p += `Starch: ${starchItems.join(', ')}\n`;
+  if (fatItems.length) p += `Fat: ${fatItems.join(', ')}\n`;
+  if (analysis.unrecognizedItems.length > 0) p += `Other: ${analysis.unrecognizedItems.join(', ')}\n`;
 
-  // Check if eggs are in the meal - eggs have DIFFERENT portion sizes than meat
-  const hasEggs = proteinItems.some(item => 
-    item.toLowerCase().includes('egg') && !item.toLowerCase().includes('egg whites')
-  );
-  
-  // Portions for this phase/gender
-  // IMPORTANT: Eggs use whole egg count, not ounces!
-  // Men: 3 eggs, Women: 2 eggs
-  const proteinPortion = hasEggs 
-    ? (gender === 'male' ? '3 eggs' : '2 eggs')
-    : (gender === 'male' ? '6oz' : '4oz');
-  const vegPortion = gender === 'male' ? '2 cups' : '1-2 cups';
-  const fatPortion = phase === 6 ? (gender === 'male' ? '3 tbsp' : '3 tbsp') : portions.fat;
-  const starchPortion = phase === 6 ? (gender === 'male' ? '3 cups' : '2 cups') : portions.starch;
-
-  // Build recognized string
-  let recognizedStr = '';
-  if (proteinItems.length) recognizedStr += `- Protein: ${proteinItems.join(', ')}\n`;
-  if (vegItems.length) recognizedStr += `- Vegetables: ${vegItems.join(', ')}\n`;
-  if (starchItems.length) recognizedStr += `- Starch: ${starchItems.join(', ')}\n`;
-  if (fatItems.length) recognizedStr += `- Fats: ${fatItems.join(', ')}\n`;
-  if (suppItems.length) recognizedStr += `- Supplements: ${suppItems.join(', ')}\n`;
-
-  // Build prompt
-  let prompt = `Client context: ${context.clientName || 'Client'}, Phase ${phase}, ${gender}, ${programType}\n\n`;
-
-  prompt += `Code detected:\n`;
-  if (recognizedStr) {
-    prompt += recognizedStr;
-  } else {
-    prompt += `- No recognized foods detected\n`;
-  }
-  if (analysis.unrecognizedItems.length > 0) {
-    prompt += `- Unrecognized foods: ${analysis.unrecognizedItems.join(', ')}\n`;
-  }
-  if (analysis.missingCategories.length > 0) {
-    prompt += `- Missing categories: ${analysis.missingCategories.join(', ')}\n`;
-  }
+  // Phase violations — lead with these
   if (analysis.disallowedItems.length > 0) {
-    prompt += `- Disallowed items: ${analysis.disallowedItems.join(', ')}\n`;
-  }
-  prompt += `\nPhase ${phase} rules:\n- ${phaseRulesDesc}\n`;
-  // EXPLICIT meal type declaration - AI must see this!
-  const mealTypeLabel = context.mealType === 'snack' ? '*** THIS IS A SNACK - GIVE SNACK ADVICE ONLY ***' : '*** THIS IS A MEAL - GIVE MEAL FEEDBACK ONLY ***';
-  prompt += `\n${mealTypeLabel}\n`;
-  prompt += `\nIMPORTANT: The user labeled this as "${context.mealType}". Follow the instructions for ${context.mealType} only!\n`;
-  // IMPORTANT: Tomorrow's advice is added AFTER this response in the route handler.
-  // Give ONLY meal feedback now - do NOT include tomorrow's advice in your response.
-  if (context.mealType !== 'dinner') {
-    prompt += `\n⚠️ CRITICAL: Do NOT give tomorrow's advice, next day's plan, or what to eat tomorrow. Only give feedback about THIS meal.\n`;
-  } else {
-    prompt += `\n⚠️ IMPORTANT: Give your meal feedback NOW. Tomorrow's advice will be added separately - do NOT include it in your response.\n`;
-  }
-  prompt += `\nYour job:\n`;
-  prompt += `1. For each UNRECOGNIZED item: use your knowledge to tell client what's in it and if it violates phase rules. Be specific about what ingredient is the problem (e.g. "tacos have a tortilla = starch").\n`;
-  // For snacks, partial meals are fine - don't give advice about missing categories or portions
-  if (context.mealType !== 'snack') {
-    prompt += `2. For MISSING categories: tell client what's missing and the portion size for their phase (Protein: ${proteinPortion}, Veg: ${vegPortion}, Fat: ${fatPortion}). NOTE: Missing categories means portions are short - this is OK, just tell client to add more. This does NOT make the meal OFF PHASE.\n`;
-    prompt += `3. For DISALLOWED items: This meal is OFF PHASE. Tell client to remove/replace it. Only DISALLOWED items (forbidden foods like alcohol, candy, pasta, bread, ice cream, chips, etc. that are NOT on the approved food lists) make a meal OFF PHASE.\n`;
-    prompt += `4. Keep response SHORT — 1-3 sentences per issue. Allen's coaching voice.\n`;
-    prompt += `5. If everything looks good: "Nice! You're on track! 💪"\n`;
-    prompt += `6. If client asks about supplements: give advice. Otherwise stay silent on supplements.\n`;
-    prompt += `7. If water not mentioned: remind about water (${gender === 'male' ? '32oz per meal' : '20oz per meal'}).\n`;
-  } else {
-    // SNACKS: Very simple response - only say something if there's a serious issue
-    prompt += `2. IMPORTANT: This is a SNACK. Only tell client to remove/replace if it's a serious phase violation (like alcohol, candy, or major disallowed items). Otherwise just say "Good snack! 💪" - do NOT give portion advice, do NOT tell them to add protein/veg/starch, do NOT give full meal structure advice.\n`;
+    p += `\n⚠️ Remove: ${analysis.disallowedItems.join(', ')}\n`;
   }
 
-  return prompt;
+  // What to add — concise
+  if (!isSnack && analysis.missingCategories.length > 0) {
+    const m = gender === 'male';
+    if (analysis.missingCategories.includes('protein')) p += `💡 Add ${m ? '6oz' : '4oz'} protein\n`;
+    if (analysis.missingCategories.includes('vegetable')) p += `💡 Add ${m ? '2 cups' : '1-2 cups'} veggies\n`;
+    if (analysis.missingCategories.includes('fat')) p += `💡 Add ${m ? '2 tbsp' : '1 tbsp'} olive oil or avocado\n`;
+    if (analysis.missingCategories.includes('water')) p += `💧 Drink ${m ? '32oz' : '20oz'} water\n`;
+  }
+
+  // Coaching rules — stripped way down
+  p += `\nRESPOND ONLY. Rules:\n`;
+  if (isSnack) {
+    p += `- If allowed: "Good snack! 💪"\n`;
+    p += `- If violation: say what's wrong, 1 sentence max\n`;
+  } else {
+    p += `- MAX 3 sentences. Allen's voice — short, punchy, direct.\n`;
+    p += `- Good meal: "Nice! You're on track! 💪"\n`;
+    p += `- Off phase: "Drop the [item]." — one sentence.\n`;
+    p += `- Missing pieces: "Add [X]." — one sentence each, max 2.\n`;
+    p += `- NEVER explain your thinking. Just the coaching response.\n`;
+    p += `- Never start with "Phase X..." or "Your portions..."\n`;
+    p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
+  }
+  p += `\nGo:`;
+
+  return p;
 }
+
 
 export function getSnackEvaluationPrompt(
   snackData: MealData,
