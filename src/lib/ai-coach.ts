@@ -1189,7 +1189,8 @@ export async function analyzeMealPortion(
     if (!hasStarch) {
       corrections.push(`💡 Notice: Starch is allowed every meal in Phase 6 — add ${context.gender === 'male' ? '3 cups' : '2 cups'} if you'd like.`);
     }
-  } else if (phase === 1 || phase === 2 || (phase === 5 && context.programType !== 'event_ready')) {
+  } else if (phase === 1 || phase === 2 || phase === 5) {
+    // Phase 5 uses rotating rules - determine if today is a strict day
     let rulePhase = phase;
     if (phase === 5) {
       const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
@@ -1197,6 +1198,7 @@ export async function analyzeMealPortion(
       rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
     }
 
+    // Strict phases (Phase 1, Phase 2, Phase 5 strict days) require all categories
     const isStrictPhase = rulePhase === 1 || rulePhase === 2;
 
     if (isStrictPhase) {
@@ -1321,28 +1323,27 @@ export function getMealEvaluationPrompt(
   // What to add — with portion sizes front and center
   if (!isSnack && analysis.missingCategories.length > 0) {
     const m = gender === 'male';
-    p += `\nMISSING (include portion in response):\n`;
-    if (analysis.missingCategories.includes('protein')) p += `- protein: ${m ? '6oz' : '4oz'}\n`;
-    if (analysis.missingCategories.includes('vegetable')) p += `- veggies: ${m ? '2 cups' : '1-2 cups'}\n`;
-    if (analysis.missingCategories.includes('fat')) p += `- fat: ${m ? '2 tbsp' : '1 tbsp'} olive oil or avocado\n`;
-    if (analysis.missingCategories.includes('water')) p += `- water: ${m ? '32oz' : '20oz'}\n`;
+    p += `\nMISSING — YOU MUST MENTION ALL OF THESE:\n`;
+    if (analysis.missingCategories.includes('protein')) p += `- Add ${m ? '6oz' : '4oz'} lean protein\n`;
+    if (analysis.missingCategories.includes('vegetable')) p += `- Add ${m ? '2 cups' : '1-2 cups'} fibrous vegetables\n`;
+    if (analysis.missingCategories.includes('fat')) p += `- Add ${m ? '2 tbsp' : '1 tbsp'} olive oil or avocado\n`;
+    if (analysis.missingCategories.includes('water')) p += `- Drink ${m ? '32oz' : '20oz'} water\n`;
   }
 
   // Coaching rules — stripped way down
-  p += `\nRESPOND ONLY. Rules:\n`;
+  p += `\nCOACHING RULES:\n`;
   if (isSnack) {
     p += `- If allowed: "Good snack! 💪"\n`;
     p += `- If violation: say what's wrong, 1 sentence max\n`;
   } else {
-    p += `- MAX 3 sentences. Allen's voice — short, punchy, direct.\n`;
-    p += `- Good meal: "Nice! You're on track! 💪"\n`;
-    p += `- Off phase: "Drop the [item]." — one sentence.\n`;
-    p += `- Missing: state the food AND portion, e.g. "Add 6oz protein." — one sentence each, max 2.\n`;
-    p += `- NEVER explain your thinking. Just the coaching response.\n`;
-    p += `- Never start with "Phase X..." or "Your portions..."\n`;
+    p += `- Allen's voice — short, punchy, direct. 1-3 sentences max.\n`;
+    p += `- If MISSING section above has items: You MUST mention each one with the portion shown. Example: "Add 6oz protein, 2 cups veggies."\n`;
+    p += `- If REMOVE section above has items: "Drop the [item]."\n`;
+    p += `- If NO MISSING and NO REMOVE: "Nice! You're on track! 💪"\n`;
+    p += `- NEVER explain your thinking. JUST the coaching response.\n`;
     p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
   }
-  p += `\nGo:`;
+  p += `\nRespond now:`;
 
   return p;
 }
