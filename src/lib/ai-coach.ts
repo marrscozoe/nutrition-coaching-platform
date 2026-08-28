@@ -1087,17 +1087,14 @@ export async function analyzeMealPortion(
     missingCategories.push('water');
   }
 
-  // Phase 1: NO starch
+  // Phase 1: NO starch allowed
   if (phase === 1) {
     if (hasStarch) {
-      // Find which starch items from STARCHY_CARBOHYDRATES are in the food
+      // Find which RECOGNIZED starch items from STARCHY_CARBOHYDRATES are in the food
+      // Only add recognized starch - don't auto-flag unrecognized items
+      // Unrecognized items are reported separately to AI for interpretation
       const foundStarchItems = STARCHY_CARBOHYDRATES.filter(starch => foodLower.includes(starch.toLowerCase()));
-      // Also check unrecognized items for starch-related content
-      const unrecognizedStarchItems = unrecognizedItems.filter(item => {
-        const itemLower = item.toLowerCase();
-        return STARCHY_CARBOHYDRATES.some(s => itemLower.includes(s.toLowerCase()));
-      });
-      disallowedItems.push(...foundStarchItems, ...unrecognizedStarchItems);
+      disallowedItems.push(...foundStarchItems);
       corrections.push(`⚠️ Phase 1 - NO starch! Skip the starch completely.`);
       onPhase = false;
     }
@@ -1134,13 +1131,10 @@ export async function analyzeMealPortion(
     const rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
 
     if (rulePhase === 1) {
-      // Find which starch items from STARCHY_CARBOHYDRATES are in the food (same as Phase 1)
+      // Find which RECOGNIZED starch items from STARCHY_CARBOHYDRATES are in the food
+      // Only add recognized starch - don't auto-flag unrecognized items
       const foundStarchItems = STARCHY_CARBOHYDRATES.filter(starch => foodLower.includes(starch.toLowerCase()));
-      const unrecognizedStarchItems = unrecognizedItems.filter(item => {
-        const itemLower = item.toLowerCase();
-        return STARCHY_CARBOHYDRATES.some(s => itemLower.includes(s.toLowerCase()));
-      });
-      disallowedItems.push(...foundStarchItems, ...unrecognizedStarchItems);
+      disallowedItems.push(...foundStarchItems);
       corrections.push(`⚠️ Phase 5 Day ${dayNum} (strict phase) - NO starch! Skip the starch completely.`);
       onPhase = false;
     } else if (rulePhase === 2) {
@@ -1216,7 +1210,8 @@ export async function analyzeMealPortion(
       }
     }
   } else if (phase === 4) {
-    // Phase 4 maintenance: all 3 categories (protein, veg, fat) needed to be "on phase"
+    // Phase 4 maintenance: ALL 4 categories (protein, veg, fat, starch) required to be "on phase"
+    // Starch is REQUIRED in Phase 4 - every meal must have starch
     if (!hasProtein) {
       missingCategories.push('protein');
       corrections.push(`💡 Notice: Consider adding some lean protein to round out your meal.`);
@@ -1228,6 +1223,12 @@ export async function analyzeMealPortion(
     if (!hasFat) {
       missingCategories.push('fat');
       corrections.push(`💡 Notice: Don't forget healthy fat like olive oil, avocado, or nuts. Stay hydrated with water too!`);
+    }
+    if (!hasStarch) {
+      // Starch is REQUIRED in Phase 4 - every meal needs starch
+      missingCategories.push('starch');
+      corrections.push(`💡 Phase 4 requires starch every meal — add ${context.gender === 'male' ? '2 cups' : '1 cup'} rice, potato, or sweet potato.`);
+      onPhase = false; // Missing required starch = off phase
     }
   }
 
@@ -1286,8 +1287,8 @@ export function getMealEvaluationPrompt(
   context: CoachContext
 ): string {
   const { currentPhase: phase, gender } = context;
-
   const isSnack = context.mealType === 'snack';
+  const m = gender === 'male';
 
   // Phase rules (one line each)
   const phaseRules: Record<number, string> = {
@@ -1298,50 +1299,63 @@ export function getMealEvaluationPrompt(
     6: 'Starch every meal — no tortillas',
   };
 
-  // Short prompt — describe the meal, give the rule, get out
+  // Build the prompt - report ALL 5 categories as YES/NO, let AI format in Allen's voice
   let p = `ALLEN'S AI COACH — ${(context.mealType || 'meal').toUpperCase()} FEEDBACK\n`;
   p += `Client: ${context.clientName || 'Client'} | Phase ${phase} | ${gender}\n`;
   p += `Rule: ${phaseRules[phase] || ''}\n\n`;
 
-  // What they ate (clean description, not "code detected")
+  // Report ALL 5 categories as YES/NO - don't filter, just report what was detected
+  p += `CATEGORIES DETECTED:\n`;
+  p += `Protein: ${analysis.hasProtein ? 'YES' : 'NO'}\n`;
+  p += `Veggies: ${analysis.hasVeg ? 'YES' : 'NO'}\n`;
+  p += `Starch: ${analysis.hasStarch ? 'YES' : 'NO'}\n`;
+  p += `Fat: ${analysis.hasFat ? 'YES' : 'NO'}\n`;
+  p += `Water: ${analysis.hasWater ? 'YES' : 'NO'}\n\n`;
+
+  // What they ate (list recognized items by category)
   const proteinItems = mealData.recognizedItems.filter(i => i.category === 'protein').map(i => i.item);
   const vegItems = mealData.recognizedItems.filter(i => i.category === 'vegetable').map(i => i.item);
   const starchItems = mealData.recognizedItems.filter(i => i.category === 'starch').map(i => i.item);
   const fatItems = mealData.recognizedItems.filter(i => i.category === 'fat').map(i => i.item);
 
+  p += `RECOGNIZED FOODS:\n`;
   if (proteinItems.length) p += `Protein: ${proteinItems.join(', ')}\n`;
   if (vegItems.length) p += `Veggies: ${vegItems.join(', ')}\n`;
   if (starchItems.length) p += `Starch: ${starchItems.join(', ')}\n`;
   if (fatItems.length) p += `Fat: ${fatItems.join(', ')}\n`;
-  if (analysis.unrecognizedItems.length > 0) p += `Other: ${analysis.unrecognizedItems.join(', ')}\n`;
 
-  // Phase violations — lead with these
-  if (analysis.disallowedItems.length > 0) {
-    p += `\n⚠️ Remove: ${analysis.disallowedItems.join(', ')}\n`;
+  // Unrecognized items - flag but don't automatically make meal off phase
+  if (analysis.unrecognizedItems.length > 0) {
+    p += `\nUNRECOGNIZED (use your judgment): ${analysis.unrecognizedItems.join(', ')}\n`;
   }
 
-  // What to add — with portion sizes front and center
+  // REMOVE section - disallowed items (Phase 1 with starch present, etc.)
+  if (analysis.disallowedItems.length > 0) {
+    p += `\n⚠️ REMOVE: ${analysis.disallowedItems.join(', ')}\n`;
+  }
+
+  // MISSING section - required categories not present (Phase 4 missing starch, etc.)
   if (!isSnack && analysis.missingCategories.length > 0) {
-    const m = gender === 'male';
-    p += `\nMISSING — YOU MUST MENTION ALL OF THESE:\n`;
+    p += `\nMISSING (mention all with portions):\n`;
     if (analysis.missingCategories.includes('protein')) p += `- Add ${m ? '6oz' : '4oz'} lean protein\n`;
     if (analysis.missingCategories.includes('vegetable')) p += `- Add ${m ? '2 cups' : '1-2 cups'} fibrous vegetables\n`;
+    if (analysis.missingCategories.includes('starch')) p += `- Add ${m ? '2 cups' : '1 cup'} rice, potato, or sweet potato\n`;
     if (analysis.missingCategories.includes('fat')) p += `- Add ${m ? '2 tbsp' : '1 tbsp'} olive oil or avocado\n`;
     if (analysis.missingCategories.includes('water')) p += `- Drink ${m ? '32oz' : '20oz'} water\n`;
   }
 
-  // Coaching rules — stripped way down
-  p += `\nCOACHING RULES:\n`;
+  // Coaching rules - keep it simple, AI formats in Allen's voice
+  p += `\nYOUR JOB:\n`;
   if (isSnack) {
     p += `- If allowed: "Good snack! 💪"\n`;
-    p += `- If violation: say what's wrong, 1 sentence max\n`;
+    p += `- If problems: explain what's wrong, 1 sentence max\n`;
   } else {
     p += `- Allen's voice — short, punchy, direct. 1-3 sentences max.\n`;
-    p += `- If MISSING section above has items: You MUST mention each one with the portion shown. Example: "Add 6oz protein, 2 cups veggies."\n`;
-    p += `- If REMOVE section above has items: "Drop the [item]."\n`;
-    p += `- If NO MISSING and NO REMOVE: "Nice! You're on track! 💪"\n`;
-    p += `- NEVER explain your thinking. JUST the coaching response.\n`;
+    p += `- If REMOVE section has items: tell client to drop them\n`;
+    p += `- If MISSING section has items: tell client what to add with portions\n`;
+    p += `- If NO REMOVE and NO MISSING: "Nice! You're on track! 💪"\n`;
     p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
+    p += `- NEVER explain your thinking. JUST give the coaching response.\n`;
   }
   p += `\nRespond now:`;
 
