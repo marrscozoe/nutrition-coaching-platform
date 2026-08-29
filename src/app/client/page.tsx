@@ -6,7 +6,7 @@ import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
 import { logout } from '@/lib/auth';
-import { getPhaseGuidance, getPortions } from '@/lib/nutrition-data';
+import { getPhaseGuidance, getPortions, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES } from '@/lib/nutrition-data';
 
 interface ClientData {
   id: string;
@@ -174,6 +174,60 @@ export default function ClientDashboard() {
         </div>
       )}
 
+      {/* Food Categories - 4 Main Groups */}
+      <div className="mx-4 mt-4">
+        <h2 className="text-sm font-semibold text-brand-cream/80 uppercase tracking-wider mb-3">Your 4 Food Groups</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {/* Lean Protein */}
+          <div className="p-4 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/10 border border-red-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">🍗</span>
+              <h3 className="text-sm font-bold text-red-400">Lean Protein</h3>
+            </div>
+            <p className="text-xs text-brand-cream/70 mb-2">{client.gender === 'male' ? '6 oz' : '4 oz'} per meal</p>
+            <p className="text-xs text-brand-cream/50 leading-relaxed">
+              {LEAN_PROTEINS.slice(0, 5).join(', ')}...
+            </p>
+          </div>
+
+          {/* Fibrous Vegetables */}
+          <div className="p-4 rounded-xl bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">🥬</span>
+              <h3 className="text-sm font-bold text-green-400">Fibrous Veggies</h3>
+            </div>
+            <p className="text-xs text-brand-cream/70 mb-2">{client.gender === 'male' ? '2 cups' : '1-2 cups'} per meal</p>
+            <p className="text-xs text-brand-cream/50 leading-relaxed">
+              {FIBROUS_VEGETABLES.slice(0, 5).join(', ')}...
+            </p>
+          </div>
+
+          {/* Healthy Fats */}
+          <div className="p-4 rounded-xl bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">🥑</span>
+              <h3 className="text-sm font-bold text-yellow-400">Healthy Fats</h3>
+            </div>
+            <p className="text-xs text-brand-cream/70 mb-2">{getPortions(client.gender as 'male' | 'female', client.current_phase).fat} per meal</p>
+            <p className="text-xs text-brand-cream/50 leading-relaxed">
+              {HEALTHY_FATS.slice(0, 4).join(', ')}...
+            </p>
+          </div>
+
+          {/* Starchy Carbohydrates */}
+          <div className="p-4 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">🍠</span>
+              <h3 className="text-sm font-bold text-orange-400">Starchy Carbs</h3>
+            </div>
+            <p className="text-xs text-brand-cream/70 mb-2">{getPortions(client.gender as 'male' | 'female', client.current_phase).starch} per meal</p>
+            <p className="text-xs text-brand-cream/50 leading-relaxed">
+              {STARCHY_CARBOHYDRATES.slice(0, 4).join(', ')}...
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Progress Card */}
       <div className="mx-4 mt-4 p-5 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
         <p className="text-sm text-brand-cream/70">{getPhaseGuidance(client.current_phase, client.gender as 'male' | 'female').advice}</p>
@@ -201,18 +255,9 @@ export default function ClientDashboard() {
           );
           return (
             <div className="mt-4 pt-4 border-t border-brand-cream/10">
-              {/* Can Eat */}
+              {/* Cannot Eat - Important Warnings */}
               <div className="mb-3">
-                <p className="text-xs text-green-400 font-semibold mb-1">✓ CAN EAT:</p>
-                {guidance.canEat.map((item, i) => (
-                  <p key={i} className="text-xs text-brand-cream/70 pl-3">
-                    • {item}
-                  </p>
-                ))}
-              </div>
-              {/* Cannot Eat */}
-              <div className="mb-3">
-                <p className="text-xs text-red-400 font-semibold mb-1">✗ CANNOT EAT:</p>
+                <p className="text-xs text-red-400 font-semibold mb-1">✗ AVOID:</p>
                 {guidance.cannotEat.map((item, i) => (
                   <p key={i} className="text-xs text-brand-cream/70 pl-3">
                     • {item}
