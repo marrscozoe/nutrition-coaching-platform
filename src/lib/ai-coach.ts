@@ -1181,7 +1181,9 @@ export async function analyzeMealPortion(
       corrections.push(`💡 Add ${context.gender === 'male' ? '3 tbsp' : '2 tbsp'} olive oil or healthy fat for Phase 6.`);
     }
     if (!hasStarch) {
-      corrections.push(`💡 Notice: Starch is allowed every meal in Phase 6 — add ${context.gender === 'male' ? '3 cups' : '2 cups'} if you'd like.`);
+      missingCategories.push('starch');
+      const starchAmount = context.gender === 'male' ? '3 cups' : '2 cups';
+      corrections.push(`💡 Add ${starchAmount} rice, potato, or sweet potato.`);
     }
   } else if (phase === 1 || phase === 2 || phase === 5) {
     // Phase 5 uses rotating rules - determine if today is a strict day
@@ -1353,14 +1355,10 @@ export function getMealEvaluationPrompt(
     p += `- If problems: explain what's wrong, 1 sentence max\n`;
   } else {
     p += `- Allen's voice — short, punchy, direct. 1-3 sentences max.\n`;
-    p += `- If REMOVE section has items: tell client to drop those specific items\n`;
-    p += `- If MISSING section has items: Quote the MISSING items word-for-word — do NOT change the food, amount, or wording\n`;
+    p += `- If REMOVE or MISSING: give short coaching on what to change\n`;
     p += `- If NO REMOVE and NO MISSING: "Nice! You're on track! 💪"\n`;
     p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
     p += `- NEVER mention a food unless it appears in REMOVE or MISSING above\n`;
-    p += `- NEVER suggest tortillas, bread, pasta, or any food not in MISSING\n`;
-    p += `- NEVER make up your own portions — use ONLY what is in the MISSING section\n`;
-    p += `- NEVER explain your thinking. JUST give the coaching response.\n`;
   }
   p += `\nRespond now:`;
 

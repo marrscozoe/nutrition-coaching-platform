@@ -9,8 +9,6 @@ import {
   analyzeMealPortion, 
   getWeightResponse,
   extractMealData,
-  getMealEvaluationPrompt,
-  getSnackEvaluationPrompt,
   LEAN_PROTEINS,
   STARCHY_CARBOHYDRATES,
   FIBROUS_VEGETABLES,
@@ -79,32 +77,13 @@ export async function POST(request: NextRequest) {
       // Step 2: analyzeMealPortion - phase rule enforcement
       const analysis = await analyzeMealPortion(foodDescription, mealContext, mealData.mealType);
 
-      // Step 3: getMealEvaluationPrompt - generate MiniMax prompt
-      // Use simpler snack prompt for snacks
-      let evalPrompt: string;
-      if (mealContext.mealType === 'snack') {
-        evalPrompt = getSnackEvaluationPrompt(mealDataStructured, mealContext);
-      } else {
-        evalPrompt = getMealEvaluationPrompt(mealDataStructured, analysis, mealContext);
-      }
-
-      // Step 4: Send to MiniMax with structured prompt
-      const systemMessage: AIMessage = { role: 'system', content: evalPrompt };
-      const result = await chatWithChatAI([systemMessage], `My meal: ${foodDescription}`, preferredProvider);
-
-      if (result.error || !result.text) {
-        // Fallback to rule-based response
-        return NextResponse.json({
-          response: analysis.portionAdvice,
-          type: 'meal_analysis',
-          provider: result.provider || 'fallback',
-        });
-      }
-
+      // Step 3: Return the code-generated portion advice (correct portions from code)
+      // The AI was generating its own portion advice which could have wrong portions
+      // Use analysis.portionAdvice which has the correct code-generated portions
       return NextResponse.json({
-        response: result.text,
+        response: analysis.portionAdvice,
         type: 'meal_analysis',
-        provider: result.provider,
+        provider: 'code-generated',
       });
     }
 
