@@ -1289,6 +1289,7 @@ export function getMealEvaluationPrompt(
   const { currentPhase: phase, gender } = context;
   const isSnack = context.mealType === 'snack';
   const m = gender === 'male';
+  const portions = getPortions(gender, phase);
 
   // Phase rules (one line each)
   const phaseRules: Record<number, string> = {
@@ -1339,7 +1340,7 @@ export function getMealEvaluationPrompt(
     p += `\nMISSING (mention all with portions):\n`;
     if (analysis.missingCategories.includes('protein')) p += `- Add ${m ? '6oz' : '4oz'} lean protein\n`;
     if (analysis.missingCategories.includes('vegetable')) p += `- Add ${m ? '2 cups' : '1-2 cups'} fibrous vegetables\n`;
-    if (analysis.missingCategories.includes('starch')) p += `- Add ${m ? '2 cups' : '1 cup'} rice, potato, or sweet potato\n`;
+    if (analysis.missingCategories.includes('starch')) p += `- Add ${portions.starch} rice, potato, or sweet potato\n`;
     if (analysis.missingCategories.includes('fat')) p += `- Add ${m ? '2 tbsp' : '1 tbsp'} olive oil or avocado\n`;
     if (analysis.missingCategories.includes('water')) p += `- Drink ${m ? '32oz' : '20oz'} water\n`;
   }
