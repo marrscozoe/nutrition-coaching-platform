@@ -1297,7 +1297,7 @@ export function getMealEvaluationPrompt(
     2: 'Starch only Wed/Sat/Sun breakfast & lunch',
     4: 'Starch every meal — maintenance',
     5: `Phase 5 — rotating 3-day blocks`,
-    6: 'Starch every meal — no tortillas',
+    6: 'Starch every meal — no tortillas (processed)',
   };
 
   // Build the prompt - report ALL 5 categories as YES/NO, let AI format in Allen's voice
@@ -1336,13 +1336,14 @@ export function getMealEvaluationPrompt(
   }
 
   // MISSING section - required categories not present (Phase 4 missing starch, etc.)
+  // IMPORTANT: Use EXACT format "Add X food" so AI cannot misinterpret portions
   if (!isSnack && analysis.missingCategories.length > 0) {
-    p += `\nMISSING (mention all with portions):\n`;
-    if (analysis.missingCategories.includes('protein')) p += `- Add ${m ? '6oz' : '4oz'} lean protein\n`;
-    if (analysis.missingCategories.includes('vegetable')) p += `- Add ${m ? '2 cups' : '1-2 cups'} fibrous vegetables\n`;
-    if (analysis.missingCategories.includes('starch')) p += `- Add ${portions.starch} rice, potato, or sweet potato\n`;
-    if (analysis.missingCategories.includes('fat')) p += `- Add ${m ? '2 tbsp' : '1 tbsp'} olive oil or avocado\n`;
-    if (analysis.missingCategories.includes('water')) p += `- Drink ${m ? '32oz' : '20oz'} water\n`;
+    p += `\nMISSING — Quote these EXACTLY in your response (do NOT change the food or amount):\n`;
+    if (analysis.missingCategories.includes('protein')) p += `- "Add ${m ? '6oz' : '4oz'} lean protein"\n`;
+    if (analysis.missingCategories.includes('vegetable')) p += `- "Add ${m ? '2 cups' : '1-2 cups'} fibrous vegetables"\n`;
+    if (analysis.missingCategories.includes('starch')) p += `- "Add ${portions.starch} rice" OR "Add ${portions.starch} potato" OR "Add ${portions.starch} sweet potato"\n`;
+    if (analysis.missingCategories.includes('fat')) p += `- "Add ${m ? '2 tbsp' : '1 tbsp'} olive oil"\n`;
+    if (analysis.missingCategories.includes('water')) p += `- "Drink ${m ? '32oz' : '20oz'} water"\n`;
   }
 
   // Coaching rules - keep it simple, AI formats in Allen's voice
@@ -1352,10 +1353,13 @@ export function getMealEvaluationPrompt(
     p += `- If problems: explain what's wrong, 1 sentence max\n`;
   } else {
     p += `- Allen's voice — short, punchy, direct. 1-3 sentences max.\n`;
-    p += `- If REMOVE section has items: tell client to drop them\n`;
-    p += `- If MISSING section has items: tell client what to add with portions\n`;
+    p += `- If REMOVE section has items: tell client to drop those specific items\n`;
+    p += `- If MISSING section has items: Quote the MISSING items word-for-word — do NOT change the food, amount, or wording\n`;
     p += `- If NO REMOVE and NO MISSING: "Nice! You're on track! 💪"\n`;
     p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
+    p += `- NEVER mention a food unless it appears in REMOVE or MISSING above\n`;
+    p += `- NEVER suggest tortillas, bread, pasta, or any food not in MISSING\n`;
+    p += `- NEVER make up your own portions — use ONLY what is in the MISSING section\n`;
     p += `- NEVER explain your thinking. JUST give the coaching response.\n`;
   }
   p += `\nRespond now:`;
