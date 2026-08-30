@@ -1035,7 +1035,7 @@ export async function analyzeMealPortion(
   if (hasWater) {
     // Find all "X oz" matches in the string, then pick the one closest to or after the word "water"
     // This fixes the bug where "6oz steak, 32 oz water" would incorrectly grab "6" from the steak
-    const allMatches = [...foodDescription.matchAll(/(\d+)\s*(?:oz|ounces?|oz\.)/gi)];
+    const allMatches = Array.from(foodDescription.matchAll(/(\d+)\s*(?:oz|ounces?|oz\.)/gi));
     if (allMatches.length > 0) {
       const waterIndex = foodLower.indexOf('water');
       // Find the first match that appears at or after the water keyword
