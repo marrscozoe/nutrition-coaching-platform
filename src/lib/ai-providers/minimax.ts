@@ -40,7 +40,8 @@ export async function chatWithMinimax(
         model: MODEL,
         messages: allMessages,
         max_tokens: 500,
-        temperature: 0.8,
+        temperature: 0.3,
+        thinking: { type: 'off' },
       }),
     });
 
@@ -60,8 +61,7 @@ export async function chatWithMinimax(
     }
 
     const data = await response.json();
-    const text = data.choices?.[0]?.message?.content || 
-                 data.choices?.[0]?.message?.reasoning_content || '';
+    const text = data.choices?.[0]?.message?.content || '';
     
     return { text };
   } catch (err: any) {
@@ -116,7 +116,8 @@ export async function analyzeImageWithMinimax(
           },
         ],
         max_tokens: 1024,
-        temperature: 0.8,
+        temperature: 0.3,
+        thinking: { type: 'off' },
       }),
     });
 
