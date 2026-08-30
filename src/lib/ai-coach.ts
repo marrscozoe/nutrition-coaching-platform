@@ -1168,20 +1168,20 @@ export async function analyzeMealPortion(
   if (phase === 6) {
     if (!hasProtein) {
       missingCategories.push('protein');
-      corrections.push(`💡 Add ${context.gender === 'male' ? '6oz' : '4oz'} lean protein.`);
+      corrections.push(`💡 You need ${context.gender === 'male' ? '6oz' : '4oz'} lean protein.`);
     }
     if (!hasVeg) {
       missingCategories.push('vegetable');
-      corrections.push(`💡 Add ${context.gender === 'male' ? '2 cups' : '1-2 cups'} fibrous vegetables.`);
+      corrections.push(`💡 You need ${context.gender === 'male' ? '2 cups' : '1-2 cups'} fibrous vegetables.`);
     }
     if (!hasFat) {
       missingCategories.push('fat');
-      corrections.push(`💡 Add ${context.gender === 'male' ? '3 tbsp' : '2 tbsp'} olive oil or healthy fat for Phase 6.`);
+      corrections.push(`💡 You need ${context.gender === 'male' ? '3 tbsp' : '2 tbsp'} olive oil or healthy fat for Phase 6.`);
     }
     if (!hasStarch) {
       missingCategories.push('starch');
       const starchAmount = context.gender === 'male' ? '3 cups' : '2 cups';
-      corrections.push(`💡 Add ${starchAmount} rice, potato, or sweet potato.`);
+      corrections.push(`💡 You need ${starchAmount} rice, potato, or sweet potato.`);
     }
   } else if (phase === 1 || phase === 2 || phase === 5) {
     // Phase 5 uses rotating rules - determine if today is a strict day
@@ -1198,15 +1198,15 @@ export async function analyzeMealPortion(
     if (isStrictPhase) {
       if (!hasProtein) {
         missingCategories.push('protein');
-        corrections.push(`💡 Add ${portions.protein} lean protein.`);
+        corrections.push(`💡 You need ${portions.protein} lean protein.`);
       }
       if (!hasVeg) {
         missingCategories.push('vegetable');
-        corrections.push(`💡 Add ${portions.fibrousVegetables} fibrous vegetables.`);
+        corrections.push(`💡 You need ${portions.fibrousVegetables} fibrous vegetables.`);
       }
       if (!hasFat) {
         missingCategories.push('fat');
-        corrections.push(`💡 Add ${portions.fat} olive oil or ${portions.avocado} avocado for healthy fat.`);
+        corrections.push(`💡 You need ${portions.fat} olive oil or ${portions.avocado} avocado for healthy fat.`);
       }
     }
   } else if (phase === 4) {
@@ -1342,14 +1342,14 @@ export function getMealEvaluationPrompt(
   }
 
   // MISSING section - required categories not present (Phase 4 missing starch, etc.)
-  // IMPORTANT: Use EXACT format "Add X food" so AI cannot misinterpret portions
+  // IMPORTANT: Use EXACT format "You need X" so AI cannot misinterpret portions
   if (!isSnack && analysis.missingCategories.length > 0) {
     p += `\nMISSING — Quote these EXACTLY in your response (do NOT change the food or amount):\n`;
-    if (analysis.missingCategories.includes('protein')) p += `- "Add ${m ? '6oz' : '4oz'} lean protein"\n`;
-    if (analysis.missingCategories.includes('vegetable')) p += `- "Add ${m ? '2 cups' : '1-2 cups'} fibrous vegetables"\n`;
-    if (analysis.missingCategories.includes('starch')) p += `- "Add ${portions.starch} rice" OR "Add ${portions.starch} potato" OR "Add ${portions.starch} sweet potato"\n`;
-    if (analysis.missingCategories.includes('fat')) p += `- "Add ${m ? '2 tbsp' : '1 tbsp'} olive oil"\n`;
-    if (analysis.missingCategories.includes('water')) p += `- "Drink ${m ? '32oz' : '20oz'} water"\n`;
+    if (analysis.missingCategories.includes('protein')) p += `- "You need ${m ? '6oz' : '4oz'} lean protein"\n`;
+    if (analysis.missingCategories.includes('vegetable')) p += `- "You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables"\n`;
+    if (analysis.missingCategories.includes('starch')) p += `- "You need ${portions.starch} rice" OR "You need ${portions.starch} potato" OR "You need ${portions.starch} sweet potato"\n`;
+    if (analysis.missingCategories.includes('fat')) p += `- "You need ${m ? '2 tbsp' : '1 tbsp'} olive oil"\n`;
+    if (analysis.missingCategories.includes('water')) p += `- "You need ${m ? '32oz' : '20oz'} water"\n`;
   }
 
   // Coaching rules - keep it simple, AI formats in Allen's voice
