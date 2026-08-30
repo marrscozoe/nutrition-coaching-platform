@@ -1147,20 +1147,9 @@ export async function analyzeMealPortion(
       }
     }
   }
-  // Phase 4 and Phase 6: starch allowed every meal - no violation EXCEPT for processed starches like tortillas
-  // Phase 6 specifically prohibits processed foods, and tortillas (flour/corn) are processed
+  // Phase 6: starch allowed every meal (tortillas now allowed)
   if (phase === 6) {
-    const tortillaKeywords = ['flour tortilla', 'corn tortilla', 'tortillas', 'tortilla'];
-    const hasTortilla = tortillaKeywords.some(t => foodLower.includes(t));
-    if (hasTortilla) {
-      // Find which items in the food description contain tortilla
-      const foundTortillaItems = tortillaKeywords.filter(t => foodLower.includes(t));
-      // Also check unrecognized items for tortilla content
-      const unrecognizedTortillaItems = unrecognizedItems.filter(item => item.toLowerCase().includes('tortilla'));
-      disallowedItems.push(...foundTortillaItems, ...unrecognizedTortillaItems);
-      corrections.push(`⚠️ Phase 6 - tortillas are NOT allowed! They're processed. Swap for sweet potato or rice.`);
-      onPhase = false;
-    }
+    // No restrictions on tortillas in Phase 6
   }
 
   // =============================================
@@ -1299,7 +1288,7 @@ export function getMealEvaluationPrompt(
     2: 'Starch only Wed/Sat/Sun breakfast & lunch',
     4: 'Starch every meal — maintenance',
     5: `Phase 5 — rotating 3-day blocks`,
-    6: 'Starch every meal — no tortillas (processed)',
+    6: 'Starch every meal — Phase 6',
   };
 
   // Build the prompt - report ALL 5 categories as YES/NO, let AI format in Allen's voice
