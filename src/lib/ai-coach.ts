@@ -1239,8 +1239,14 @@ export async function analyzeMealPortion(
         : `Looks good! Great job staying hydrated! 👊`;
     }
   } else {
-    const waterReminder = getWaterReminder(context.gender);
-    portionAdvice = corrections.join('\n') + '\n' + waterReminder;
+    // Only append water reminder if water is actually missing or below requirement
+    const waterRequired = context.gender === 'male' ? 32 : 20;
+    if (loggedWaterOz < waterRequired) {
+      const waterReminder = getWaterReminder(context.gender);
+      portionAdvice = corrections.join('\n') + '\n' + waterReminder;
+    } else {
+      portionAdvice = corrections.join('\n');
+    }
   }
 
   return {
