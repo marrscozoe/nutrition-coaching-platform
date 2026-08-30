@@ -1033,8 +1033,17 @@ export async function analyzeMealPortion(
 
   let loggedWaterOz = 0;
   if (hasWater) {
-    const waterAmountMatch = foodDescription.match(/(\d+)\s*(?:oz|ounces?|oz\.)/i);
-    if (waterAmountMatch) loggedWaterOz = parseInt(waterAmountMatch[1], 10);
+    // Find all "X oz" matches in the string, then pick the one closest to or after the word "water"
+    // This fixes the bug where "6oz steak, 32 oz water" would incorrectly grab "6" from the steak
+    const allMatches = [...foodDescription.matchAll(/(\d+)\s*(?:oz|ounces?|oz\.)/gi)];
+    if (allMatches.length > 0) {
+      const waterIndex = foodLower.indexOf('water');
+      // Find the first match that appears at or after the water keyword
+      // (since in "32 oz water", the number comes before the word)
+      const waterMatch = allMatches.find(m => m.index !== undefined && m.index >= waterIndex - 5)
+                     || allMatches[allMatches.length - 1];
+      if (waterMatch) loggedWaterOz = parseInt(waterMatch[1], 10);
+    }
   }
 
   const baseWaterOz = context.gender === 'male' ? 128 : 80;
