@@ -34,7 +34,6 @@ interface PendingMealData {
   photoUrl?: string;
   analyzedText?: string;
   portionAdvice?: string;
-  onPhase: boolean;
   messedUp?: boolean;
   coachMessage?: {
     id: string;
@@ -141,7 +140,6 @@ export default function ChatPage() {
                   mealData: {
                     mealType: pendingMealData.mealType,
                     foodDescription: pendingMealData.foodDescription,
-                    onPhase: pendingMealData.onPhase,
                     messedUp: pendingMealData.messedUp,
                   }
                 }),
@@ -441,7 +439,6 @@ export default function ChatPage() {
           mealData: {
             mealType: mealData.mealType,
             foodDescription: mealData.foodDescription,
-            onPhase: mealData.onPhase,
             messedUp: mealData.messedUp,
           }
         }),

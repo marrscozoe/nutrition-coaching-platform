@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { mealType, mealDate, foodDescription, photoUrl, analyzedText, portionAdvice, onPhase, messedUp } = body;
+    const { mealType, mealDate, foodDescription, photoUrl, analyzedText, portionAdvice, messedUp } = body;
 
     if (!mealType) {
       return NextResponse.json({ error: 'Meal type is required' }, { status: 400 });
@@ -78,7 +78,6 @@ export async function POST(request: NextRequest) {
       photo_url: photoUrl || null,
       analyzed_text: analyzedText || null,
       portion_advice: portionAdvice || null,
-      on_phase: onPhase ? 1 : 0,
       messed_up: messedUp ? 1 : 0,
       photo_analyzed: photoUrl ? 1 : 0,
       logged_at: now,
@@ -108,7 +107,7 @@ export async function POST(request: NextRequest) {
         const daysInPhase = Math.floor((new Date(now).getTime() - new Date(phaseStartDate).getTime()) / (1000 * 60 * 60 * 24));
 
         // Update streak: increment on good meal, reset to 0 on messed up
-        const newStreak = (onPhase && !messedUp) ? currentStreak + 1 : 0;
+        const newStreak = !messedUp ? currentStreak + 1 : 0;
 
         // Check phase transitions based on program_type
         let newPhase = currentPhase;

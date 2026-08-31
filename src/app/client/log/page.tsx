@@ -43,7 +43,6 @@ export default function LogMealPage() {
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [portionAdvice, setPortionAdvice] = useState<string | null>(null);
-  const [onPhase, setOnPhase] = useState(true);
   const [messedUp, setMessedUp] = useState(false);
   const [showMessedUpConfirm, setShowMessedUpConfirm] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -212,8 +211,7 @@ export default function LogMealPage() {
       if (data.analysis) {
         setAnalysisResult(data.analysis);
         setPortionAdvice(data.portionAdvice);
-        setOnPhase(data.onPhase !== false);
-        setMessedUp(data.onPhase === false);
+        setMessedUp(data.messed_up === true);
       }
     } catch (err) {
       console.error('Analysis failed:', err);
@@ -256,15 +254,13 @@ export default function LogMealPage() {
 
       let analysisResult = null;
       let portionAdvice = null;
-      let onPhase = true;
       let messedUp = false;
 
       if (analyzeRes.ok) {
         const analyzeData = await analyzeRes.json();
         analysisResult = analyzeData.analysis;
         portionAdvice = analyzeData.portionAdvice;
-        onPhase = analyzeData.onPhase !== false;
-        messedUp = analyzeData.onPhase === false;
+        messedUp = analyzeData.messed_up === true;
       }
 
       // Step 2: Save meal to database
@@ -281,7 +277,6 @@ export default function LogMealPage() {
           photoUrl: photoPreview,
           analyzedText: analysisResult,
           portionAdvice,
-          onPhase,
           messedUp,
         }),
       });
@@ -303,7 +298,6 @@ export default function LogMealPage() {
         photoUrl: photoPreview,
         analyzedText: analysisResult,
         portionAdvice,
-        onPhase,
         messedUp,
         coachMessage: saveData.coachMessage || null,
       };
@@ -317,7 +311,6 @@ export default function LogMealPage() {
       setPhotoBase64(null);
       setAnalysisResult(null);
       setPortionAdvice(null);
-      setOnPhase(true);
       setMessedUp(false);
 
       // Show success and redirect to chat

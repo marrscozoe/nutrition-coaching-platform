@@ -1140,7 +1140,6 @@ export async function analyzeMealPortion(
   missingCategories: string[];
   disallowedItems: string[];
   portionAdvice: string;
-  onPhase: boolean;
   corrections: string[];
 }> {
   console.log('[DEBUG analyzeMealPortion] START');
@@ -1161,7 +1160,6 @@ export async function analyzeMealPortion(
       missingCategories: [],
       disallowedItems: [],
       portionAdvice: 'Please describe what you are eating so I can give you portion advice.',
-      onPhase: false,
       corrections: [],
     };
   }
@@ -1195,7 +1193,6 @@ export async function analyzeMealPortion(
         missingCategories: [],
         disallowedItems: [foodDescription],
         portionAdvice: `${disallowedMsg} ${waterReminder}`,
-        onPhase: false,
         corrections: [disallowedMsg, waterReminder],
       };
     }
@@ -1242,7 +1239,6 @@ export async function analyzeMealPortion(
       missingCategories: [],
       disallowedItems,
       portionAdvice: `Looks good! ${waterReminder}`,
-      onPhase: true,
       corrections: [waterReminder],
     };
   }
@@ -1383,7 +1379,6 @@ export async function analyzeMealPortion(
   const corrections: string[] = [];
   const disallowedItems: string[] = [];
   const missingCategories: string[] = [];
-  let onPhase = true;
 
   // Water check - per meal requirement: 32oz for men, 20oz for women
   const waterRequired = context.gender === 'male' ? 32 : 20;
@@ -1400,7 +1395,6 @@ export async function analyzeMealPortion(
       const foundStarchItems = STARCHY_CARBOHYDRATES.filter(starch => foodLower.includes(starch.toLowerCase()));
       disallowedItems.push(...foundStarchItems);
       corrections.push(`⚠️ Phase 1 - NO starch! Skip the starch completely.`);
-      onPhase = false;
     }
   }
   // Phase 2: Starch allowed Wed/Sat/Sun breakfast/lunch ONLY
@@ -1410,7 +1404,6 @@ export async function analyzeMealPortion(
 
     if (isDinnerOrSnack) {
       corrections.push(`⚠️ Phase 2 - NO starch for ${mealType || context.mealType || 'this meal'}! Only breakfast and lunch get starch in Phase 2. Skip the starch.`);
-      onPhase = false;
     } else if (context.mealDate) {
       const mealDateObj = new Date(context.mealDate + 'T12:00:00');
       const dayOfWeek = mealDateObj.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
@@ -1418,14 +1411,11 @@ export async function analyzeMealPortion(
 
       if (!allowedDays.includes(dayOfWeek)) {
         corrections.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. No starch today. Remove it or swap for extra veg.`);
-        onPhase = false;
       } else if ((context.mealsLoggedToday || 0) >= 2) {
         corrections.push(`⚠️ Phase 2 - starch only in first 2 meals. You've had ${context.mealsLoggedToday} meals today. Skip the starch.`);
-        onPhase = false;
       }
     } else {
       corrections.push(`⚠️ Phase 2 - starch only allowed on Wed, Sat, Sun. Check if today is an allowed day before eating starch.`);
-      onPhase = false;
     }
   }
   // Phase 5: Uses 3-day rotating rules (applies to ALL Phase 5 clients including event_ready)
@@ -1440,14 +1430,12 @@ export async function analyzeMealPortion(
       const foundStarchItems = STARCHY_CARBOHYDRATES.filter(starch => foodLower.includes(starch.toLowerCase()));
       disallowedItems.push(...foundStarchItems);
       corrections.push(`⚠️ Phase 5 Day ${dayNum} (strict phase) - NO starch! Skip the starch completely.`);
-      onPhase = false;
     } else if (rulePhase === 2) {
       const isBreakfastOrLunch = mealType === 'breakfast' || mealType === 'lunch' || context.mealType === 'breakfast' || context.mealType === 'lunch';
       const isDinnerOrSnack = mealType === 'dinner' || mealType === 'snack' || context.mealType === 'dinner' || context.mealType === 'snack';
 
       if (isDinnerOrSnack) {
         corrections.push(`⚠️ Phase 5 Day ${dayNum} - starch allowed at breakfast & lunch ONLY. No starch at ${mealType || context.mealType}! Skip the starch.`);
-        onPhase = false;
       }
     }
   }
@@ -1530,7 +1518,6 @@ export async function analyzeMealPortion(
       if (portionCorrection) {
         console.log('[DEBUG analyzeMealPortion] ADDING correction to array:', `💡 ${portionCorrection}`);
         corrections.push(`💡 ${portionCorrection}`);
-        onPhase = false;
       }
     }
   }
@@ -1602,7 +1589,6 @@ export async function analyzeMealPortion(
       // Starch is REQUIRED in Phase 4 - every meal needs starch
       missingCategories.push('starch');
       corrections.push(`💡 Phase 4 requires starch every meal — add ${context.gender === 'male' ? '2 cups' : '1 cup'} rice, potato, or sweet potato.`);
-      onPhase = false; // Missing required starch = off phase
     }
   }
 
@@ -1649,7 +1635,6 @@ export async function analyzeMealPortion(
     missingCategories,
     disallowedItems,
     portionAdvice,
-    onPhase,
     corrections,
   };
 }
@@ -1668,7 +1653,7 @@ export function getMealEvaluationPrompt(
     hasProtein: boolean; hasVeg: boolean; hasStarch: boolean;
     hasFat: boolean; hasWater: boolean; hasSupplement: boolean;
     unrecognizedItems: string[]; missingCategories: string[];
-    disallowedItems: string[]; onPhase: boolean; corrections: string[];
+    disallowedItems: string[]; corrections: string[];
   },
   context: CoachContext
 ): string {
@@ -1750,8 +1735,7 @@ export function getMealEvaluationPrompt(
     p += `- Allen's voice — short, punchy, direct. 1-3 sentences max.\n`;
     p += `- If CORRECTIONS: include the portion corrections in your response\n`;
     p += `- If REMOVE or MISSING: give short coaching on what to change\n`;
-    p += `- If ON TRACK (analysis.onPhase === true AND NO CORRECTIONS AND NO REMOVE AND NO MISSING): "Nice! You're on track! 💪"\n`;
-    p += `- If OFF PHASE (analysis.onPhase === false): explain what's wrong, give corrections — NEVER say "on track"!\n`;
+    p += `- If NO CORRECTIONS, NO REMOVE, NO MISSING: "Nice! Keep it up! 💪"\n`;
     p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
     p += `- NEVER mention a food unless it appears in CORRECTIONS, REMOVE, or MISSING above\n`;
   }

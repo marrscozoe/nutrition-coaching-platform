@@ -72,15 +72,13 @@ function deletePhotoServerSide(photoPath: string | undefined): void {
   }
 }
 
-// BUG #4 FIX: Helper to compute messed_up field
+// Helper to compute messed_up field - determines if meal violates phase rules
 function computeMessUp(
-  analysis: { onPhase: boolean; disallowedItems: string[]; hasStarch: boolean; hasProcessedFood?: boolean },
+  analysis: { disallowedItems: string[]; hasStarch: boolean },
   context: CoachContext,
   mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined
 ): boolean {
-  if (analysis.onPhase) return false;
-  
-  const { currentPhase: phase, programType, phase5Plan, phase5StartDate, mealDate, mealsLoggedToday } = context;
+  const { currentPhase: phase, phase5Plan, phase5StartDate, mealDate, mealsLoggedToday } = context;
   
   // Has disallowed items (e.g., junk food, processed food)
   if (analysis.disallowedItems.length > 0) return true;
@@ -267,7 +265,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           analysis: visionResult.error,
           portionAdvice,
-          onPhase: analysis.onPhase,
           messed_up: computeMessUp(analysis, context, validatedMealType),
           corrections: analysis.corrections,
           aiError: visionResult.error,
@@ -286,7 +283,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           analysis: 'I cannot identify this food from the photo. Please describe what you are eating and I\'ll give you portion advice.',
           portionAdvice: 'Please describe your meal so I can help with portions.',
-          onPhase: false,
           messed_up: false, // Cannot identify = not a mess-up per se
           corrections: [],
           provider: visionResult.provider,
@@ -328,7 +324,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         analysis: visionResult.text, // Vision AI's food identification (for reference)
         portionAdvice, // Chat AI's coaching advice
-        onPhase: analysis.onPhase,
         messed_up: computeMessUp(analysis, context, validatedMealType),
         corrections: analysis.corrections,
         provider: visionResult.provider,
@@ -369,7 +364,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         analysis: aiResult.text,
         portionAdvice,
-        onPhase: analysis.onPhase,
         messed_up: computeMessUp(analysis, context, validatedMealType),
         corrections: analysis.corrections,
         provider: aiResult.provider || 'ai',
@@ -384,7 +378,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       analysis: portionAdvice,
       portionAdvice,
-      onPhase: analysis.onPhase,
       messed_up: computeMessUp(analysis, context, validatedMealType),
       corrections: analysis.corrections,
       provider: 'rule-based',
