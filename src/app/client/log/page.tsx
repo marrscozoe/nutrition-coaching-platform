@@ -623,6 +623,14 @@ export default function LogMealPage() {
         />
       )}
 
+      {/* Quick Suggestion */}
+      <div className="p-4 rounded-xl bg-brand-charcoal/60 border border-brand-cream/10">
+        <p className="text-xs text-brand-cream/50 mb-2">💡 Quick tip:</p>
+        <p className="text-sm text-brand-cream/80">
+          Muscle gain phase! Higher carbs and fats. Take whey protein 1st thing Am and last thing Pm and creatine as directed on container. If you hit your goal weight, you will move to maintenance.
+        </p>
+      </div>
+
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-brand-charcoal/95 backdrop-blur-sm border-t border-brand-cream/10 safe-bottom">
         <div className="flex justify-around py-3">
