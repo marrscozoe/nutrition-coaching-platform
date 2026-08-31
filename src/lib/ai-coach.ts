@@ -1750,7 +1750,8 @@ export function getMealEvaluationPrompt(
     p += `- Allen's voice — short, punchy, direct. 1-3 sentences max.\n`;
     p += `- If CORRECTIONS: include the portion corrections in your response\n`;
     p += `- If REMOVE or MISSING: give short coaching on what to change\n`;
-    p += `- If NO CORRECTIONS and NO REMOVE and NO MISSING: "Nice! You're on track! 💪"\n`;
+    p += `- If ON TRACK (analysis.onPhase === true AND NO CORRECTIONS AND NO REMOVE AND NO MISSING): "Nice! You're on track! 💪"\n`;
+    p += `- If OFF PHASE (analysis.onPhase === false): explain what's wrong, give corrections — NEVER say "on track"!\n`;
     p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
     p += `- NEVER mention a food unless it appears in CORRECTIONS, REMOVE, or MISSING above\n`;
   }
