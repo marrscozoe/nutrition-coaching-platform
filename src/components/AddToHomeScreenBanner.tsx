@@ -18,14 +18,8 @@ export default function AddToHomeScreenBanner() {
       setShowBanner(true);
     }, 3000);
 
-    // Auto-dismiss after 15 seconds so it never permanently blocks UI
-    const autoDismissTimer = setTimeout(() => {
-      handleDismiss();
-    }, 15000);
-
     return () => {
       clearTimeout(timer);
-      clearTimeout(autoDismissTimer);
     };
   }, []);
 
@@ -35,11 +29,48 @@ export default function AddToHomeScreenBanner() {
     localStorage.setItem('pwa-install-dismissed', 'true');
   }
 
+  function handleAddToHomeScreen() {
+    // iOS Safari
+    if (typeof navigator !== 'undefined' && 'standalone' in navigator) {
+      // @ts-ignore - iOS Safari
+      if (navigator.standalone) {
+        // Already installed
+        handleDismiss();
+        return;
+      }
+    }
+
+    // Show instructions based on device
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroid = /Android/.test(navigator.userAgent);
+
+    if (isIOS) {
+      alert(
+        'To add this app to your Home Screen:\n\n' +
+        '1. Tap the Share button at the bottom of Safari\n' +
+        '2. Scroll down and tap "Add to Home Screen"\n' +
+        '3. Tap "Add" in the top right corner'
+      );
+    } else if (isAndroid) {
+      alert(
+        'To add this app to your Home Screen:\n\n' +
+        '1. Tap the three dots menu (top right)\n' +
+        '2. Tap "Install app" or "Add to Home Screen"\n' +
+        '3. Tap "Install" or "Add automatically"'
+      );
+    } else {
+      alert(
+        'To add this app to your Home Screen:\n\n' +
+        'Desktop: Use your browser\'s "Add to Home Screen" or "Install" feature in the menu.\n\n' +
+        'Mobile: Follow the instructions for iOS or Android above.'
+      );
+    }
+  }
+
   if (!showBanner) return null;
 
   return (
-    // pointer-events-none ensures this banner never blocks clicks on underlying UI
-    <div className="fixed bottom-20 left-4 right-4 z-40 animate-slide-up pointer-events-none">
+    <div className="fixed bottom-20 left-4 right-4 z-40 animate-slide-up">
       <div className="bg-brand-charcoal/95 backdrop-blur-sm border border-brand-orange/30 rounded-2xl p-4 shadow-2xl">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-brand-orange/20 flex items-center justify-center flex-shrink-0">
@@ -50,13 +81,18 @@ export default function AddToHomeScreenBanner() {
               Add to Home Screen
             </p>
             <p className="text-brand-cream/60 text-xs mt-1">
-              Tap the share button → "Add to Home Screen" for the best experience!
+              Get the app for easy access anytime!
             </p>
+            <button
+              onClick={handleAddToHomeScreen}
+              className="mt-2 bg-brand-orange hover:bg-brand-orange/80 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              How to Add
+            </button>
           </div>
-          {/* Only the dismiss button receives pointer events */}
           <button
             onClick={handleDismiss}
-            className="text-brand-cream/40 hover:text-brand-cream/80 flex-shrink-0 p-1 pointer-events-auto"
+            className="text-brand-cream/40 hover:text-brand-cream/80 flex-shrink-0 p-1"
             aria-label="Dismiss"
           >
             ✕
