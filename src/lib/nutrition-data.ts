@@ -450,7 +450,7 @@ export function getPhaseGuidance(
         supplements: [
           `Whey protein powder: ${isMale ? '40g' : '20g'} — 1st thing AM & last thing PM (NOT with meals)`,
           'Creatine: Daily (follow container directions)',
-          'Whey protein drink (Wright Premier Protein Drink): As needed',
+          'Whey protein drink (Premier Protein Drink) — No more than 1 per day',
           'Vitamin (Centrum with dinner)',
         ],
         exampleMeal: `${proteinOz} grilled chicken, ${starchPortion} rice, ${vegPortion} broccoli, ${fatPortion} olive oil, water`,
