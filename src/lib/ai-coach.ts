@@ -911,6 +911,7 @@ function extractPortionBeforeFood(item: string, matchedFood: string): string | n
   
   // Get the portion of the string BEFORE the matched food
   const textBeforeFood = item.substring(0, foodIndex);
+  console.log('[DEBUG extractPortionBeforeFood] item:', item, 'matchedFood:', matchedFood, 'textBeforeFood:', textBeforeFood);
   
   // Now search for portion patterns in the text BEFORE the food
   const portionPatterns = [
@@ -924,6 +925,7 @@ function extractPortionBeforeFood(item: string, matchedFood: string): string | n
   
   for (const pattern of portionPatterns) {
     const match = textBeforeFood.match(pattern);
+    console.log('[DEBUG extractPortionBeforeFood] pattern:', pattern, 'match:', match);
     if (match) {
       // If no unit captured, just return the number
       if (!match[2]) {
@@ -931,9 +933,11 @@ function extractPortionBeforeFood(item: string, matchedFood: string): string | n
       } else {
         lastMatch = match[1] + ' ' + match[2];
       }
+      console.log('[DEBUG extractPortionBeforeFood] lastMatch updated to:', lastMatch);
     }
   }
   
+  console.log('[DEBUG extractPortionBeforeFood] returning:', lastMatch);
   return lastMatch;
 }
 
@@ -992,21 +996,33 @@ function compareStatedPortionToRequired(
 ): boolean {
   // Parse stated portion: "6 oz" -> value=6, unit="oz"
   const statedMatch = statedPortion.match(/^([\d.\/]+)\s*(\S+)?$/);
-  if (!statedMatch) return false;
+  console.log('[DEBUG compareStatedPortionToRequired] statedPortion:', statedPortion, 'statedMatch:', statedMatch);
+  if (!statedMatch) {
+    console.log('[DEBUG compareStatedPortionToRequired] no statedMatch, returning false');
+    return false;
+  }
   
   const statedValue = parsePortionValue(statedMatch[1]);
   const statedUnit = statedMatch[2] ? normalizePortionUnit(statedMatch[2]) : '';
+  console.log('[DEBUG compareStatedPortionToRequired] statedValue:', statedValue, 'statedUnit:', statedUnit);
   
   // Parse required portion: "6 ounces" -> value=6, unit="ounces"
   const requiredMatch = requiredPortion.match(/^([\d.\/]+)\s*(\S+)?$/);
-  if (!requiredMatch) return false;
+  console.log('[DEBUG compareStatedPortionToRequired] requiredPortion:', requiredPortion, 'requiredMatch:', requiredMatch);
+  if (!requiredMatch) {
+    console.log('[DEBUG compareStatedPortionToRequired] no requiredMatch, returning false');
+    return false;
+  }
   
   const requiredValue = parsePortionValue(requiredMatch[1]);
   const requiredUnit = requiredMatch[2] ? normalizePortionUnit(requiredMatch[2]) : '';
+  console.log('[DEBUG compareStatedPortionToRequired] requiredValue:', requiredValue, 'requiredUnit:', requiredUnit);
   
   // Same unit - direct comparison with tolerance
   if (statedUnit === requiredUnit && statedUnit !== '') {
-    return Math.abs(statedValue - requiredValue) < 0.15;
+    const result = Math.abs(statedValue - requiredValue) < 0.15;
+    console.log('[DEBUG compareStatedPortionToRequired] same unit comparison:', statedValue, 'vs', requiredValue, 'diff:', Math.abs(statedValue - requiredValue), 'result:', result);
+    return result;
   }
   
   // Special case: oz and tbsp are interchangeable for fat (1 oz ≈ 2 tbsp)
@@ -1015,14 +1031,19 @@ function compareStatedPortionToRequired(
   
   // Same unit (non-converting units like cups)
   if (statedUnit === requiredUnit && statedUnit !== '') {
-    return Math.abs(statedValue - requiredValue) < 0.15;
+    const result = Math.abs(statedValue - requiredValue) < 0.15;
+    console.log('[DEBUG compareStatedPortionToRequired] same unit comparison (2):', statedValue, 'vs', requiredValue, 'diff:', Math.abs(statedValue - requiredValue), 'result:', result);
+    return result;
   }
   
   // Fallback: compare numeric values with tolerance
   if (statedUnit === '' || requiredUnit === '') {
-    return Math.abs(statedValue - requiredValue) < 0.5;
+    const result = Math.abs(statedValue - requiredValue) < 0.5;
+    console.log('[DEBUG compareStatedPortionToRequired] fallback comparison:', statedValue, 'vs', requiredValue, 'diff:', Math.abs(statedValue - requiredValue), 'result:', result);
+    return result;
   }
   
+  console.log('[DEBUG compareStatedPortionToRequired] units dont match, returning false');
   return false;
 }
 
@@ -1042,11 +1063,16 @@ function checkItemPortionCorrection(
   gender: 'male' | 'female',
   matchedFood?: string  // NEW: the specific food that was matched
 ): string | null {
+  console.log('[DEBUG checkItemPortionCorrection] item:', item, 'category:', category, 'matchedFood:', matchedFood);
   // Extract portion - if we know the matched food, only look for portions before it
   const statedPortion = matchedFood 
     ? extractPortionBeforeFood(item, matchedFood)
     : extractPortionFromItem(item);
-  if (!statedPortion) return null; // Rule 1: No portion stated = assume correct
+  console.log('[DEBUG checkItemPortionCorrection] statedPortion:', statedPortion);
+  if (!statedPortion) {
+    console.log('[DEBUG checkItemPortionCorrection] no statedPortion, returning null (Rule 1: No portion stated = assume correct)');
+    return null; // Rule 1: No portion stated = assume correct
+  }
   
   // Get required portion for this category
   let requiredPortion: string;
@@ -1073,16 +1099,22 @@ function checkItemPortionCorrection(
       return null;
   }
   
+  console.log('[DEBUG checkItemPortionCorrection] requiredPortion:', requiredPortion, 'categoryLabel:', categoryLabel);
+  
   // Compare stated vs required
   const isCorrect = compareStatedPortionToRequired(statedPortion, requiredPortion);
+  console.log('[DEBUG checkItemPortionCorrection] isCorrect:', isCorrect);
   
   if (isCorrect) {
+    console.log('[DEBUG checkItemPortionCorrection] isCorrect=true, returning null (Rule 3: Portion stated and correct - no correction)');
     return null; // Rule 3: Portion stated and correct - no correction
   }
   
   // Rule 2: Portion stated and WRONG - return correction
   // Format the correction message with the required portion
-  return `You need ${requiredPortion} ${categoryLabel}`;
+  const correction = `You need ${requiredPortion} ${categoryLabel}`;
+  console.log('[DEBUG checkItemPortionCorrection] returning correction:', correction);
+  return correction;
 }
 
 // ============================================
@@ -1111,6 +1143,11 @@ export async function analyzeMealPortion(
   onPhase: boolean;
   corrections: string[];
 }> {
+  console.log('[DEBUG analyzeMealPortion] START');
+  console.log('[DEBUG analyzeMealPortion] foodDescription:', foodDescription);
+  console.log('[DEBUG analyzeMealPortion] context:', JSON.stringify(context));
+  console.log('[DEBUG analyzeMealPortion] mealType:', mealType);
+  
   // Defensive: ensure foodDescription is a valid non-empty string
   if (!foodDescription || typeof foodDescription !== 'string' || foodDescription.trim().length === 0) {
     return {
@@ -1133,9 +1170,11 @@ export async function analyzeMealPortion(
   await ensureCacheLoaded();
 
   const portions = getPortions(context.gender, context.currentPhase);
+  console.log('[DEBUG analyzeMealPortion] portions:', JSON.stringify(portions));
   const isSnack = mealType === 'snack' || context.mealType === 'snack';
   const foodLower = foodDescription.toLowerCase();
   const phase = context.currentPhase;
+  console.log('[DEBUG analyzeMealPortion] phase:', phase, 'gender:', context.gender, 'isSnack:', isSnack);
 
   // =============================================
   // SNACK LOGIC
@@ -1479,6 +1518,7 @@ export async function analyzeMealPortion(
     
     // For each matched category, check if the portion is wrong
     for (const match of matchedCategories) {
+      console.log('[DEBUG analyzeMealPortion] checking item:', item, 'category:', match.category, 'matchedFood:', match.matchedFood);
       const portionCorrection = checkItemPortionCorrection(
         item, 
         match.category, 
@@ -1486,7 +1526,9 @@ export async function analyzeMealPortion(
         context.gender, 
         match.matchedFood
       );
+      console.log('[DEBUG analyzeMealPortion] portionCorrection:', portionCorrection);
       if (portionCorrection) {
+        console.log('[DEBUG analyzeMealPortion] ADDING correction to array:', `💡 ${portionCorrection}`);
         corrections.push(`💡 ${portionCorrection}`);
         onPhase = false;
       }
@@ -1590,6 +1632,12 @@ export async function analyzeMealPortion(
     }
   }
 
+  console.log('[DEBUG analyzeMealPortion] FINAL corrections array:', corrections);
+  console.log('[DEBUG analyzeMealPortion] FINAL missingCategories:', missingCategories);
+  console.log('[DEBUG analyzeMealPortion] FINAL disallowedItems:', disallowedItems);
+  console.log('[DEBUG analyzeMealPortion] FINAL hasFat:', hasFat);
+  console.log('[DEBUG analyzeMealPortion] END');
+
   return {
     hasProtein,
     hasVeg,
@@ -1620,7 +1668,7 @@ export function getMealEvaluationPrompt(
     hasProtein: boolean; hasVeg: boolean; hasStarch: boolean;
     hasFat: boolean; hasWater: boolean; hasSupplement: boolean;
     unrecognizedItems: string[]; missingCategories: string[];
-    disallowedItems: string[]; onPhase: boolean;
+    disallowedItems: string[]; onPhase: boolean; corrections: string[];
   },
   context: CoachContext
 ): string {
@@ -1673,6 +1721,15 @@ export function getMealEvaluationPrompt(
     p += `\n⚠️ REMOVE: ${analysis.disallowedItems.join(', ')}\n`;
   }
 
+  // CORRECTIONS section - portion corrections (e.g., "You need 2 tablespoons healthy fats" for wrong fat amount)
+  // These come from checkItemPortionCorrection when the stated portion doesn't match required portion
+  if (analysis.corrections && analysis.corrections.length > 0) {
+    p += `\n💡 PORTION CORRECTIONS (include these EXACTLY in your response):\n`;
+    for (const correction of analysis.corrections) {
+      p += `- "${correction.replace(/^💡\s*/, '')}"\n`;
+    }
+  }
+
   // MISSING section - required categories not present (Phase 4 missing starch, etc.)
   // IMPORTANT: Use EXACT format "You need X" so AI cannot misinterpret portions
   if (!isSnack && analysis.missingCategories.length > 0) {
@@ -1691,10 +1748,11 @@ export function getMealEvaluationPrompt(
     p += `- If problems: explain what's wrong, 1 sentence max\n`;
   } else {
     p += `- Allen's voice — short, punchy, direct. 1-3 sentences max.\n`;
+    p += `- If CORRECTIONS: include the portion corrections in your response\n`;
     p += `- If REMOVE or MISSING: give short coaching on what to change\n`;
-    p += `- If NO REMOVE and NO MISSING: "Nice! You're on track! 💪"\n`;
+    p += `- If NO CORRECTIONS and NO REMOVE and NO MISSING: "Nice! You're on track! 💪"\n`;
     p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
-    p += `- NEVER mention a food unless it appears in REMOVE or MISSING above\n`;
+    p += `- NEVER mention a food unless it appears in CORRECTIONS, REMOVE, or MISSING above\n`;
   }
   p += `\nRespond now:`;
 
