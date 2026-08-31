@@ -551,23 +551,6 @@ export default function LogMealPage() {
           </button>
         )}
 
-        {/* Quick Suggestion */}
-        <div className="p-4 rounded-xl bg-brand-charcoal/60 border border-brand-cream/10">
-          <p className="text-xs text-brand-cream/50 mb-2">💡 Phase {client.current_phase} tip:</p>
-          <p className="text-sm text-brand-cream/80">
-            {client.current_phase === 1
-              ? 'No starch! Focus on lean protein, fibrous vegetables, and healthy fats.'
-              : client.current_phase === 2
-              ? 'Add starch on Wed/Sat/Sun to first 2 meals only.'
-              : client.current_phase === 4
-              ? 'Maintenance mode! Add starch to every meal. If you go 5+ lbs over goal, you will move back to Phase 1.'
-              : client.current_phase === 5
-              ? 'Rotating 14-day plan! Alternate between strict (no starch) and re-feed (add starch) days. Check your plan for daily details.'
-              : client.current_phase === 6
-              ? 'Muscle gain phase! Higher carbs and fats. Take whey protein 1st thing Am and last thing Pm and creatine as directed on container. If you hit your goal weight, you will move to maintenance.'
-              : 'Keep following your plan and stay consistent!'}
-          </p>
-        </div>
       </div>
 
       {/* Correction Dialog */}
