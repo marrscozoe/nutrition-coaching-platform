@@ -11,6 +11,7 @@ export default function UpdateBanner() {
   const [dismissing, setDismissing] = useState(false);
   const [updateProgress, setUpdateProgress] = useState(false);
   const updateTriggered = useRef(false);
+  const serverVersionRef = useRef<string>(CURRENT_VERSION);
 
   useEffect(() => {
     // Check for updates on every page load — this effect runs client-side only
@@ -19,38 +20,89 @@ export default function UpdateBanner() {
   }, []);
 
   async function checkForUpdate() {
-    const storedVersion = localStorage.getItem(STORAGE_KEY);
-
-    // First visit — store version and don't show banner
-    if (!storedVersion) {
-      localStorage.setItem(STORAGE_KEY, CURRENT_VERSION);
-      return;
-    }
-
-    // Version mismatch — show update banner
-    if (storedVersion !== CURRENT_VERSION) {
-      // Check if user already dismissed this version
-      const dismissed = localStorage.getItem(`${DISMISS_KEY}_${CURRENT_VERSION}`);
-      if (!dismissed) {
-        setShowBanner(true);
+    try {
+      // Get the server's current version
+      let serverVersion: string;
+      try {
+        const res = await fetch('/api/version?t=' + Date.now(), {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          serverVersion = data.version;
+        } else {
+          // Fallback to local version if API fails
+          serverVersion = CURRENT_VERSION;
+        }
+      } catch {
+        // Fallback to local version if fetch fails
+        serverVersion = CURRENT_VERSION;
       }
+      
+      // Store server version for use in dismiss
+      serverVersionRef.current = serverVersion;
+
+      // Get stored version
+      let storedVersion: string | null = null;
+      try {
+        storedVersion = localStorage.getItem(STORAGE_KEY);
+      } catch (e) {
+        // localStorage not available, skip banner
+        console.warn('[UpdateBanner] localStorage not available:', e);
+        return;
+      }
+
+      // First visit — store version and don't show banner
+      if (!storedVersion) {
+        try {
+          localStorage.setItem(STORAGE_KEY, serverVersion);
+        } catch (e) {
+          console.warn('[UpdateBanner] Failed to save version:', e);
+        }
+        return;
+      }
+
+      // Version mismatch — show update banner
+      if (storedVersion !== serverVersion) {
+        // Check if user already dismissed this version
+        let dismissed = false;
+        try {
+          dismissed = localStorage.getItem(`${DISMISS_KEY}_${serverVersion}`) === 'true';
+        } catch (e) {
+          // Ignore storage errors
+        }
+        if (!dismissed) {
+          setShowBanner(true);
+        }
+      }
+    } catch (e) {
+      console.error('[UpdateBanner] Version check failed:', e);
     }
   }
 
   async function unregisterServiceWorkers(): Promise<void> {
     if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(
-        registrations.map((registration) => registration.unregister())
-      );
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(
+          registrations.map((registration) => registration.unregister())
+        );
+      } catch (e) {
+        console.warn('[UpdateBanner] Failed to unregister service workers:', e);
+      }
     }
   }
 
   async function clearAllCaches(): Promise<void> {
     // Clear Workbox caches (used by next-pwa)
     if ('caches' in window) {
-      const cacheNames = await caches.keys();
-      await Promise.all(cacheNames.map((name) => caches.delete(name)));
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+      } catch (e) {
+        console.warn('[UpdateBanner] Failed to clear caches:', e);
+      }
     }
   }
 
@@ -70,11 +122,15 @@ export default function UpdateBanner() {
       await clearAllCaches();
 
       // Step 3: Clear storage keys
-      localStorage.removeItem(STORAGE_KEY);
-      // Clear ALL localStorage entries (user sessions, preferences, etc.)
-      // but we'll restore critical ones after reload
-      localStorage.clear();
-      sessionStorage.clear();
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        // Clear ALL localStorage entries (user sessions, preferences, etc.)
+        // but we'll restore critical ones after reload
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch (e) {
+        console.warn('[UpdateBanner] Failed to clear storage:', e);
+      }
 
       // Step 4: Force hard reload bypassing all caches
       // Use a cache-busting approach: reload with replacement
@@ -100,8 +156,12 @@ export default function UpdateBanner() {
   }
 
   function handleDismiss() {
-    // Remember that user dismissed this specific version
-    localStorage.setItem(`${DISMISS_KEY}_${CURRENT_VERSION}`, 'true');
+    // Remember that user dismissed this specific version (use server version)
+    try {
+      localStorage.setItem(`${DISMISS_KEY}_${serverVersionRef.current}`, 'true');
+    } catch (e) {
+      console.warn('[UpdateBanner] Failed to save dismiss:', e);
+    }
     setShowBanner(false);
   }
 
