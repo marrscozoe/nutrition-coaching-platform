@@ -9,9 +9,10 @@
 
 ## 📋 REMAINING TO BUILD
 
-1. **Bacon Tracking** — Ask if nitrate-free, track twice/week limit
-2. **Stripe Billing** — Real payments for subscriptions
-3. **White Label** — Custom subdomains and branding for trainers
+1. **Login Persistence** — Switch to localStorage or JWT tokens for longer sessions
+2. **Bacon Tracking** — Ask if nitrate-free, track twice/week limit
+3. **Stripe Billing** — Real payments for subscriptions
+4. **White Label** — Custom subdomains and branding for trainers
 
 ---
 

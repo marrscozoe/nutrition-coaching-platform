@@ -234,6 +234,40 @@
 
 ---
 
+## 13. Login Persistence
+
+**Overview:** Allow clients to stay logged in for extended periods without needing to re-authenticate.
+
+**Current State:** App uses sessionStorage for login sessions. Users get logged out when they close the browser tab or PWA.
+
+**Problem:**
+- sessionStorage is cleared when browser tab/PWA is closed
+- Clients have to re-login frequently (every few hours to few days)
+- Home screen shortcuts can get "stuck" on old cached versions
+- PWA shortcuts don't always check for updates
+
+**Solution Options:**
+1. **localStorage** - Simple change, persists until manually cleared, less secure
+2. **JWT with Refresh Tokens** - More secure, proper token-based auth, automatic token refresh
+3. **Service Worker Update Configuration** - Force periodic update checks for PWA shortcuts
+
+**What's Needed:**
+- Replace sessionStorage with localStorage OR implement JWT token system
+- Add refresh token logic for automatic re-authentication
+- Configure service worker to check for updates more frequently
+- Set appropriate token expiration (e.g., 30-90 days)
+- Handle token revocation for logout/security
+
+**Implementation Tasks:**
+1. Choose auth approach (localStorage vs JWT refresh tokens)
+2. Update auth code to use chosen approach
+3. Set appropriate session/token expiration
+4. Update service worker to check for app updates periodically
+5. Test login persistence across browser close, PWA shortcuts, device restart
+6. Update logout to properly clear tokens
+
+---
+
 ## Completed Features
 
 - Phase 2 violation logic (dairy/sugar checks active)
