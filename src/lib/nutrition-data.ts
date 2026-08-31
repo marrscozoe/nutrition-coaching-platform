@@ -205,7 +205,21 @@ export function generateMealSuggestion(
     if (avocadoFraction === 0.75) return '3/4 avocado';
     return '1/2 avocado';
   };
-  const fatDisplay = fatChoice.includes('Avocado') ? getAvocadoDisplay() : `${portions.fat} ${fatChoice}`;
+  const isNuts = fatChoice.includes('Almonds') || fatChoice.includes('Walnuts') || fatChoice.includes('Mixed nuts');
+  let fatDisplay: string;
+  if (fatChoice.includes('Avocado')) {
+    fatDisplay = getAvocadoDisplay();
+  } else if (isNuts) {
+    // Convert tablespoons to small handfuls for nuts
+    const tbspMatch = portions.fat.match(/(\d+)/);
+    const fatTbsp = tbspMatch ? parseInt(tbspMatch[1]) : 2;
+    const handfuls = fatTbsp === 1 ? '1 small handful' : `${fatTbsp} small handfuls`;
+    // Extract just the nut name (e.g., "Almonds" from "Almonds (3 small handfuls male, ...)")
+    const nutName = fatChoice.split(' (')[0];
+    fatDisplay = `${handfuls} ${nutName}`;
+  } else {
+    fatDisplay = `${portions.fat} ${fatChoice}`;
+  }
 
   let starchDisplay: string | undefined;
   let starchAllowed = false;
