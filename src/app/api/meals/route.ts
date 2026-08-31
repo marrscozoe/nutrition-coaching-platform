@@ -3,6 +3,79 @@ import { db_all, db_get, db_run, getAdminClient, MealLog, insertCoachMessage, ha
 import { v4 as uuidv4 } from 'uuid';
 import { generatePhase5Plan, getTomorrowPhase, getTomorrowStarchMessage } from '@/lib/ai-coach';
 
+// PATCH - Update an existing meal log
+export async function PATCH(request: NextRequest) {
+  let supabase;
+  try {
+    supabase = getAdminClient();
+  } catch (e) {
+    console.error('Admin client not available:', e);
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+  }
+
+  try {
+    const clientId = request.headers.get('x-client-id');
+    if (!clientId) {
+      return NextResponse.json({ error: 'Client ID required' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { mealId, mealType, foodDescription } = body;
+
+    if (!mealId) {
+      return NextResponse.json({ error: 'Meal ID required' }, { status: 400 });
+    }
+
+    // Build update object - only include fields that are provided
+    const updates: Record<string, any> = {};
+    if (mealType !== undefined) {
+      const validMealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
+      if (!validMealTypes.includes(mealType)) {
+        return NextResponse.json({ error: 'Invalid meal type' }, { status: 400 });
+      }
+      updates.meal_type = mealType;
+    }
+    if (foodDescription !== undefined) {
+      updates.food_description = foodDescription;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
+
+    // First verify the meal belongs to this client
+    const { data: existingMeal, error: fetchError } = await supabase
+      .from('meals')
+      .select('id, client_id')
+      .eq('id', mealId)
+      .single();
+
+    if (fetchError || !existingMeal) {
+      return NextResponse.json({ error: 'Meal not found' }, { status: 404 });
+    }
+
+    if (existingMeal.client_id !== clientId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    // Update the meal
+    const { error: updateError } = await supabase
+      .from('meals')
+      .update(updates)
+      .eq('id', mealId);
+
+    if (updateError) {
+      console.error('Meal update error:', updateError);
+      return NextResponse.json({ error: 'Failed to update meal' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Update meal error:', error);
+    return NextResponse.json({ error: 'Failed to update meal' }, { status: 500 });
+  }
+}
+
 // GET - Fetch meal logs for a client
 export async function GET(request: NextRequest) {
   let supabase;

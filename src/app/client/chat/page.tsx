@@ -24,6 +24,7 @@ interface ChatMessage {
   timestamp: Date;
   isMealLog?: boolean;
   isWeightLog?: boolean;
+  mealDbId?: string; // Database ID of the meal for editing
 }
 
 interface PendingMealData {
@@ -67,6 +68,11 @@ export default function ChatPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const msgIdRef = useRef(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Meal edit state
+  const [editingMeal, setEditingMeal] = useState<{ messageId: string; mealDbId: string; mealType: string; foodDescription: string } | null>(null);
+  const [editMealType, setEditMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('lunch');
+  const [editFoodDescription, setEditFoodDescription] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     const userData = sessionStorage.getItem('client_user');
@@ -123,6 +129,7 @@ export default function ChatPage() {
             content: mealContent,
             timestamp: new Date(),
             isMealLog: true,
+            mealDbId: pendingMealData.id,
           };
 
           // Get coach message content
@@ -223,6 +230,7 @@ export default function ChatPage() {
             content: mealContent,
             timestamp: new Date(meal.logged_at),
             isMealLog: true,
+            mealDbId: meal.id,
           });
           pastMessages.push({
             id: `meal-${meal.id}-coach`,
@@ -386,6 +394,7 @@ export default function ChatPage() {
       content: mealContent,
       timestamp: new Date(),
       isMealLog: true,
+      mealDbId: mealData.id,
     };
 
     const updatedMessages = [...messages, userMessage];
@@ -730,6 +739,76 @@ export default function ChatPage() {
     window.location.reload();
   }
 
+  // Open edit modal for a meal log
+  function openEditMealModal(messageId: string, mealDbId: string, currentContent: string) {
+    // Parse the current content to extract meal type and food description
+    // Format: "📸 MEAL_TYPE — date\nfood description"
+    const lines = currentContent.split('\n');
+    const firstLine = lines[0]; // "📸 MEAL_TYPE — date"
+    const foodDesc = lines.slice(1).join('\n');
+    
+    // Extract meal type from first line
+    const mealTypeMatch = firstLine.match(/📸\s*(\w+)/i);
+    const mealType = (mealTypeMatch ? mealTypeMatch[1].toLowerCase() : 'lunch') as 'breakfast' | 'lunch' | 'dinner' | 'snack';
+    
+    setEditingMeal({ messageId, mealDbId, mealType, foodDescription: foodDesc });
+    setEditMealType(mealType);
+    setEditFoodDescription(foodDesc);
+  }
+
+  function closeEditMealModal() {
+    setEditingMeal(null);
+    setEditMealType('lunch');
+    setEditFoodDescription('');
+  }
+
+  async function saveMealEdit() {
+    if (!editingMeal || !client) return;
+    
+    setSavingEdit(true);
+    try {
+      const res = await fetch('/api/meals', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-id': client.id,
+        },
+        body: JSON.stringify({
+          mealId: editingMeal.mealDbId,
+          mealType: editMealType,
+          foodDescription: editFoodDescription,
+        }),
+      });
+      
+      if (res.ok) {
+        // Capture the updated messages before calling setMessages to avoid stale closure
+        const dateMatch = messages.find(m => m.id === editingMeal.messageId)?.content.match(/—([^\n]+)/);
+        const dateStr = dateMatch ? dateMatch[1].trim() : '';
+        const newContent = `📸 ${editMealType.toUpperCase()} — ${dateStr}\n${editFoodDescription}`;
+        
+        const updatedMessages = messages.map(m => 
+          m.id === editingMeal.messageId 
+            ? { ...m, content: newContent } 
+            : m
+        );
+        
+        // Update state and sessionStorage with the captured updated messages
+        setMessages(updatedMessages);
+        const chatKey = `chat_history_${client.id}`;
+        sessionStorage.setItem(chatKey, JSON.stringify(updatedMessages));
+        
+        closeEditMealModal();
+      } else {
+        alert('Failed to update meal. Please try again.');
+      }
+    } catch (err) {
+      console.error('Failed to update meal:', err);
+      alert('Failed to update meal. Please check your connection.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   if (loading || !client) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -812,6 +891,66 @@ export default function ChatPage() {
         </div>
       )}
 
+      {/* Edit Meal Modal */}
+      {editingMeal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-brand-charcoal rounded-2xl p-6 w-full max-w-md border border-brand-cream/20">
+            <h3 className="text-lg font-semibold text-brand-cream mb-4">✏️ Edit Meal</h3>
+            
+            {/* Meal Type Selector */}
+            <div className="mb-4">
+              <label className="block text-sm text-brand-cream/60 mb-2">Meal</label>
+              <div className="grid grid-cols-4 gap-2">
+                {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setEditMealType(type)}
+                    className={`py-2 px-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+                      editMealType === type
+                        ? 'bg-brand-orange text-white'
+                        : 'bg-brand-charcoal/80 text-brand-cream/60'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Food Description */}
+            <div className="mb-6">
+              <label className="block text-sm text-brand-cream/60 mb-2">What did you eat?</label>
+              <textarea
+                value={editFoodDescription}
+                onChange={(e) => setEditFoodDescription(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream placeholder-brand-cream/40 focus:outline-none focus:border-brand-orange resize-none"
+                placeholder="Describe your meal..."
+                rows={3}
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={closeEditMealModal}
+                className="flex-1 py-3 rounded-xl bg-brand-charcoal/80 text-brand-cream font-medium hover:bg-brand-charcoal transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveMealEdit}
+                disabled={savingEdit || !editFoodDescription.trim()}
+                className="flex-1 py-3 rounded-xl bg-brand-orange text-white font-semibold hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
+              >
+                {savingEdit ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pt-[140px]">
         {/* Welcome intro - pinned at top */}
@@ -838,11 +977,23 @@ export default function ChatPage() {
               }`}
             >
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-              <p className={`text-xs mt-1 ${
-                message.role === 'user' ? 'text-white/50' : 'text-brand-cream/30'
-              }`}>
-                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
+              <div className="flex items-center justify-between mt-1">
+                <p className={`text-xs ${
+                  message.role === 'user' ? 'text-white/50' : 'text-brand-cream/30'
+                }`}>
+                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+                {message.role === 'user' && message.isMealLog && message.mealDbId && (
+                  <button
+                    onClick={() => openEditMealModal(message.id, message.mealDbId!, message.content)}
+                    className="text-xs hover:opacity-80 ml-2"
+                    style={{ color: 'rgba(255,255,255,0.6)' }}
+                    title="Edit meal"
+                  >
+                    ✏️
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
