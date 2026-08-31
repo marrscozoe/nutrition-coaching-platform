@@ -564,7 +564,7 @@ export default function LogMealPage() {
               : client.current_phase === 5
               ? 'Rotating 14-day plan! Alternate between strict (no starch) and re-feed (add starch) days. Check your plan for daily details.'
               : client.current_phase === 6
-              ? 'Muscle gain phase! Higher carbs and fats. Take whey protein post-workout and creatine daily. If you hit your goal weight, you will move to Phase 4.'
+              ? 'Muscle gain phase! Higher carbs and fats. Take whey protein 1st thing Am and last thing Pm and creatine as directed on container. If you hit your goal weight, you will move to maintenance.'
               : 'Keep following your plan and stay consistent!'}
           </p>
         </div>
