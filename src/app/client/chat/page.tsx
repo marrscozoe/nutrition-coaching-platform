@@ -116,8 +116,7 @@ export default function ChatPage() {
             month: 'short',
             day: 'numeric'
           });
-          const status = pendingMealData.messedUp ? '⚠️ Off Phase' : pendingMealData.onPhase ? '✅ On Phase' : '❓ Review';
-          const mealContent = `📸 ${pendingMealData.mealType.toUpperCase()} — ${dateStr}\n${pendingMealData.foodDescription}\n${status}`;
+          const mealContent = `📸 ${pendingMealData.mealType.toUpperCase()} — ${dateStr}\n${pendingMealData.foodDescription}`;
 
           const userMessage: ChatMessage = {
             id: `meal_${pendingMealData.id}_${Date.now()}`,
@@ -216,10 +215,9 @@ export default function ChatPage() {
             month: 'short',
             day: 'numeric'
           });
-          const status = meal.messed_up ? '⚠️ Off Phase' : meal.on_phase ? '✅ On Phase' : '❓ Review';
           // Derive meal type from food description if not available
           const mealType = meal.meal_type || 'MEAL';
-          const mealContent = `📸 ${mealType.toUpperCase()} — ${dateStr}\n${meal.food_description || 'Logged a meal'}\n${status}`;
+          const mealContent = `📸 ${mealType.toUpperCase()} — ${dateStr}\n${meal.food_description || 'Logged a meal'}`;
           
           pastMessages.push({
             id: `meal-${meal.id}-user`,
@@ -381,8 +379,7 @@ export default function ChatPage() {
       month: 'short',
       day: 'numeric'
     });
-    const status = mealData.messedUp ? '⚠️ Off Phase' : mealData.onPhase ? '✅ On Phase' : '❓ Review';
-    const mealContent = `📸 ${mealData.mealType.toUpperCase()} — ${dateStr}\n${mealData.foodDescription}\n${status}`;
+    const mealContent = `📸 ${mealData.mealType.toUpperCase()} — ${dateStr}\n${mealData.foodDescription}`;
 
     // Add meal log as user message
     const userMessage: ChatMessage = {
