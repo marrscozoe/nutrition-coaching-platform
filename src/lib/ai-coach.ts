@@ -863,6 +863,183 @@ export function extractMealData(
 }
 
 // ============================================
+// PORTION EXTRACTION AND COMPARISON HELPERS
+// ============================================
+
+/**
+ * Extract portion string from a food item description.
+ * Returns the portion text if found, null otherwise.
+ * Examples:
+ *   "4 oz chicken" -> "4 oz"
+ *   "1 tbsp olive oil" -> "1 tbsp"
+ *   "2 cups broccoli" -> "2 cups"
+ *   "1/2 avocado" -> "1/2"
+ *   "grilled chicken" -> null
+ */
+function extractPortionFromItem(item: string): string | null {
+  const portionPatterns = [
+    /(\d+\/\d+)\s*(oz|ounce|tbsp|tablespoon|cup|cups|tablespoons|ounces)?/i,  // "1/2 cup", "1/2 oz"
+    /(\d+\.?\d*)\s*(oz|ounce|tbsp|tablespoon|cup|cups|tablespoons|ounces)/i,   // "6 oz", "2 cups"
+  ];
+  
+  for (const pattern of portionPatterns) {
+    const match = item.match(pattern);
+    if (match) {
+      // If no unit captured, just return the number
+      if (!match[2]) {
+        return match[1];
+      }
+      return match[1] + ' ' + match[2];
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse a portion value string into a numeric value.
+ * Handles fractions like "1/2", "3/4", and decimals like "6", "2.5"
+ */
+function parsePortionValue(portion: string): number {
+  const fractionMap: Record<string, number> = {
+    '1/2': 0.5, '1/4': 0.25, '3/4': 0.75,
+    '1/3': 0.333, '2/3': 0.667,
+    '1/8': 0.125, '3/8': 0.375, '5/8': 0.625, '7/8': 0.875
+  };
+  
+  const lower = portion.toLowerCase().trim();
+  
+  // Check fraction map first
+  if (fractionMap[lower] !== undefined) {
+    return fractionMap[lower];
+  }
+  
+  // Try to parse as number
+  const num = parseFloat(lower);
+  if (!isNaN(num)) {
+    return num;
+  }
+  
+  return 0;
+}
+
+/**
+ * Normalize a portion unit to a standard form.
+ * "ounces" -> "oz", "tablespoons" -> "tbsp", etc.
+ */
+function normalizePortionUnit(unit: string): string {
+  const unitMap: Record<string, string> = {
+    'ounce': 'oz',
+    'ounces': 'oz',
+    'oz': 'oz',
+    'tablespoon': 'tbsp',
+    'tablespoons': 'tbsp',
+    'tbsp': 'tbsp',
+    'cup': 'cup',
+    'cups': 'cup'
+  };
+  return unitMap[unit.toLowerCase()] || unit.toLowerCase();
+}
+
+/**
+ * Compare a stated portion to a required portion.
+ * Returns true if they match (within tolerance), false otherwise.
+ */
+function compareStatedPortionToRequired(
+  statedPortion: string,
+  requiredPortion: string
+): boolean {
+  // Parse stated portion: "6 oz" -> value=6, unit="oz"
+  const statedMatch = statedPortion.match(/^([\d.\/]+)\s*(\S+)?$/);
+  if (!statedMatch) return false;
+  
+  const statedValue = parsePortionValue(statedMatch[1]);
+  const statedUnit = statedMatch[2] ? normalizePortionUnit(statedMatch[2]) : '';
+  
+  // Parse required portion: "6 ounces" -> value=6, unit="ounces"
+  const requiredMatch = requiredPortion.match(/^([\d.\/]+)\s*(\S+)?$/);
+  if (!requiredMatch) return false;
+  
+  const requiredValue = parsePortionValue(requiredMatch[1]);
+  const requiredUnit = requiredMatch[2] ? normalizePortionUnit(requiredMatch[2]) : '';
+  
+  // Same unit - direct comparison with tolerance
+  if (statedUnit === requiredUnit && statedUnit !== '') {
+    return Math.abs(statedValue - requiredValue) < 0.15;
+  }
+  
+  // Special case: oz and tbsp are interchangeable for fat (1 oz ≈ 2 tbsp)
+  // Phase 6 fat = 3 tbsp = 1.5 oz (but we use tbsp directly)
+  // So we don't do oz<->tbsp conversion for fat
+  
+  // Same unit (non-converting units like cups)
+  if (statedUnit === requiredUnit && statedUnit !== '') {
+    return Math.abs(statedValue - requiredValue) < 0.15;
+  }
+  
+  // Fallback: compare numeric values with tolerance
+  if (statedUnit === '' || requiredUnit === '') {
+    return Math.abs(statedValue - requiredValue) < 0.5;
+  }
+  
+  return false;
+}
+
+/**
+ * Check if a recognized food item has a wrong portion stated.
+ * Returns a correction message if the portion is wrong, null otherwise.
+ * 
+ * RULES:
+ * 1. If NO portion stated -> assume correct, return null
+ * 2. If portion stated AND wrong -> return correction message
+ * 3. If portion stated AND correct -> return null
+ */
+function checkItemPortionCorrection(
+  item: string,
+  category: 'protein' | 'vegetable' | 'starch' | 'fat',
+  portions: { protein: string; fibrousVegetables: string; fat: string; starch: string },
+  gender: 'male' | 'female'
+): string | null {
+  const statedPortion = extractPortionFromItem(item);
+  if (!statedPortion) return null; // Rule 1: No portion stated = assume correct
+  
+  // Get required portion for this category
+  let requiredPortion: string;
+  let categoryLabel: string;
+  
+  switch (category) {
+    case 'protein':
+      requiredPortion = portions.protein; // "6 ounces" or "4 ounces"
+      categoryLabel = 'lean protein';
+      break;
+    case 'vegetable':
+      requiredPortion = portions.fibrousVegetables; // "2 cups" or "1-2 cups"
+      categoryLabel = 'fibrous vegetables';
+      break;
+    case 'starch':
+      requiredPortion = portions.starch; // "2 cups" or "3 cups" (Phase 6 male)
+      categoryLabel = 'starchy carbohydrates';
+      break;
+    case 'fat':
+      requiredPortion = portions.fat; // "2 tablespoons" or "3 tablespoons" (Phase 6)
+      categoryLabel = 'healthy fats';
+      break;
+    default:
+      return null;
+  }
+  
+  // Compare stated vs required
+  const isCorrect = compareStatedPortionToRequired(statedPortion, requiredPortion);
+  
+  if (isCorrect) {
+    return null; // Rule 3: Portion stated and correct - no correction
+  }
+  
+  // Rule 2: Portion stated and WRONG - return correction
+  // Format the correction message with the required portion
+  return `You need ${requiredPortion} ${categoryLabel}`;
+}
+
+// ============================================
 // MEAL EVALUATION: Modified analyzeMealPortion()
 // ============================================
 
@@ -1192,6 +1369,66 @@ export async function analyzeMealPortion(
   // Phase 6: starch allowed every meal (tortillas now allowed)
   if (phase === 6) {
     // No restrictions on tortillas in Phase 6
+  }
+
+  // =============================================
+  // CHECK STATED PORTIONS
+  // =============================================
+  // For each recognized food item, check if the stated portion is correct
+  // RULES:
+  // - If NO portion stated -> assume correct (no correction)
+  // - If portion stated AND wrong -> add correction
+  // - If portion stated AND correct -> no correction
+  for (const item of foodItems) {
+    const itemLower = item.toLowerCase();
+    let category: 'protein' | 'vegetable' | 'starch' | 'fat' | null = null;
+    
+    // Determine the category for this item
+    // Special case: eggs are both protein AND fat - check protein portion
+    if (itemLower.includes('egg') && !itemLower.includes('eggplant')) {
+      category = 'protein'; // Eggs - check protein portion
+    } else {
+      // Check each category
+      for (const protein of LEAN_PROTEINS) {
+        if (itemLower.includes(protein.toLowerCase())) {
+          category = 'protein';
+          break;
+        }
+      }
+      if (!category) {
+        for (const veg of FIBROUS_VEGETABLES) {
+          if (itemLower.includes(veg.toLowerCase())) {
+            category = 'vegetable';
+            break;
+          }
+        }
+      }
+      if (!category) {
+        for (const starch of STARCHY_CARBOHYDRATES) {
+          if (itemLower.includes(starch.toLowerCase())) {
+            category = 'starch';
+            break;
+          }
+        }
+      }
+      if (!category) {
+        for (const fat of HEALTHY_FATS) {
+          if (itemLower.includes(fat.toLowerCase())) {
+            category = 'fat';
+            break;
+          }
+        }
+      }
+    }
+    
+    // If we found a category, check if the portion is wrong
+    if (category) {
+      const portionCorrection = checkItemPortionCorrection(item, category, portions, context.gender);
+      if (portionCorrection) {
+        corrections.push(`💡 ${portionCorrection}`);
+        onPhase = false;
+      }
+    }
   }
 
   // =============================================
