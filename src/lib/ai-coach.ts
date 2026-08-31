@@ -662,6 +662,30 @@ function splitIntoFoodItems(foodDescription: string): string[] {
 }
 
 /**
+ * Check if a food item matches any entry in a food list.
+ * Matching is bidirectional: either the item contains the list entry,
+ * or the item contains the main food word from the list entry.
+ * 
+ * Examples:
+ * - "6 oz grilled chicken" matches "chicken" -> TRUE (item contains "chicken")
+ * - "3 cups rice" matches "brown rice" -> TRUE (item contains "rice")
+ * - "white fish" matches "white fish" -> TRUE (exact match)
+ */
+function itemMatchesFoodList(itemLower: string, foodList: string[]): boolean {
+  for (const foodEntry of foodList) {
+    const entryLower = foodEntry.toLowerCase();
+    // Direct match: item contains the full food entry
+    if (itemLower.includes(entryLower)) return true;
+    // Check for common food words that might be embedded
+    const foodWords = entryLower.split(/[\s,]+/).filter(w => w.length > 3);
+    for (const word of foodWords) {
+      if (word.length > 3 && itemLower.includes(word)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Extract structured meal data from a meal description.
  * Uses substring matching (case-insensitive) against food categories.
  */
@@ -709,63 +733,46 @@ export function extractMealData(
         recognizedItems.push({ item, category: 'protein' });
         hasProtein = true;
         found = true;
-      } else {
-        for (const protein of LEAN_PROTEINS) {
-          if (itemLower.includes(protein.toLowerCase())) {
-            recognizedItems.push({ item, category: 'protein' });
-            hasProtein = true;
-            found = true;
-            break;
-          }
-        }
+      } else if (itemMatchesFoodList(itemLower, LEAN_PROTEINS)) {
+        recognizedItems.push({ item, category: 'protein' });
+        hasProtein = true;
+        found = true;
       }
     }
 
     // Check vegetable
     if (!found && !hasVeg) {
-      for (const veg of FIBROUS_VEGETABLES) {
-        if (itemLower.includes(veg.toLowerCase())) {
-          recognizedItems.push({ item, category: 'vegetable' });
-          hasVeg = true;
-          found = true;
-          break;
-        }
+      if (itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) {
+        recognizedItems.push({ item, category: 'vegetable' });
+        hasVeg = true;
+        found = true;
       }
     }
 
     // Check starch
     if (!found && !hasStarch) {
-      for (const starch of STARCHY_CARBOHYDRATES) {
-        if (itemLower.includes(starch.toLowerCase())) {
-          recognizedItems.push({ item, category: 'starch' });
-          hasStarch = true;
-          found = true;
-          break;
-        }
+      if (itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) {
+        recognizedItems.push({ item, category: 'starch' });
+        hasStarch = true;
+        found = true;
       }
     }
 
     // Check fat
     if (!found && !hasFat) {
-      for (const fat of HEALTHY_FATS) {
-        if (itemLower.includes(fat.toLowerCase())) {
-          recognizedItems.push({ item, category: 'fat' });
-          hasFat = true;
-          found = true;
-          break;
-        }
+      if (itemMatchesFoodList(itemLower, HEALTHY_FATS)) {
+        recognizedItems.push({ item, category: 'fat' });
+        hasFat = true;
+        found = true;
       }
     }
 
     // Check supplements
     if (!found && !hasSupplement) {
-      for (const supp of SUPPLEMENTS) {
-        if (itemLower.includes(supp.toLowerCase())) {
-          recognizedItems.push({ item, category: 'supplement' });
-          hasSupplement = true;
-          found = true;
-          break;
-        }
+      if (itemMatchesFoodList(itemLower, SUPPLEMENTS)) {
+        recognizedItems.push({ item, category: 'supplement' });
+        hasSupplement = true;
+        found = true;
       }
     }
 
@@ -1281,21 +1288,17 @@ export async function analyzeMealPortion(
       hasFat = true;
     }
 
-    // Match against food lists using substring matching
-    for (const protein of LEAN_PROTEINS) {
-      if (foodLower.includes(protein.toLowerCase())) { hasProtein = true; break; }
-    }
-    for (const veg of FIBROUS_VEGETABLES) {
-      if (foodLower.includes(veg.toLowerCase())) { hasVeg = true; break; }
-    }
-    for (const starch of STARCHY_CARBOHYDRATES) {
-      if (foodLower.includes(starch.toLowerCase())) { hasStarch = true; break; }
-    }
-    for (const fat of HEALTHY_FATS) {
-      if (foodLower.includes(fat.toLowerCase())) { hasFat = true; break; }
-    }
-    for (const supp of SUPPLEMENTS) {
-      if (foodLower.includes(supp.toLowerCase())) { hasSupplement = true; break; }
+    // Match against food lists using proper item matching
+    // Split into food items and check each one
+    const mealFoodItems = splitIntoFoodItems(foodDescription);
+    for (const item of mealFoodItems) {
+      const itemLower = item.toLowerCase();
+      if (itemLower.includes('egg') && !itemLower.includes('eggplant')) { hasProtein = true; hasFat = true; }
+      if (itemMatchesFoodList(itemLower, LEAN_PROTEINS)) hasProtein = true;
+      if (itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) hasVeg = true;
+      if (itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) hasStarch = true;
+      if (itemMatchesFoodList(itemLower, HEALTHY_FATS)) hasFat = true;
+      if (itemMatchesFoodList(itemLower, SUPPLEMENTS)) hasSupplement = true;
     }
   }
 
@@ -1306,11 +1309,11 @@ export async function analyzeMealPortion(
     let found = false;
     // Special case: eggs are recognized as both protein AND fat
     if (itemLower.includes('egg') && !itemLower.includes('eggplant')) { found = true; }
-    if (!found) for (const protein of LEAN_PROTEINS) { if (itemLower.includes(protein.toLowerCase())) { found = true; break; } }
-    if (!found) for (const veg of FIBROUS_VEGETABLES) { if (itemLower.includes(veg.toLowerCase())) { found = true; break; } }
-    if (!found) for (const starch of STARCHY_CARBOHYDRATES) { if (itemLower.includes(starch.toLowerCase())) { found = true; break; } }
-    if (!found) for (const fat of HEALTHY_FATS) { if (itemLower.includes(fat.toLowerCase())) { found = true; break; } }
-    if (!found) for (const supp of SUPPLEMENTS) { if (itemLower.includes(supp.toLowerCase())) { found = true; break; } }
+    if (!found && itemMatchesFoodList(itemLower, LEAN_PROTEINS)) { found = true; }
+    if (!found && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) { found = true; }
+    if (!found && itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) { found = true; }
+    if (!found && itemMatchesFoodList(itemLower, HEALTHY_FATS)) { found = true; }
+    if (!found && itemMatchesFoodList(itemLower, SUPPLEMENTS)) { found = true; }
     if (!found) unrecognizedItems.push(item);
   }
 
