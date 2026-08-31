@@ -896,6 +896,48 @@ function extractPortionFromItem(item: string): string | null {
 }
 
 /**
+ * Extract portion string from a food item description, looking ONLY before the matched food name.
+ * This prevents extracting portions from unrelated foods in compound items.
+ * Example: "2 cups asparagus with 1 tablespoon olive oil" with matchedFood="olive oil"
+ * -> extracts "1 tablespoon" (from before "olive oil"), not "2 cups" (from asparagus)
+ */
+function extractPortionBeforeFood(item: string, matchedFood: string): string | null {
+  // Find the position of the matched food in the item
+  const foodIndex = item.toLowerCase().indexOf(matchedFood.toLowerCase());
+  if (foodIndex === -1) {
+    // Fallback to original behavior if food not found
+    return extractPortionFromItem(item);
+  }
+  
+  // Get the portion of the string BEFORE the matched food
+  const textBeforeFood = item.substring(0, foodIndex);
+  
+  // Now search for portion patterns in the text BEFORE the food
+  const portionPatterns = [
+    /(\d+\/\d+)\s*(oz|ounce|tbsp|tablespoon|cup|cups|tablespoons|ounces)?/i,  // "1/2 cup", "1/2 oz"
+    /(\d+\.?\d*)\s*(oz|ounce|tbsp|tablespoon|cup|cups|tablespoons|ounces)/i,   // "6 oz", "2 cups"
+  ];
+  
+  // Find the LAST portion pattern in the text before the food
+  // (since the portion for the food is most likely immediately before it)
+  let lastMatch: string | null = null;
+  
+  for (const pattern of portionPatterns) {
+    const match = textBeforeFood.match(pattern);
+    if (match) {
+      // If no unit captured, just return the number
+      if (!match[2]) {
+        lastMatch = match[1];
+      } else {
+        lastMatch = match[1] + ' ' + match[2];
+      }
+    }
+  }
+  
+  return lastMatch;
+}
+
+/**
  * Parse a portion value string into a numeric value.
  * Handles fractions like "1/2", "3/4", and decimals like "6", "2.5"
  */
@@ -997,9 +1039,13 @@ function checkItemPortionCorrection(
   item: string,
   category: 'protein' | 'vegetable' | 'starch' | 'fat',
   portions: { protein: string; fibrousVegetables: string; fat: string; starch: string },
-  gender: 'male' | 'female'
+  gender: 'male' | 'female',
+  matchedFood?: string  // NEW: the specific food that was matched
 ): string | null {
-  const statedPortion = extractPortionFromItem(item);
+  // Extract portion - if we know the matched food, only look for portions before it
+  const statedPortion = matchedFood 
+    ? extractPortionBeforeFood(item, matchedFood)
+    : extractPortionFromItem(item);
   if (!statedPortion) return null; // Rule 1: No portion stated = assume correct
   
   // Get required portion for this category
@@ -1382,16 +1428,19 @@ export async function analyzeMealPortion(
   for (const item of foodItems) {
     const itemLower = item.toLowerCase();
     let category: 'protein' | 'vegetable' | 'starch' | 'fat' | null = null;
+    let matchedFood: string | undefined = undefined; // Track which specific food was matched
     
     // Determine the category for this item
     // Special case: eggs are both protein AND fat - check protein portion
     if (itemLower.includes('egg') && !itemLower.includes('eggplant')) {
       category = 'protein'; // Eggs - check protein portion
+      matchedFood = 'egg';
     } else {
       // Check each category
       for (const protein of LEAN_PROTEINS) {
         if (itemLower.includes(protein.toLowerCase())) {
           category = 'protein';
+          matchedFood = protein;
           break;
         }
       }
@@ -1399,6 +1448,7 @@ export async function analyzeMealPortion(
         for (const veg of FIBROUS_VEGETABLES) {
           if (itemLower.includes(veg.toLowerCase())) {
             category = 'vegetable';
+            matchedFood = veg;
             break;
           }
         }
@@ -1407,6 +1457,7 @@ export async function analyzeMealPortion(
         for (const starch of STARCHY_CARBOHYDRATES) {
           if (itemLower.includes(starch.toLowerCase())) {
             category = 'starch';
+            matchedFood = starch;
             break;
           }
         }
@@ -1415,6 +1466,7 @@ export async function analyzeMealPortion(
         for (const fat of HEALTHY_FATS) {
           if (itemLower.includes(fat.toLowerCase())) {
             category = 'fat';
+            matchedFood = fat;
             break;
           }
         }
@@ -1423,7 +1475,7 @@ export async function analyzeMealPortion(
     
     // If we found a category, check if the portion is wrong
     if (category) {
-      const portionCorrection = checkItemPortionCorrection(item, category, portions, context.gender);
+      const portionCorrection = checkItemPortionCorrection(item, category, portions, context.gender, matchedFood);
       if (portionCorrection) {
         corrections.push(`💡 ${portionCorrection}`);
         onPhase = false;
