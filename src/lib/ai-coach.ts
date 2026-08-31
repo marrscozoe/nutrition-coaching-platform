@@ -1425,57 +1425,67 @@ export async function analyzeMealPortion(
   // - If NO portion stated -> assume correct (no correction)
   // - If portion stated AND wrong -> add correction
   // - If portion stated AND correct -> no correction
+  // 
+  // IMPORTANT: Check ALL categories for each food item, not just the first match!
+  // For compound items like "2 cups asparagus with 1 tablespoon olive oil",
+  // we need to check BOTH the vegetable portion (asparagus) AND the fat portion (olive oil).
   for (const item of foodItems) {
     const itemLower = item.toLowerCase();
-    let category: 'protein' | 'vegetable' | 'starch' | 'fat' | null = null;
-    let matchedFood: string | undefined = undefined; // Track which specific food was matched
     
-    // Determine the category for this item
-    // Special case: eggs are both protein AND fat - check protein portion
+    // Collect all matched categories for this item
+    interface MatchedCategory {
+      category: 'protein' | 'vegetable' | 'starch' | 'fat';
+      matchedFood: string;
+    }
+    const matchedCategories: MatchedCategory[] = [];
+    
+    // Special case: eggs are both protein AND fat
     if (itemLower.includes('egg') && !itemLower.includes('eggplant')) {
-      category = 'protein'; // Eggs - check protein portion
-      matchedFood = 'egg';
+      matchedCategories.push({ category: 'protein', matchedFood: 'egg' });
+      matchedCategories.push({ category: 'fat', matchedFood: 'egg' });
     } else {
-      // Check each category
+      // Check each category and collect ALL matches
+      // Don't break early - we need to find ALL foods in this item
+      
+      // Check protein
       for (const protein of LEAN_PROTEINS) {
         if (itemLower.includes(protein.toLowerCase())) {
-          category = 'protein';
-          matchedFood = protein;
-          break;
+          matchedCategories.push({ category: 'protein', matchedFood: protein });
+          // Don't break - there might be other foods too
         }
       }
-      if (!category) {
-        for (const veg of FIBROUS_VEGETABLES) {
-          if (itemLower.includes(veg.toLowerCase())) {
-            category = 'vegetable';
-            matchedFood = veg;
-            break;
-          }
+      
+      // Check vegetable
+      for (const veg of FIBROUS_VEGETABLES) {
+        if (itemLower.includes(veg.toLowerCase())) {
+          matchedCategories.push({ category: 'vegetable', matchedFood: veg });
         }
       }
-      if (!category) {
-        for (const starch of STARCHY_CARBOHYDRATES) {
-          if (itemLower.includes(starch.toLowerCase())) {
-            category = 'starch';
-            matchedFood = starch;
-            break;
-          }
+      
+      // Check starch
+      for (const starch of STARCHY_CARBOHYDRATES) {
+        if (itemLower.includes(starch.toLowerCase())) {
+          matchedCategories.push({ category: 'starch', matchedFood: starch });
         }
       }
-      if (!category) {
-        for (const fat of HEALTHY_FATS) {
-          if (itemLower.includes(fat.toLowerCase())) {
-            category = 'fat';
-            matchedFood = fat;
-            break;
-          }
+      
+      // Check fat
+      for (const fat of HEALTHY_FATS) {
+        if (itemLower.includes(fat.toLowerCase())) {
+          matchedCategories.push({ category: 'fat', matchedFood: fat });
         }
       }
     }
     
-    // If we found a category, check if the portion is wrong
-    if (category) {
-      const portionCorrection = checkItemPortionCorrection(item, category, portions, context.gender, matchedFood);
+    // For each matched category, check if the portion is wrong
+    for (const match of matchedCategories) {
+      const portionCorrection = checkItemPortionCorrection(
+        item, 
+        match.category, 
+        portions, 
+        context.gender, 
+        match.matchedFood
+      );
       if (portionCorrection) {
         corrections.push(`💡 ${portionCorrection}`);
         onPhase = false;
