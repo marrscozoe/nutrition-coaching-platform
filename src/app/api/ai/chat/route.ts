@@ -407,22 +407,24 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
   }
 
   // MEAL / FOOD queries → use rule-based meal analyzer
+  // Note: 'what can i', 'what should i', 'what am i' removed so specific handlers above can catch them
   if (lower.includes('eat') || lower.includes('meal') || lower.includes('food') ||
       lower.includes('breakfast') || lower.includes('lunch') || lower.includes('dinner') ||
       lower.includes('snack') || lower.includes('chicken') || lower.includes('beef') ||
       lower.includes('veggie') || lower.includes('vegetable') ||
-      lower.includes('fat') || lower.includes('starch') ||
-      lower.includes('what can i') || lower.includes('what should i') || lower.includes('what am i')) {
+      lower.includes('fat') || lower.includes('starch')) {
     const fallback = await analyzeMealPortion(message, context);
     return fallback.portionAdvice;
   }
 
   // PORTION SIZES - simple response (no AI, no markdown)
-  if (lower.includes('portion size')) {
-    const protein = context.gender === 'male' ? '6oz' : '4oz';
-    const starch = context.gender === 'male' ? '2 cups' : '1 cup';
-    const veggies = context.gender === 'male' ? '2 cups' : '1-2 cups';
-    const fat = context.gender === 'male' ? '2 tbsp' : '1 tbsp';
+  if (lower.includes('portion size') || lower.includes('portion sizes')) {
+    const isMale = context.gender === 'male';
+    const isPhase6 = context.currentPhase === 6;
+    const protein = isMale ? '6oz' : '4oz';
+    const veggies = isMale ? '2 cups' : '1-2 cups';
+    const fat = isPhase6 ? (isMale ? '3 tbsp' : '2 tbsp') : (isMale ? '2 tbsp' : '1 tbsp');
+    const starch = isPhase6 ? (isMale ? '3 cups' : '2 cups') : (isMale ? '2 cups' : '1 cup');
     return `Your portions per meal:\nProtein: ${protein}\nStarch: ${starch}\nVegetables: ${veggies}\nHealthy fats: ${fat} or 1/2 avocado`;
   }
 
