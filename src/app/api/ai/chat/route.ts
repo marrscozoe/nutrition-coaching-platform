@@ -16,7 +16,7 @@ import {
   FIBROUS_VEGETABLES,
   HEALTHY_FATS,
 } from '@/lib/ai-coach';
-import { generateMealSuggestion, formatMealSuggestion } from '@/lib/nutrition-data';
+import { generateMealSuggestion, formatMealSuggestion, getPortions } from '@/lib/nutrition-data';
 
 export async function POST(request: NextRequest) {
   try {
@@ -373,7 +373,7 @@ Fill half your plate! Fiber fills you up without the calories. 💪`;
     }
     // Fat question
     if (lower.includes('fat') || lower.includes('fats') || lower.includes('healthy fat') || lower.includes('what fat')) {
-      const fatPortion = context.gender === 'male' ? '2 tablespoons' : '1 tablespoon';
+      const fatPortion = getPortions(context.gender, context.currentPhase).fat;
       return `Healthy fats for your meals:
 
 • ${HEALTHY_FATS.join('\n• ')}
