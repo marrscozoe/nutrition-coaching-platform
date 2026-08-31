@@ -14,6 +14,7 @@ import {
   STARCHY_CARBOHYDRATES,
   HEALTHY_FATS,
   SUPPLEMENTS,
+  EGG_PORTIONS,
   Phase5Day,
   getPhase5DayNumber,
   getPhase5CurrentRule,
@@ -929,6 +930,11 @@ export async function analyzeMealPortion(
     const unrecognizedItems: string[] = [];
     const disallowedItems: string[] = [];
 
+    // SPECIAL CASE: Eggs are BOTH protein AND fat
+    if (foodLower.includes('egg') && !foodLower.includes('eggplant')) {
+      hasProtein = true;
+      hasFat = true;
+    }
     for (const protein of LEAN_PROTEINS) {
       if (foodLower.includes(protein.toLowerCase())) { hasProtein = true; break; }
     }
@@ -992,6 +998,14 @@ export async function analyzeMealPortion(
       }
     }
 
+    // SPECIAL CASE: Eggs are BOTH protein AND fat — check before general protein loop
+    // The LEAN_PROTEINS entry is "Eggs (2-3 for men, 1-2 for women)" which doesn't match plain "egg"
+    // so we handle eggs specially to recognize them as protein AND fat
+    if (foodLower.includes('egg') && !foodLower.includes('eggplant')) {
+      hasProtein = true;
+      hasFat = true;
+    }
+
     // Match against food lists using substring matching
     for (const protein of LEAN_PROTEINS) {
       if (foodLower.includes(protein.toLowerCase())) { hasProtein = true; break; }
@@ -1015,7 +1029,9 @@ export async function analyzeMealPortion(
   for (const item of foodItems) {
     const itemLower = item.toLowerCase();
     let found = false;
-    for (const protein of LEAN_PROTEINS) { if (itemLower.includes(protein.toLowerCase())) { found = true; break; } }
+    // Special case: eggs are recognized as both protein AND fat
+    if (itemLower.includes('egg') && !itemLower.includes('eggplant')) { found = true; }
+    if (!found) for (const protein of LEAN_PROTEINS) { if (itemLower.includes(protein.toLowerCase())) { found = true; break; } }
     if (!found) for (const veg of FIBROUS_VEGETABLES) { if (itemLower.includes(veg.toLowerCase())) { found = true; break; } }
     if (!found) for (const starch of STARCHY_CARBOHYDRATES) { if (itemLower.includes(starch.toLowerCase())) { found = true; break; } }
     if (!found) for (const fat of HEALTHY_FATS) { if (itemLower.includes(fat.toLowerCase())) { found = true; break; } }

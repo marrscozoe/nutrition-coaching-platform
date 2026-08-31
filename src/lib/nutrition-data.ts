@@ -49,10 +49,29 @@ export const HEALTHY_FATS = [
   'Almonds (3 small handfuls male, 2 small handfuls female)', 'Walnuts (3 small handfuls male, 2 small handfuls female)', 'Mixed nuts (3 small handfuls male, 2 small handfuls female)',
   'Kerrygold gold butter',
   'Heavy cream',
-  'Eggs',
   'Safflower oil', 'Coconut oil',
   'MCT oil (in coffee)',
 ];
+
+// Eggs are counted by number, not ounces — both protein AND fat
+// Phases 1, 2, 4, 5: Men = 2-3 eggs, Women = 1-2 eggs
+// Phase 6 (muscle gain): Men = 3-4 eggs, Women = 2-3 eggs
+export const EGG_PORTIONS: Record<'male' | 'female', Record<number, string>> = {
+  male: {
+    1: '2-3 eggs',
+    2: '2-3 eggs',
+    4: '2-3 eggs',
+    5: '2-3 eggs',
+    6: '3-4 eggs',
+  },
+  female: {
+    1: '1-2 eggs',
+    2: '1-2 eggs',
+    4: '1-2 eggs',
+    5: '1-2 eggs',
+    6: '2-3 eggs',
+  },
+};
 
 export const SUPPLEMENTS = [
   'Whey protein powder — 40g (male) / 20g (female) — 1st thing AM & last thing PM (NOT with meals)',
