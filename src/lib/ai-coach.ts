@@ -686,6 +686,14 @@ export function extractMealData(
   let hasFat = false;
   let hasSupplement = false;
 
+  // SPECIAL CASE: Eggs are BOTH protein AND fat — check at food level first
+  // The LEAN_PROTEINS entry is "Eggs (2-3 for men, 1-2 for women)" which doesn't match plain "egg"
+  // so we handle eggs specially to recognize them as protein AND fat
+  if (foodLower.includes('egg') && !foodLower.includes('eggplant')) {
+    hasProtein = true;
+    hasFat = true;
+  }
+
   // For each food item, find which category it matches
   for (const item of foodItems) {
     const itemLower = item.toLowerCase();
@@ -694,12 +702,21 @@ export function extractMealData(
     // Check each category using substring matching (case-insensitive)
     // Check protein
     if (!hasProtein) {
-      for (const protein of LEAN_PROTEINS) {
-        if (itemLower.includes(protein.toLowerCase())) {
-          recognizedItems.push({ item, category: 'protein' });
-          hasProtein = true;
-          found = true;
-          break;
+      // SPECIAL CASE: Eggs are BOTH protein AND fat — check before general protein loop
+      // The LEAN_PROTEINS entry is "Eggs (2-3 for men, 1-2 for women)" which doesn't match plain "egg"
+      // so we handle eggs specially to recognize them as protein AND fat
+      if (itemLower.includes('egg') && !itemLower.includes('eggplant')) {
+        recognizedItems.push({ item, category: 'protein' });
+        hasProtein = true;
+        found = true;
+      } else {
+        for (const protein of LEAN_PROTEINS) {
+          if (itemLower.includes(protein.toLowerCase())) {
+            recognizedItems.push({ item, category: 'protein' });
+            hasProtein = true;
+            found = true;
+            break;
+          }
         }
       }
     }
