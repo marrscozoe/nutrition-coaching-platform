@@ -55,8 +55,8 @@ export default function AddToHomeScreenBanner() {
       alert(
         'To add this app to your Home Screen:\n\n' +
         '1. Tap the three dots menu (top right)\n' +
-        '2. Tap "Install app" or "Add to Home Screen"\n' +
-        '3. Tap "Install" or "Add automatically"'
+        '2. Tap "Add to Home Screen"\n' +
+        '3. Tap "Add" or "Install" to confirm'
       );
     } else {
       alert(
