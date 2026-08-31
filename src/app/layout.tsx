@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import UpdateBanner from '@/components/UpdateBanner';
 
 export const metadata: Metadata = {
   title: 'AMarsBody Nutrition',
@@ -35,6 +36,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-brand-charcoal text-brand-cream antialiased">
         {children}
+        <UpdateBanner />
       </body>
     </html>
   );
