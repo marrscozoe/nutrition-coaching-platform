@@ -141,10 +141,15 @@ export async function POST(request: NextRequest) {
 
           // GENERAL_HEALTH: Phase 4 ONLY — if 4+ lbs over goal, AI/trainer advises to switch programs or adjust goal, no phase change
 
-          // MUSCLE_GAIN: Phase 4 → Phase 6 when 4+ lbs below goal (Phase 6 → Phase 4 handled by early goal check)
+          // MUSCLE_GAIN: Phase 4 → Phase 6 when 4+ lbs below goal; Phase 6 → Phase 4 when at or above goal
           else if (programType === 'muscle_gain' && newPhase === currentPhase) {
-            // Weight drops 4+ lbs below goal → Phase 6
-            if (currentPhase === 4 && goalWeight && weight < goalWeight - 4) {
+            // Phase 6 → Phase 4: at or above goal weight → maintenance
+            if (currentPhase === 6 && goalWeight && weight >= goalWeight) {
+              newPhase = 4;
+              resetPhaseStart = true;
+            }
+            // Phase 4 → Phase 6: weight drops 4+ lbs below goal
+            else if (currentPhase === 4 && goalWeight && weight < goalWeight - 4) {
               newPhase = 6;
               resetPhaseStart = true;
             }

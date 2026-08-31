@@ -37,9 +37,16 @@ export async function POST(request: NextRequest) {
       const programType = oldClient.program_type;
       const currentPhase = oldClient.current_phase || 1;
 
+      // ===== MUSCLE_GAIN: Phase 6 → Phase 4 when goal is at/below current weight =====
+      if (programType === 'muscle_gain' && currentPhase === 6 && currentWeight) {
+        if (goal_weight <= currentWeight) {
+          newPhase = 4; // Goal met/attained → maintenance
+          phaseChanged = true;
+        }
+        // Otherwise stays in Phase 6 (still needs to gain toward higher goal)
+      }
       // ===== MUSCLE_GAIN: goal raised above current weight → Phase 6 (needs to gain) =====
-      // This must come BEFORE the general "at goal" check to override it
-      if (programType === 'muscle_gain' && currentPhase !== 6 && currentWeight) {
+      else if (programType === 'muscle_gain' && currentPhase !== 6 && currentWeight) {
         if (goal_weight > currentWeight) {
           newPhase = 6; // Goal is now above current weight → needs to gain
           phaseChanged = true;
