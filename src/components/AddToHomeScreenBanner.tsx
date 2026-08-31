@@ -48,9 +48,10 @@ export default function AddToHomeScreenBanner() {
       alert(
         'To add this app to your Home Screen:\n\n' +
         '1. Hold down on the address bar\n' +
-        '2. Tap "Share" from the popup menu\n' +
-        '3. Scroll down and tap "Add to Home Screen"\n' +
-        '4. Tap "Add" in the top right corner'
+        '2. Tap "Share"\n' +
+        '3. Tap "View More"\n' +
+        '4. Tap "Add to Home Screen"\n' +
+        '5. Tap "Add" in the top right corner'
       );
     } else if (isAndroid) {
       alert(
