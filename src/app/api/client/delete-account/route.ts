@@ -47,13 +47,11 @@ export async function DELETE(request: NextRequest) {
       .from('clients')
       .delete()
       .eq('id', clientId);
-      
-      if (deleteError) {
-        console.error(`[DELETE] Error deleting from ${table}:`, deleteError);
-        // Continue with other deletions even if one fails
-      } else {
-        console.log(`[DELETE] Deleted from ${table}`);
-      }
+
+    if (deleteClientError) {
+      console.error(`[DELETE] Error deleting client:`, deleteClientError);
+    } else {
+      console.log(`[DELETE] Deleted client ${clientId} from clients table`);
     }
 
     // Also delete from auth.users if possible
