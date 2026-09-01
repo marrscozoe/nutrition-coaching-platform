@@ -1738,7 +1738,9 @@ export function getMealEvaluationPrompt(
     
     if (processedStarchesToFlag.length > 0) {
       p += `\n⚠️ PROCESSED STARCH - NOT ON APPROVED LIST:\n`;
-      p += `- ${processedStarchesToFlag.join(', ')} is processed. Use sweet potato or any approved starch from the list instead.\n`;
+      const itemList = processedStarchesToFlag.join(', ');
+      const isAre = processedStarchesToFlag.length > 1 ? 'are' : 'is';
+      p += `- ${itemList} ${isAre} a PROCESSED STARCH (not on the approved list). Replace with sweet potato, red potato, beans, or fruit.\n`;
     }
     
     // Show other unrecognized items (not processed starches) for AI judgment
