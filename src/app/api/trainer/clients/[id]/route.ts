@@ -198,13 +198,27 @@ export async function DELETE(
     console.log(`[DELETE /trainer/clients/:id] Deleting client ${clientId} (${client.email})`);
 
     // Delete in order: coach_messages -> feedback -> milestones -> weigh_ins -> meals -> clients
-    const tablesToDelete = ['coach_messages', 'feedback', 'milestones', 'weigh_ins', 'meals', 'clients'];
+    // Note: 'clients' table uses 'id' not 'client_id' as primary key
+    const tablesWithClientId = ['coach_messages', 'feedback', 'milestones', 'weigh_ins', 'meals'];
     
-    for (const table of tablesToDelete) {
+    for (const table of tablesWithClientId) {
       const { error: deleteError } = await supabase
         .from(table)
         .delete()
         .eq('client_id', clientId);
+      
+      if (deleteError) {
+        console.error(`[DELETE] Error deleting from ${table}:`, deleteError);
+      } else {
+        console.log(`[DELETE] Deleted from ${table}`);
+      }
+    }
+    
+    // Delete from clients table using 'id' (not 'client_id')
+    const { error: deleteClientError } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', clientId);
       
       if (deleteError) {
         console.error(`[DELETE] Error deleting from ${table}:`, deleteError);
