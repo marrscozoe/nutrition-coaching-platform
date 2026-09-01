@@ -63,12 +63,18 @@ export default function UpdateBanner() {
         return;
       }
 
-      // Version mismatch — AUTO-UPDATE without requiring user interaction
+      // Version mismatch — show update banner (user clicks to update)
       if (storedVersion !== serverVersion) {
-        // Auto-trigger update immediately without showing banner
-        console.log('[UpdateBanner] Version mismatch detected, auto-updating...');
-        handleUpdate();
-        return;
+        // Check if user already dismissed this version
+        let dismissed = false;
+        try {
+          dismissed = localStorage.getItem(`${DISMISS_KEY}_${serverVersion}`) === 'true';
+        } catch (e) {
+          // Ignore storage errors
+        }
+        if (!dismissed) {
+          setShowBanner(true);
+        }
       }
     } catch (e) {
       console.error('[UpdateBanner] Version check failed:', e);
@@ -115,17 +121,21 @@ export default function UpdateBanner() {
       // Step 2: Clear ALL browser caches (HTTP cache, Workbox caches, etc.)
       await clearAllCaches();
 
-      // Step 3: Clear caches (but NOT localStorage - we want to preserve user session)
-      // The SW unregister + cache clear + hard reload is enough to get new code
-      // No need to log the user out
+      // Step 3: Store the new version in localStorage so after reload, version check finds a match
       try {
-        // Clear sessionStorage but NOT localStorage to preserve user session
+        localStorage.setItem(STORAGE_KEY, serverVersionRef.current);
+      } catch (e) {
+        console.warn('[UpdateBanner] Failed to save version:', e);
+      }
+
+      // Step 4: Clear sessionStorage (but NOT localStorage - we want to preserve user session)
+      try {
         sessionStorage.clear();
       } catch (e) {
         console.warn('[UpdateBanner] Failed to clear sessionStorage:', e);
       }
 
-      // Step 4: Force hard reload bypassing all caches
+      // Step 5: Force hard reload bypassing all caches
       // Use a cache-busting approach: reload with replacement
       // First replace current entry so back-button doesn't re-trigger
       window.location.replace(

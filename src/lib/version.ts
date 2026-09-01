@@ -2,16 +2,23 @@
 // Uses Vercel deployment ID in production (changes every deploy)
 // Falls back to build timestamp in dev mode
 
-// Vercel automatically sets this on each deploy
+// Vercel automatically sets these on each deploy
 const getVersion = (): string => {
   // Production: use Vercel's deployment ID (unique per deploy)
+  // Check both env vars to match the server API route logic
   if (process.env.NEXT_PUBLIC_VERCEL_DEPLOYMENT_ID) {
     return process.env.NEXT_PUBLIC_VERCEL_DEPLOYMENT_ID;
   }
-  
-  // Fallback for local dev: use timestamp (changes on every build/hot-reload)
-  // Using a random suffix ensures even same-second builds get different versions
-  return `dev-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+  // Fallback to VERCEL_DEPLOYMENT_ID (set in Vercel runtime environment)
+  if (process.env.VERCEL_DEPLOYMENT_ID) {
+    return process.env.VERCEL_DEPLOYMENT_ID;
+  }
+
+  // Fallback for local dev: use a fixed dev marker
+  // DO NOT use Date.now() or Math.random() - those change on every call/build
+  // and cause infinite update loops because client and server versions drift apart
+  return 'local-dev';
 };
 
 export const CURRENT_VERSION = getVersion();
