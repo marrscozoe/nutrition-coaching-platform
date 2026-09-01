@@ -28,10 +28,11 @@ function getSupabaseClient(): SupabaseClient {
 // For backwards compatibility
 export { getSupabaseClient as getSupabase };
 
-// Admin client getter
+// Admin client getter - always use this instead of referencing supabaseAdmin directly
 function getAdminClient(): SupabaseClient {
   if (!supabaseAdmin) {
     if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('[Supabase] Missing config:', { hasUrl: !!supabaseUrl, hasServiceKey: !!supabaseServiceKey });
       throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
     }
     supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -127,7 +128,7 @@ export async function db_all<T = any>(sql: string | PreparedStatement, ...params
     if (!table) return [];
     
     // Use admin client (service role key) to bypass RLS
-    const client = supabaseAdmin ?? getSupabaseClient();
+    const client = getAdminClient();
     let query = client.from(table).select('*');
     
     for (const [key, value] of Object.entries(conditions)) {
@@ -217,7 +218,7 @@ export async function db_run(sql: string | PreparedStatement, ...params: any[]):
       console.log('[db_run] INSERT obj:', JSON.stringify(obj));
       
       // Use admin client for INSERT to bypass RLS
-      const insertClient = supabaseAdmin ?? getSupabaseClient();
+      const insertClient = getAdminClient();
       const { error } = await insertClient.from(table).insert(obj);
       if (error) {
         console.error('[db_run] INSERT error:', error);
@@ -256,7 +257,7 @@ export async function db_run(sql: string | PreparedStatement, ...params: any[]):
       }
       
       // Use admin client for updates to bypass RLS
-      const updateClient = supabaseAdmin ?? getSupabaseClient();
+      const updateClient = getAdminClient();
       let query = updateClient.from(table).update(obj);
       for (const [key, value] of Object.entries(whereConditions)) {
         query = query.eq(key, value);
@@ -284,7 +285,7 @@ export async function db_run(sql: string | PreparedStatement, ...params: any[]):
       }
       
       // Use admin client for deletes to bypass RLS
-      const deleteClient = supabaseAdmin ?? getSupabaseClient();
+      const deleteClient = getAdminClient();
       let query = deleteClient.from(table).delete();
       for (const [key, value] of Object.entries(whereConditions)) {
         query = query.eq(key, value);
@@ -319,7 +320,7 @@ export async function forceSyncDb(): Promise<void> {
 
 export async function redis_get<T = any>(key: string): Promise<T | null> {
   // Use admin client (service role key) to bypass RLS
-  const client = supabaseAdmin ?? getSupabaseClient();
+  const client = getAdminClient();
   const { data, error } = await client
     .from('kv_store')
     .select('value')
@@ -337,7 +338,7 @@ export async function redis_get<T = any>(key: string): Promise<T | null> {
 export async function redis_set(key: string, value: any): Promise<void> {
   const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
   // Use admin client (service role key) to bypass RLS
-  const client = supabaseAdmin ?? getSupabaseClient();
+  const client = getAdminClient();
   const { error } = await client.from('kv_store').upsert({ key, value: stringValue }, { onConflict: 'key' });
   if (error) {
     console.error('[redis_set] Supabase upsert error:', error);
@@ -347,7 +348,7 @@ export async function redis_set(key: string, value: any): Promise<void> {
 
 export async function redis_del(key: string): Promise<void> {
   // Use admin client (service role key) to bypass RLS
-  const client = supabaseAdmin ?? getSupabaseClient();
+  const client = getAdminClient();
   await client.from('kv_store').delete().eq('key', key);
 }
 
