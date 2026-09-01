@@ -63,18 +63,12 @@ export default function UpdateBanner() {
         return;
       }
 
-      // Version mismatch — show update banner
+      // Version mismatch — AUTO-UPDATE without requiring user interaction
       if (storedVersion !== serverVersion) {
-        // Check if user already dismissed this version
-        let dismissed = false;
-        try {
-          dismissed = localStorage.getItem(`${DISMISS_KEY}_${serverVersion}`) === 'true';
-        } catch (e) {
-          // Ignore storage errors
-        }
-        if (!dismissed) {
-          setShowBanner(true);
-        }
+        // Auto-trigger update immediately without showing banner
+        console.log('[UpdateBanner] Version mismatch detected, auto-updating...');
+        handleUpdate();
+        return;
       }
     } catch (e) {
       console.error('[UpdateBanner] Version check failed:', e);
@@ -121,15 +115,14 @@ export default function UpdateBanner() {
       // Step 2: Clear ALL browser caches (HTTP cache, Workbox caches, etc.)
       await clearAllCaches();
 
-      // Step 3: Clear storage keys
+      // Step 3: Clear caches (but NOT localStorage - we want to preserve user session)
+      // The SW unregister + cache clear + hard reload is enough to get new code
+      // No need to log the user out
       try {
-        localStorage.removeItem(STORAGE_KEY);
-        // Clear ALL localStorage entries (user sessions, preferences, etc.)
-        // but we'll restore critical ones after reload
-        localStorage.clear();
+        // Clear sessionStorage but NOT localStorage to preserve user session
         sessionStorage.clear();
       } catch (e) {
-        console.warn('[UpdateBanner] Failed to clear storage:', e);
+        console.warn('[UpdateBanner] Failed to clear sessionStorage:', e);
       }
 
       // Step 4: Force hard reload bypassing all caches

@@ -50,12 +50,13 @@ const withPWA = require('next-pwa')({
     },
     {
       urlPattern: /\.(?:js)$/i,
-      handler: 'StaleWhileRevalidate',
+      handler: 'NetworkFirst',
       options: {
         cacheName: 'static-js-assets',
+        networkTimeoutSeconds: 5, // Fast timeout - fall back to cache quickly
         expiration: {
           maxEntries: 32,
-          maxAgeSeconds: 60 * 60 * 24, // 1 day
+          maxAgeSeconds: 60 * 60, // 1 hour max
         },
       },
     },
