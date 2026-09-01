@@ -214,12 +214,24 @@ export default function ChatPage() {
           // Skip if this meal is already in sessionStorage
           if (existingMealIds.has(String(meal.id))) return;
           
-          // Format the meal with proper display (same formatting as processMealData)
-          const dateStr = new Date(meal.logged_at).toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric'
-          });
+          // Format the meal with proper display - use meal_date (user-selected) if available,
+          // otherwise fall back to logged_at for backwards compatibility
+          let dateStr: string;
+          if (meal.meal_date) {
+            // meal_date is YYYY-MM-DD from database, parse it to avoid timezone shifts
+            dateStr = new Date(meal.meal_date + 'T12:00:00').toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric'
+            });
+          } else {
+            // Fallback to logged_at for backwards compatibility with old meals
+            dateStr = new Date(meal.logged_at).toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric'
+            });
+          }
           // Derive meal type from food description if not available
           const mealType = meal.meal_type || 'MEAL';
           const mealContent = `📸 ${mealType.toUpperCase()} — ${dateStr}\n${meal.food_description || 'Logged a meal'}`;

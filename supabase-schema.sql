@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS meals (
   portion_advice TEXT,
   on_phase INTEGER DEFAULT 1,
   messed_up INTEGER DEFAULT 0,
+  meal_date DATE,
   logged_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -362,3 +363,14 @@ CREATE POLICY "Public can view kv_store" ON kv_store FOR SELECT USING (true);
 -- Public can insert/update kv_store
 CREATE POLICY "Public can insert kv_store" ON kv_store FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public can update kv_store" ON kv_store FOR UPDATE USING (true);
+
+-- =============================================
+-- MIGRATION: Add meal_date column to meals table
+-- Run this on existing databases that don't have the column yet
+-- =============================================
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'meals' AND column_name = 'meal_date') THEN
+    ALTER TABLE meals ADD COLUMN meal_date DATE;
+  END IF;
+END $$;

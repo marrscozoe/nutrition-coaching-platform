@@ -143,6 +143,7 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
 
     // Use admin client to insert meal (bypasses RLS)
+    // mealDate comes in as YYYY-MM-DD string from client, store as DATE
     const { error: insertError } = await supabase.from('meals').insert({
       id: mealId,
       client_id: clientId,
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
       portion_advice: portionAdvice || null,
       messed_up: messedUp ? 1 : 0,
       photo_analyzed: photoUrl ? 1 : 0,
+      meal_date: mealDate || null,  // Store the user-selected date
       logged_at: now,
     });
 

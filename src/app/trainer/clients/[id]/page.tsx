@@ -442,7 +442,11 @@ export default function ClientDetailPage() {
                     }`} />
                   </div>
                   <p className="text-brand-cream/40 text-xs mt-1">
-                    {new Date(meal.logged_at).toLocaleDateString()} {new Date(meal.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {/* Use meal_date for date (user-selected), logged_at for time (when logged) */}
+                    {meal.meal_date 
+                      ? new Date(meal.meal_date + 'T12:00:00').toLocaleDateString()
+                      : new Date(meal.logged_at).toLocaleDateString()
+                    } {new Date(meal.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
               ))}
