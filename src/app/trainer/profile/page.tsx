@@ -19,6 +19,12 @@ export default function TrainerProfilePage() {
   const [trainer, setTrainer] = useState<TrainerData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Delete account state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
   useEffect(() => {
     const userData = sessionStorage.getItem('trainer_user');
     const userType = sessionStorage.getItem('trainer_user_type');
@@ -41,6 +47,49 @@ export default function TrainerProfilePage() {
 
   async function handleLogout() {
     await logout();
+  }
+
+  async function handleDeleteAccount() {
+    if (deleteConfirmText !== 'DELETE') return;
+    
+    setDeleting(true);
+    setDeleteError('');
+    
+    try {
+      const res = await fetch('/api/trainer/delete-account', {
+        method: 'DELETE',
+        headers: {
+          'x-trainer-id': trainer!.id,
+        },
+      });
+
+      if (res.ok) {
+        // Clear session and redirect to home
+        sessionStorage.removeItem('trainer_user');
+        sessionStorage.removeItem('trainer_user_type');
+        router.push('/');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setDeleteError(data.error || 'Failed to delete account');
+        setDeleting(false);
+      }
+    } catch (err) {
+      console.error('Failed to delete account:', err);
+      setDeleteError('Network error - please try again');
+      setDeleting(false);
+    }
+  }
+
+  function openDeleteModal() {
+    setShowDeleteModal(true);
+    setDeleteConfirmText('');
+    setDeleteError('');
+  }
+
+  function closeDeleteModal() {
+    setShowDeleteModal(false);
+    setDeleteConfirmText('');
+    setDeleteError('');
   }
 
   if (loading) {
@@ -136,6 +185,20 @@ export default function TrainerProfilePage() {
           Log Out
         </button>
 
+        {/* Danger Zone */}
+        <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/20">
+          <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wider mb-2">⚠️ Danger Zone</h2>
+          <p className="text-sm text-brand-cream/60 mb-4">
+            Permanently delete your account, all your clients, and all associated data including meals, weigh-ins, messages, milestones, and feedback.
+          </p>
+          <button
+            onClick={openDeleteModal}
+            className="w-full py-3 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400 font-semibold hover:bg-red-500/30 transition-colors"
+          >
+            Delete My Account
+          </button>
+        </div>
+
         {/* Beta Notice */}
         <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
           <p className="text-yellow-400 text-sm font-medium">⚠️ Beta Mode</p>
@@ -144,6 +207,59 @@ export default function TrainerProfilePage() {
           </p>
         </div>
       </div>
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md bg-brand-charcoal rounded-2xl border border-red-500/30 p-6">
+            <h2 className="text-xl font-bold text-red-400 mb-2">Delete Account</h2>
+            <p className="text-brand-cream/70 mb-4">
+              This action is <strong className="text-red-400">PERMANENT</strong>. All your data will be deleted including:
+            </p>
+            <ul className="text-sm text-brand-cream/60 mb-4 list-disc list-inside space-y-1">
+              <li>All your clients</li>
+              <li>All meal logs</li>
+              <li>All weigh-ins</li>
+              <li>All coach messages</li>
+              <li>All milestones</li>
+              <li>All feedback</li>
+              <li>Your trainer account</li>
+            </ul>
+            <p className="text-sm text-brand-cream/60 mb-4">
+              Type <strong className="text-red-400">DELETE</strong> to confirm:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+              placeholder="Type DELETE"
+              className="w-full px-4 py-3 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream focus:outline-none focus:border-red-500 mb-4"
+              autoFocus
+            />
+            {deleteError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 text-sm">
+                {deleteError}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={closeDeleteModal}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-xl bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream font-medium hover:bg-brand-charcoal/60 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText !== 'DELETE' || deleting}
+                className="flex-1 py-3 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? 'Deleting...' : 'Delete Forever'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-brand-charcoal/95 backdrop-blur-sm border-t border-brand-cream/10 safe-bottom">
