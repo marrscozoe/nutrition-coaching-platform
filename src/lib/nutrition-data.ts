@@ -512,7 +512,7 @@ const PHASE_DISALLOWED: Record<number, { starch: boolean; dairy: boolean; sugar:
 const STARCH_KEYWORDS = ['bread', 'rice', 'pasta', 'potato', 'beans', 'corn', 'oatmeal', 'cereal', 'fruit', 'banana', 'apple', 'orange', 'mango', 'pineapple', 'grape', 'peach', 'plum', 'cherry', 'melon', 'watermelon', 'berries', 'cantaloupe', 'grapefruit', 'black eyed peas'];
 const DAIRY_KEYWORDS = ['milk', 'cheese', 'yogurt', 'ice cream', 'cream'];
 const SUGAR_KEYWORDS = ['candy', 'soda', 'sugar', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry'];
-const PROCESSED_KEYWORDS = ['chips', 'fries', 'fried', 'nuggets', 'tenders'];
+const PROCESSED_KEYWORDS = ['chips', 'fries', 'fried', 'nuggets', 'tenders', 'tortilla', 'tortillas', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'french toast'];
 const ALCOHOL_KEYWORDS = ['beer', 'wine', 'vodka', 'whiskey', 'tequila', 'rum', 'cocktail', 'alcohol'];
 
 export function isSnackAllowed(food: string, phase: number): { allowed: boolean; reason?: string } {

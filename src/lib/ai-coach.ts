@@ -1543,9 +1543,17 @@ export async function analyzeMealPortion(
       corrections.push(`💡 You need ${context.gender === 'male' ? '3 tbsp' : '2 tbsp'} olive oil or healthy fat for Phase 6.`);
     }
     if (!hasStarch) {
-      missingCategories.push('starch');
-      const starchAmount = context.gender === 'male' ? '3 cups' : '2 cups';
-      corrections.push(`💡 You need ${starchAmount} rice, potato, or sweet potato.`);
+      // In Phase 6, tortillas are explicitly allowed
+      // If tortillas are in unrecognized items, don't add 'starch' to missingCategories
+      const hasTortillasInUnrecognized = unrecognizedItems.some(item => 
+        item.toLowerCase().includes('tortilla')
+      );
+      if (!hasTortillasInUnrecognized) {
+        missingCategories.push('starch');
+        const starchAmount = context.gender === 'male' ? '3 cups' : '2 cups';
+        corrections.push(`💡 You need ${starchAmount} rice, potato, or sweet potato.`);
+      }
+      // If tortillas are present in unrecognized items, they're allowed in Phase 6, so no starch correction needed
     }
   } else if (phase === 1 || phase === 2 || phase === 5) {
     // Phase 5 uses rotating rules - determine if today is a strict day
@@ -1590,8 +1598,21 @@ export async function analyzeMealPortion(
     }
     if (!hasStarch) {
       // Starch is REQUIRED in Phase 4 - every meal needs starch
-      missingCategories.push('starch');
-      corrections.push(`💡 Phase 4 requires starch every meal — add ${context.gender === 'male' ? '2 cups' : '1 cup'} rice, potato, or sweet potato.`);
+      // BUT: if unrecognized items contain processed starches (tortillas, bread, etc.),
+      // DON'T add 'starch' to missingCategories - the person had starch, just not on approved list
+      const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle'];
+      const hasProcessedStarchInUnrecognized = unrecognizedItems.some(item => {
+        const lower = item.toLowerCase();
+        return processedStarchKeywords.some(kw => lower.includes(kw));
+      });
+      
+      if (!hasProcessedStarchInUnrecognized) {
+        // Truly missing starch - no processed starches in unrecognized items
+        missingCategories.push('starch');
+        corrections.push(`💡 Phase 4 requires starch every meal — add ${context.gender === 'male' ? '2 cups' : '1 cup'} rice, potato, or sweet potato.`);
+      }
+      // If hasProcessedStarchInUnrecognized is true, don't add 'starch' to missingCategories
+      // The processed starch will be handled in getMealEvaluationPrompt as "PROCESSED STARCH - NOT ON APPROVED LIST"
     }
   }
 
@@ -1700,8 +1721,31 @@ export function getMealEvaluationPrompt(
   if (fatItems.length) p += `Fat: ${fatItems.join(', ')}\n`;
 
   // Unrecognized items - flag but don't automatically make meal off phase
+  // IMPORTANT: If the unrecognized item is a processed starch (tortillas, bread, pasta, etc.),
+  // flag it explicitly so the AI doesn't give generic "add starch" advice
+  // EXCEPTION: In Phase 6, tortillas are explicitly allowed, so don't flag them
   if (analysis.unrecognizedItems.length > 0) {
-    p += `\nUNRECOGNIZED (use your judgment): ${analysis.unrecognizedItems.join(', ')}\n`;
+    const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle'];
+    const processedStarches = analysis.unrecognizedItems.filter(item => {
+      const lower = item.toLowerCase();
+      return processedStarchKeywords.some(kw => lower.includes(kw));
+    });
+    
+    // In Phase 6, tortillas are allowed - don't flag them as processed starch
+    const processedStarchesToFlag = phase === 6 
+      ? processedStarches.filter(item => !item.toLowerCase().includes('tortilla'))
+      : processedStarches;
+    
+    if (processedStarchesToFlag.length > 0) {
+      p += `\n⚠️ PROCESSED STARCH - NOT ON APPROVED LIST:\n`;
+      p += `- ${processedStarchesToFlag.join(', ')} is processed. Use sweet potato or any approved starch from the list instead.\n`;
+    }
+    
+    // Show other unrecognized items (not processed starches) for AI judgment
+    const otherUnrecognized = analysis.unrecognizedItems.filter(item => !processedStarches.includes(item));
+    if (otherUnrecognized.length > 0) {
+      p += `\nUNRECOGNIZED (use your judgment): ${otherUnrecognized.join(', ')}\n`;
+    }
   }
 
   // REMOVE section - disallowed items (Phase 1 with starch present, etc.)
