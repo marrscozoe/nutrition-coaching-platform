@@ -60,6 +60,12 @@ export default function ClientDetailPage() {
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  
+  // Delete modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Edit form state
   const [notes, setNotes] = useState('');
@@ -139,6 +145,47 @@ export default function ClientDetailPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleDeleteClient() {
+    if (deleteConfirmText !== 'DELETE') return;
+    
+    setDeleting(true);
+    setDeleteError('');
+    
+    try {
+      const res = await fetch(`/api/trainer/clients/${clientId}`, {
+        method: 'DELETE',
+        headers: {
+          'x-trainer-id': trainer!.id,
+        },
+      });
+
+      if (res.ok) {
+        // Redirect to clients list after successful deletion
+        router.push('/trainer/clients');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setDeleteError(data.error || 'Failed to delete client');
+        setDeleting(false);
+      }
+    } catch (err) {
+      console.error('Failed to delete client:', err);
+      setDeleteError('Network error - please try again');
+      setDeleting(false);
+    }
+  }
+
+  function openDeleteModal() {
+    setShowDeleteModal(true);
+    setDeleteConfirmText('');
+    setDeleteError('');
+  }
+
+  function closeDeleteModal() {
+    setShowDeleteModal(false);
+    setDeleteConfirmText('');
+    setDeleteError('');
   }
 
   function getProgramLabel(type: string): string {
@@ -311,6 +358,20 @@ export default function ClientDetailPage() {
           </button>
         </div>
 
+        {/* Danger Zone */}
+        <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/20">
+          <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wider mb-3">⚠️ Danger Zone</h3>
+          <p className="text-sm text-brand-cream/60 mb-4">
+            Permanently delete this client and all their data including meals, weigh-ins, messages, milestones, and feedback.
+          </p>
+          <button
+            onClick={openDeleteModal}
+            className="w-full py-3 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400 font-semibold hover:bg-red-500/30 transition-colors"
+          >
+            Delete Client
+          </button>
+        </div>
+
         {/* Milestones */}
         {milestones.length > 0 && (
           <div className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
@@ -389,6 +450,58 @@ export default function ClientDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md bg-brand-charcoal rounded-2xl border border-red-500/30 p-6">
+            <h2 className="text-xl font-bold text-red-400 mb-2">Delete Client</h2>
+            <p className="text-brand-cream/70 mb-4">
+              This action is <strong className="text-red-400">PERMANENT</strong>. All data for <strong>{client.name}</strong> will be deleted including:
+            </p>
+            <ul className="text-sm text-brand-cream/60 mb-4 list-disc list-inside space-y-1">
+              <li>All meal logs</li>
+              <li>All weigh-ins</li>
+              <li>All coach messages</li>
+              <li>All milestones</li>
+              <li>All feedback</li>
+              <li>Client account</li>
+            </ul>
+            <p className="text-sm text-brand-cream/60 mb-4">
+              Type <strong className="text-red-400">DELETE</strong> to confirm:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+              placeholder="Type DELETE"
+              className="w-full px-4 py-3 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream focus:outline-none focus:border-red-500 mb-4"
+              autoFocus
+            />
+            {deleteError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 text-sm">
+                {deleteError}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={closeDeleteModal}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-xl bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream font-medium hover:bg-brand-charcoal/60 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteClient}
+                disabled={deleteConfirmText !== 'DELETE' || deleting}
+                className="flex-1 py-3 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? 'Deleting...' : 'Delete Forever'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-brand-charcoal/95 backdrop-blur-sm border-t border-brand-cream/10 safe-bottom">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/db';
 import { generatePhase5Plan } from '@/lib/ai-coach';
+import { supabase as supabaseAuth } from '@/lib/auth';
 
 // GET - Fetch a single client's details
 export async function GET(
@@ -159,5 +160,77 @@ export async function PUT(
   } catch (error) {
     console.error('Update client error:', error);
     return NextResponse.json({ error: 'Failed to update client' }, { status: 500 });
+  }
+}
+
+// DELETE - Delete a client and all their data
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const trainerId = request.headers.get('x-trainer-id');
+    
+    if (!trainerId) {
+      return NextResponse.json({ error: 'Trainer ID required' }, { status: 401 });
+    }
+
+    const supabase = getAdminClient();
+    
+    // Verify client exists AND belongs to this trainer
+    const { data: client, error: clientError } = await supabase
+      .from('clients')
+      .select('id, email')
+      .eq('id', id)
+      .single();
+
+    if (clientError || !client) {
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    }
+
+    // SECURITY: Verify this client belongs to the requesting trainer
+    if (client.trainer_id !== trainerId) {
+      console.error(`[DELETE /trainer/clients/:id] Unauthorized: trainer ${trainerId} tried to delete client ${id} owned by ${client.trainer_id}`);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const clientId = id;
+    console.log(`[DELETE /trainer/clients/:id] Deleting client ${clientId} (${client.email})`);
+
+    // Delete in order: coach_messages -> feedback -> milestones -> weigh_ins -> meals -> clients
+    const tablesToDelete = ['coach_messages', 'feedback', 'milestones', 'weigh_ins', 'meals', 'clients'];
+    
+    for (const table of tablesToDelete) {
+      const { error: deleteError } = await supabase
+        .from(table)
+        .delete()
+        .eq('client_id', clientId);
+      
+      if (deleteError) {
+        console.error(`[DELETE] Error deleting from ${table}:`, deleteError);
+        // Continue with other deletions even if one fails
+      } else {
+        console.log(`[DELETE] Deleted from ${table}`);
+      }
+    }
+
+    // Also delete from auth.users if possible (email match)
+    try {
+      const { error: authError } = await supabase.auth.admin.deleteUser(clientId);
+      if (authError) {
+        console.warn(`[DELETE] Could not delete auth user: ${authError.message}`);
+      } else {
+        console.log(`[DELETE] Deleted auth user ${clientId}`);
+      }
+    } catch (e) {
+      console.warn(`[DELETE] Auth user deletion skipped (not available)`);
+    }
+
+    console.log(`[DELETE /trainer/clients/:id] Successfully deleted client ${clientId}`);
+    return NextResponse.json({ success: true, deletedClientId: clientId });
+  } catch (error) {
+    console.error('Delete client error:', error);
+    return NextResponse.json({ error: 'Failed to delete client' }, { status: 500 });
   }
 }
