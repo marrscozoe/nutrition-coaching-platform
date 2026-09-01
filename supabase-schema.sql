@@ -15,9 +15,22 @@ CREATE TABLE IF NOT EXISTS trainers (
   business_name TEXT,
   brand_color TEXT DEFAULT '#3B82F6',
   logo_url TEXT,
+  session_token TEXT,
+  session_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: Add session columns if they don't exist (for existing tables)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'trainers' AND column_name = 'session_token') THEN
+    ALTER TABLE trainers ADD COLUMN session_token TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'trainers' AND column_name = 'session_expires_at') THEN
+    ALTER TABLE trainers ADD COLUMN session_expires_at TIMESTAMPTZ;
+  END IF;
+END $$;
 
 -- =============================================
 -- CLIENTS TABLE

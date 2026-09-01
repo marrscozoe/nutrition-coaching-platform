@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { createTrainerSession } from '@/lib/trainer-session';
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,13 +101,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Return user data (excluding password)
-    const { password_hash, ...userData } = userAny;
+    const { password_hash, session_token, session_expires_at, ...userData } = userAny;
 
-    return NextResponse.json({
+    // For trainers, create a session token for secure API access
+    let sessionToken = null;
+    if (userType === 'trainer') {
+      sessionToken = await createTrainerSession(user.id);
+      if (!sessionToken) {
+        console.error('[Login] Failed to create trainer session for:', user.id);
+        // Continue anyway - the session token is optional for now
+        // But in production, you might want to fail here
+      } else {
+        console.log('[Login] Session token created for trainer:', user.id);
+      }
+    }
+
+    const response: Record<string, any> = {
       success: true,
       user: userData,
       userType,
-    });
+    };
+
+    // Include session token for trainers
+    if (sessionToken) {
+      response.sessionToken = sessionToken;
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(

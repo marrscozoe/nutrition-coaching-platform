@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/db';
 import { generatePhase5Plan } from '@/lib/ai-coach';
+import { verifyTrainerSession } from '@/lib/trainer-session';
 
 // GET - Fetch a single client's details
 export async function GET(
@@ -9,11 +10,24 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const trainerId = request.headers.get('x-trainer-id');
     
-    if (!trainerId) {
-      return NextResponse.json({ error: 'Trainer ID required' }, { status: 401 });
+    // SECURITY FIX: Verify the session token before trusting any trainer ID
+    const sessionToken = request.headers.get('x-trainer-token');
+    
+    if (!sessionToken) {
+      console.warn('[GET /trainer/clients/:id] No session token provided');
+      return NextResponse.json({ error: 'Authentication required. Please log in again.' }, { status: 401 });
     }
+    
+    const sessionResult = await verifyTrainerSession(sessionToken);
+    
+    if (!sessionResult.valid) {
+      console.warn('[GET /trainer/clients/:id] Invalid session:', sessionResult.error);
+      return NextResponse.json({ error: sessionResult.error || 'Invalid session. Please log in again.' }, { status: 401 });
+    }
+    
+    const trainerId = sessionResult.trainerId;
+    console.log('[GET /trainer/clients/:id] Authenticated trainer:', trainerId, 'for client:', id);
 
     // Use admin client to bypass RLS
     const supabase = getAdminClient();
@@ -77,11 +91,24 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const trainerId = request.headers.get('x-trainer-id');
     
-    if (!trainerId) {
-      return NextResponse.json({ error: 'Trainer ID required' }, { status: 401 });
+    // SECURITY FIX: Verify the session token before trusting any trainer ID
+    const sessionToken = request.headers.get('x-trainer-token');
+    
+    if (!sessionToken) {
+      console.warn('[PUT /trainer/clients/:id] No session token provided');
+      return NextResponse.json({ error: 'Authentication required. Please log in again.' }, { status: 401 });
     }
+    
+    const sessionResult = await verifyTrainerSession(sessionToken);
+    
+    if (!sessionResult.valid) {
+      console.warn('[PUT /trainer/clients/:id] Invalid session:', sessionResult.error);
+      return NextResponse.json({ error: sessionResult.error || 'Invalid session. Please log in again.' }, { status: 401 });
+    }
+    
+    const trainerId = sessionResult.trainerId;
+    console.log('[PUT /trainer/clients/:id] Authenticated trainer:', trainerId, 'for client:', id);
 
     // Use admin client to bypass RLS
     let supabase;

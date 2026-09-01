@@ -90,6 +90,11 @@ export default function HomePage() {
         if (data.userType === 'trainer') {
           sessionStorage.setItem('trainer_user', JSON.stringify(data.user));
           sessionStorage.setItem('trainer_user_type', 'trainer');
+          // Store session token for secure API authentication
+          if (data.sessionToken) {
+            sessionStorage.setItem('trainer_session_token', data.sessionToken);
+            console.log('[Login] Session token stored for trainer');
+          }
         } else {
           sessionStorage.setItem('client_user', JSON.stringify(data.user));
           sessionStorage.setItem('client_user_type', 'client');
