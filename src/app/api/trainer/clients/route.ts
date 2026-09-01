@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, db_all, getAdminClient } from '@/lib/db';
-import { verifyTrainerSession } from '@/lib/trainer-session';
 
 // Force dynamic rendering - this route uses request headers and Supabase admin client
 export const dynamic = 'force-dynamic';
@@ -8,26 +7,10 @@ export const dynamic = 'force-dynamic';
 // GET - Fetch all clients for a trainer
 export async function GET(request: NextRequest) {
   try {
-    // SECURITY FIX: Verify the session token before trusting any trainer ID
-    // The x-trainer-token header contains the session token for authentication
-    const sessionToken = request.headers.get('x-trainer-token');
-    
-    if (!sessionToken) {
-      console.warn('[GET /trainer/clients] No session token provided');
-      return NextResponse.json({ error: 'Authentication required. Please log in again.' }, { status: 401 });
+    const trainerId = request.headers.get('x-trainer-id');
+    if (!trainerId) {
+      return NextResponse.json({ error: 'Trainer ID required' }, { status: 401 });
     }
-    
-    // Verify the session token and get the authenticated trainer ID
-    const sessionResult = await verifyTrainerSession(sessionToken);
-    
-    if (!sessionResult.valid) {
-      console.warn('[GET /trainer/clients] Invalid session:', sessionResult.error);
-      return NextResponse.json({ error: sessionResult.error || 'Invalid session. Please log in again.' }, { status: 401 });
-    }
-    
-    // Use the verified trainer ID from the session
-    const trainerId = sessionResult.trainerId;
-    console.log('[GET /trainer/clients] Authenticated trainer:', trainerId);
 
     // Use admin client to bypass RLS (trainer API needs full access)
     const supabase = getAdminClient();

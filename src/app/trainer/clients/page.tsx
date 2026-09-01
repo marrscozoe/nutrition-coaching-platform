@@ -35,33 +35,14 @@ export default function TrainerClientsPage() {
     }
 
     const user = JSON.parse(userData);
-    fetchClients();
+    fetchClients(user.id);
   }, [router]);
 
-  async function fetchClients() {
+  async function fetchClients(trainerId: string) {
     try {
-      // Get session token for authentication
-      const sessionToken = sessionStorage.getItem('trainer_session_token');
-      if (!sessionToken) {
-        console.error('No session token found - please log in again');
-        router.push('/?login=trainer');
-        return;
-      }
-
       const res = await fetch('/api/trainer/clients', {
-        headers: { 
-          'x-trainer-token': sessionToken,
-        },
+        headers: { 'x-trainer-id': trainerId },
       });
-
-      // If unauthorized, redirect to login
-      if (res.status === 401) {
-        console.error('Session expired - please log in again');
-        sessionStorage.clear();
-        router.push('/?login=trainer');
-        return;
-      }
-
       const data = await res.json();
       setClients(data.clients || []);
     } catch (err) {

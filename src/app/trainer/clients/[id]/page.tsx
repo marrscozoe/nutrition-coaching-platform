@@ -77,32 +77,14 @@ export default function ClientDetailPage() {
 
     const user = JSON.parse(userData);
     setTrainer(user);
-    fetchClientData(clientId);
+    fetchClientData(clientId, user.id);
   }, [router, clientId]);
 
-  async function fetchClientData(clientId: string) {
+  async function fetchClientData(clientId: string, trainerId: string) {
     try {
-      // Get session token for authentication
-      const sessionToken = sessionStorage.getItem('trainer_session_token');
-      if (!sessionToken) {
-        console.error('No session token found - please log in again');
-        router.push('/?login=trainer');
-        return;
-      }
-
       const res = await fetch(`/api/trainer/clients/${clientId}`, {
-        headers: { 
-          'x-trainer-token': sessionToken,
-        },
+        headers: { 'x-trainer-id': trainerId },
       });
-
-      // If unauthorized, redirect to login
-      if (res.status === 401) {
-        console.error('Session expired - please log in again');
-        sessionStorage.clear();
-        router.push('/?login=trainer');
-        return;
-      }
       const data = await res.json();
 
       if (data.error === 'Client not found') {
@@ -128,21 +110,11 @@ export default function ClientDetailPage() {
     setSaving(true);
     setErrorMessage('');
     try {
-      // Get session token for authentication
-      const sessionToken = sessionStorage.getItem('trainer_session_token');
-      if (!sessionToken) {
-        setErrorMessage('Session expired - please log in again');
-        sessionStorage.clear();
-        router.push('/?login=trainer');
-        setSaving(false);
-        return;
-      }
-
       const res = await fetch(`/api/trainer/clients/${clientId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-trainer-token': sessionToken,
+          'x-trainer-id': trainer!.id,
         },
         body: JSON.stringify({
           notes,
@@ -151,20 +123,10 @@ export default function ClientDetailPage() {
         }),
       });
 
-      // If unauthorized, redirect to login
-      if (res.status === 401) {
-        const data = await res.json().catch(() => ({}));
-        setErrorMessage(data.error || 'Session expired - please log in again');
-        sessionStorage.clear();
-        router.push('/?login=trainer');
-        setSaving(false);
-        return;
-      }
-
       if (res.ok) {
         setSavedMessage('Changes saved!');
         setTimeout(() => setSavedMessage(''), 3000);
-        fetchClientData(clientId);
+        fetchClientData(clientId, trainer!.id);
       } else {
         const data = await res.json().catch(() => ({}));
         setErrorMessage(data.error || `Save failed (${res.status})`);
