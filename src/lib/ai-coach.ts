@@ -1770,7 +1770,7 @@ export function getMealEvaluationPrompt(
     p += `\nMISSING — Quote these EXACTLY in your response (do NOT change the food or amount):\n`;
     if (analysis.missingCategories.includes('protein')) p += `- "You need ${m ? '6oz' : '4oz'} lean protein"\n`;
     if (analysis.missingCategories.includes('vegetable')) p += `- "You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables"\n`;
-    if (analysis.missingCategories.includes('starch')) p += `- "You need ${portions.starch} rice" OR "You need ${portions.starch} potato" OR "You need ${portions.starch} sweet potato"\n`;
+    if (analysis.missingCategories.includes('starch')) p += `- "You need ${portions.starch} sweet potato" OR "You need ${portions.starch} red potato" OR "You need ${portions.starch} beans" OR "You need ${portions.starch} fruit"\n`;
     if (analysis.missingCategories.includes('fat')) p += `- "You need ${m ? '2 tbsp' : '1 tbsp'} olive oil"\n`;
     if (analysis.missingCategories.includes('water')) p += `- "You need ${m ? '32oz' : '20oz'} water"\n`;
   }
