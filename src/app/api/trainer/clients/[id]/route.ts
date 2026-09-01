@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/db';
 import { generatePhase5Plan } from '@/lib/ai-coach';
-import { supabase as supabaseAuth } from '@/lib/auth';
 
 // GET - Fetch a single client's details
 export async function GET(
