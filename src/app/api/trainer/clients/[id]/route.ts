@@ -180,7 +180,7 @@ export async function DELETE(
     // Verify client exists AND belongs to this trainer
     const { data: client, error: clientError } = await supabase
       .from('clients')
-      .select('id, email')
+      .select('id, email, trainer_id')
       .eq('id', id)
       .single();
 
