@@ -28,6 +28,7 @@ interface MealLog {
   on_phase: boolean;
   messed_up: boolean;
   logged_at: string;
+  meal_date?: string;
 }
 
 interface WeighIn {
