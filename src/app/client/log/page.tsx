@@ -620,7 +620,15 @@ export default function LogMealPage() {
       <div className="p-4 rounded-xl bg-brand-charcoal/60 border border-brand-cream/10">
         <p className="text-xs text-brand-cream/50 mb-2">💡 Quick tip:</p>
         <p className="text-sm text-brand-cream/80">
-          Muscle gain phase! Higher carbs and fats. Take whey protein 1st thing Am and last thing Pm and creatine as directed on container. If you hit your goal weight, you will move to maintenance.
+          {client?.program_type === 'general_health'
+            ? "General Health program — maintenance phase. Focus on balanced portions and consistent habits."
+            : client?.program_type === 'event_ready'
+            ? "Stay consistent with your portions and log every meal for best results."
+            : client?.program_type === 'get_shredded'
+            ? "Stay consistent with your portions and log every meal for best results."
+            : client?.program_type === 'muscle_gain' || client?.current_phase === 6
+            ? "Muscle gain phase! Higher carbs and fats. Take whey protein 1st thing Am and last thing Pm and creatine as directed on container. If you hit your goal weight, you will move to maintenance."
+            : "Log every meal consistently for best results. Stay mindful of your portions."}
         </p>
       </div>
 
