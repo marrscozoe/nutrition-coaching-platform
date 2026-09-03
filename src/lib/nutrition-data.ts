@@ -14,6 +14,8 @@ export const LEAN_PROTEINS = [
   'Protein powder',
   'Whey protein',
   'Bacon (nitrate-free, twice per week)',
+  'Pepperoni', 'Salami', 'Ham',
+  'Turkey pepperoni',
 ];
 // NO cheese or dairy while dieting
 
@@ -26,6 +28,15 @@ export const STARCHY_CARBOHYDRATES = [
   'Lentils', 'Cannellini beans', 'Navy beans', 'Lima beans', 'Butter beans',
   'Berries', 'Cantaloupe', 'Black Eyed Peas', 'Grapefruit',
   'Plantain', 'Parsnips', 'Acorn squash', 'Delicata squash',
+  // Mixed foods with starch component
+  'Pizza', 'Pizza slice', 'Pizza crust',
+  'Pepperoni pizza', 'Cheese pizza', 'Veggie pizza',
+  'Sandwich', 'Sub sandwich', 'Hoagie',
+  'Burrito', 'Quesadilla', 'Enchilada',
+  'Pasta dish', 'Pasta with sauce', 'Spaghetti', 'Macaroni',
+  'Taco', 'Taco shell', 'Corn taco', 'Flour tortilla',
+  'Wrap', 'Flour wrap', 'Corn tortilla',
+  'Rice bowl', 'Fried rice',
 ];
 // Fresh or frozen, NO CANS
 
@@ -39,6 +50,7 @@ export const FIBROUS_VEGETABLES = [
   'Artichoke', 'Brussels sprouts', 'Carrots', 'Eggplant',
   'Anaheim peppers', 'Poblano peppers', 'Jalapeño peppers', 'Serrano peppers',
   'Celery root', 'Fennel', 'Leeks', 'Water chestnuts', 'Bean sprouts', 'Alfalfa sprouts',
+  'Pizza toppings', 'Veggie pizza toppings',
 ];
 // Fresh or frozen, NO CANS
 
