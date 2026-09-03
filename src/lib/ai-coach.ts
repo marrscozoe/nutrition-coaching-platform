@@ -816,7 +816,9 @@ export function extractMealData(
   // Phase 5: depends on rotating sub-phase
   else if (phase === 5) {
     const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
-    const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
+    const currentDayRule = (Array.isArray(context.phase5Plan) && context.phase5Plan.length > 0)
+      ? context.phase5Plan.find(d => d.day === dayNum)
+      : null;
     const rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
 
     if (rulePhase === 1) {
@@ -1424,7 +1426,9 @@ export async function analyzeMealPortion(
   // Phase 5: Uses 3-day rotating rules (applies to ALL Phase 5 clients including event_ready)
   else if (phase === 5 && hasStarch) {
     const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
-    const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
+    const currentDayRule = (Array.isArray(context.phase5Plan) && context.phase5Plan.length > 0)
+      ? context.phase5Plan.find(d => d.day === dayNum)
+      : null;
     const rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
 
     if (rulePhase === 1) {
@@ -1560,7 +1564,9 @@ export async function analyzeMealPortion(
     let rulePhase = phase;
     if (phase === 5) {
       const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
-      const currentDayRule = context.phase5Plan?.find(d => d.day === dayNum);
+      const currentDayRule = (Array.isArray(context.phase5Plan) && context.phase5Plan.length > 0)
+        ? context.phase5Plan.find(d => d.day === dayNum)
+        : null;
       rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
     }
 

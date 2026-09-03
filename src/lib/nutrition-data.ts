@@ -325,7 +325,7 @@ export function getPhase5DayNumber(phase5StartDate: string): number {
 }
 
 export function getPhase5CurrentRule(phase5Plan: Phase5Day[], phase5StartDate: string): Phase5Day | null {
-  if (!phase5Plan || phase5Plan.length === 0) return null;
+  if (!Array.isArray(phase5Plan) || phase5Plan.length === 0) return null;
   const currentDay = getPhase5DayNumber(phase5StartDate);
   return phase5Plan.find(d => d.day === currentDay) || null;
 }
