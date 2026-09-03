@@ -1606,7 +1606,7 @@ export async function analyzeMealPortion(
       // Starch is REQUIRED in Phase 4 - every meal needs starch
       // BUT: if unrecognized items contain processed starches (tortillas, bread, etc.),
       // DON'T add 'starch' to missingCategories - the person had starch, just not on approved list
-      const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle'];
+      const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'pepperoni', 'salami', 'bacon', 'ham', 'hot dog', 'sausage', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub ', 'hoagie', 'pasta dish', 'fried rice'];
       const hasProcessedStarchInUnrecognized = unrecognizedItems.some(item => {
         const lower = item.toLowerCase();
         return processedStarchKeywords.some(kw => lower.includes(kw));
