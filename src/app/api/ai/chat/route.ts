@@ -57,7 +57,13 @@ export async function POST(request: NextRequest) {
       })(),
       trainerNotes: client.notes,
       // Phase 5 data
-      phase5Plan: client.phase5_plan ? JSON.parse(client.phase5_plan) : undefined,
+      phase5Plan: (() => {
+        if (!client.phase5_plan) return undefined;
+        const raw = typeof client.phase5_plan === 'string'
+          ? JSON.parse(client.phase5_plan)
+          : client.phase5_plan;
+        return Array.isArray(raw) ? raw : (raw.days || undefined);
+      })(),
       phase5StartDate: client.phase5_start_date || undefined,
     };
 
