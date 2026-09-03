@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/db';
-import { generatePhase5Plan, getPhase5DayNumber } from '@/lib/nutrition-data';
+import { generatePhase5Plan } from '@/lib/ai-coach';
+import { getPhase5DayNumber } from '@/lib/nutrition-data';
 
 /**
  * GET /api/admin/set-phase-day?phase5_start_date=YYYY-MM-DD&force_today_type=phase1|phase2|phase4
