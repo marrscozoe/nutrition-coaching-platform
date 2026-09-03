@@ -232,9 +232,10 @@ export async function POST(request: NextRequest) {
     ];
     if (mealQueryPatterns.some(p => lower.includes(p))) {
       try {
+        const detectedMealType = detectMealType(message);
         const suggestion = generateMealSuggestion(
-          { gender: context.gender as 'male' | 'female', currentPhase: context.currentPhase },
-          'lunch'
+          { gender: context.gender as 'male' | 'female', currentPhase: context.currentPhase, phase5StartDate: context.phase5StartDate, phase5Plan: context.phase5Plan },
+          detectedMealType
         );
         const response = formatMealSuggestion(suggestion);
         return NextResponse.json({
@@ -308,6 +309,20 @@ export async function POST(request: NextRequest) {
     console.error('AI chat error:', error);
     return NextResponse.json({ error: 'Chat failed' }, { status: 500 });
   }
+}
+
+function detectMealType(message: string): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
+  const lower = message.toLowerCase();
+  if (lower.includes('breakfast') || lower.includes('morning') || lower.includes('eggs') || lower.includes('oatmeal')) return 'breakfast';
+  if (lower.includes('lunch') || lower.includes('midday') || lower.includes('noon')) return 'lunch';
+  if (lower.includes('dinner') || lower.includes('supper') || lower.includes('evening')) return 'dinner';
+  if (lower.includes('snack') || lower.includes('crunch') || lower.includes('bite')) return 'snack';
+  // Fallback to time-of-day in America/Chicago
+  const chicagoTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+  const hour = new Date(chicagoTime).getHours();
+  if (hour < 10) return 'breakfast';
+  if (hour < 17) return 'lunch';
+  return 'dinner';
 }
 
 async function getFallbackResponse(message: string, context: CoachContext): Promise<string> {
@@ -405,6 +420,7 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
       lower.includes('meal plan') || lower.includes('example meal') || lower.includes('my plan') ||
       lower.includes('show me what') || lower.includes('give me a') || lower.includes('next meal')) {
     try {
+      const detectedMealType = detectMealType(message);
       const suggestion = generateMealSuggestion(
         {
           gender: context.gender as 'male' | 'female',
@@ -412,7 +428,7 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
           phase5StartDate: context.phase5StartDate,
           phase5Plan: context.phase5Plan,
         },
-        'lunch'
+        detectedMealType
       );
       const response = formatMealSuggestion(suggestion);
       return response;
