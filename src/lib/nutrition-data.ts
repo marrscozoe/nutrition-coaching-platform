@@ -327,35 +327,14 @@ export interface Phase5Day {
 export function getPhase5DayNumber(phase5StartDate: string): number {
   if (!phase5StartDate) return 1;
   const [y, m, d] = phase5StartDate.split('-').map(Number);
-  // The plan start date is a calendar date in Chicago. To compute the correct
-  // number of days elapsed, we need to work in the Chicago timezone.
-  // Approach: find the UTC offset for Chicago on the plan date, then add that
-  // to midnight UTC to get Chicago midnight as UTC milliseconds.
-  // Chicago UTC offset for Sep 2026 = UTC-5 (CDT).
-  const getUtcOffsetForChicago = (): number => {
-    // Create a date in the America/Chicago timezone and read its UTC offset
-    // by checking what UTC time corresponds to midnight Chicago.
-    // Use noon Chicago time to avoid any DST boundary issues.
-    const noonChicago = new Date(y, m - 1, d, 12, 0, 0); // noon local = noon Chicago if server is in Chicago TZ
-    // But we need the offset from the server's perspective... actually simpler:
-    // The plan date string "Sep 2" means Sep 2 00:00 Chicago time.
-    // Convert: Sep 2 00:00 CDT (UTC-5) = Sep 2 05:00 UTC = Date.UTC(y, m-1, d) + 5*3600*1000
-    // We need to add the Chicago UTC offset to the plan date.
-    // Determine Chicago offset by: what UTC time corresponds to midnight Chicago?
-    // Midnight Chicago = Date.UTC(y, m-1, d) + chicagoOffset
-    // toLocaleString gives us Chicago time; compute offset from UTC.
-    // Simplified: just add 5h (CDT) since September is always CDT.
-    return 5 * 3600 * 1000; // CDT = UTC-5
-  };
-  const chicagoOffsetMs = getUtcOffsetForChicago();
-  // Start of the plan date in UTC (Chicago midnight on the plan date)
-  const startMs = Date.UTC(y, m - 1, d) + chicagoOffsetMs;
-  // Current UTC time
-  const nowMs = Date.now();
-  // Compute integer days
-  const diffDays = Math.floor((nowMs - startMs) / (1000 * 60 * 60 * 24));
+  // Plan date is a calendar date in the user's timezone (America/Chicago).
+  // Parse it as local time (same calendar date, midnight).
+  // Then compute days elapsed against current local time.
+  const start = new Date(y, m - 1, d, 0, 0, 0);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   const result = Math.min(14, Math.max(1, diffDays + 1));
-  console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate, '| startMs:', new Date(startMs).toISOString(), '| nowMs:', new Date(nowMs).toISOString(), '| diffDays:', diffDays, '| currentDay:', result);
+  console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate, '| startLocal:', start.toISOString(), '| nowLocal:', now.toISOString(), '| diffDays:', diffDays, '| currentDay:', result);
   return result;
 }
 
