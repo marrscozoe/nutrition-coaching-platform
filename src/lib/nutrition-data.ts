@@ -518,16 +518,34 @@ const PHASE_DISALLOWED: Record<number, { starch: boolean; dairy: boolean; sugar:
 };
 
 // Keywords to detect disallowed foods
-const STARCH_KEYWORDS = ['bread', 'rice', 'pasta', 'potato', 'beans', 'corn', 'oatmeal', 'cereal', 'fruit', 'banana', 'apple', 'orange', 'mango', 'pineapple', 'grape', 'peach', 'plum', 'cherry', 'melon', 'watermelon', 'berries', 'cantaloupe', 'grapefruit', 'black eyed peas'];
-const DAIRY_KEYWORDS = ['milk', 'cheese', 'yogurt', 'ice cream', 'cream'];
+const STARCH_KEYWORDS = ['bread', 'rice', 'pasta', 'potato', 'beans', 'corn', 'oatmeal', 'cereal', 'banana', 'apple', 'orange', 'mango', 'pineapple', 'grape', 'peach', 'plum', 'cherry'];
+const DAIRY_KEYWORDS = ['milk', 'cheese', 'ice cream'];
 const SUGAR_KEYWORDS = ['candy', 'soda', 'sugar', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry'];
 const PROCESSED_KEYWORDS = ['chips', 'fries', 'fried', 'nuggets', 'tenders', 'tortilla', 'tortillas', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'french toast'];
 const ALCOHOL_KEYWORDS = ['beer', 'wine', 'vodka', 'whiskey', 'tequila', 'rum', 'cocktail', 'alcohol'];
+
+// Helper: check if a food appears on any approved list
+function isOnApprovedList(food: string): boolean {
+  const lower = food.toLowerCase();
+  // Check lean proteins (but not whey/bacon)
+  const leanCheck = LEAN_PROTEINS.filter(p => !p.includes('Whey') && !p.includes('Bacon'));
+  if (leanCheck.some(p => lower.includes(p.toLowerCase()))) return true;
+  // Check starch list
+  if (STARCHY_CARBOHYDRATES.some(p => lower.includes(p.toLowerCase()))) return true;
+  // Check vegetable list
+  if (FIBROUS_VEGETABLES.some(p => lower.includes(p.toLowerCase()))) return true;
+  // Check healthy fats
+  if (HEALTHY_FATS.some(p => lower.includes(p.toLowerCase()))) return true;
+  return false;
+}
 
 export function isSnackAllowed(food: string, phase: number): { allowed: boolean; reason?: string } {
   const lowerFood = food.toLowerCase();
   const rules = PHASE_DISALLOWED[phase];
   if (!rules) return { allowed: true };
+
+  // NEVER ban a food that appears on the approved list
+  if (isOnApprovedList(food)) return { allowed: true };
 
   if (rules.starch && STARCH_KEYWORDS.some(k => lowerFood.includes(k))) {
     return { allowed: false, reason: `No starch in Phase ${phase}` };
