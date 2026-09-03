@@ -161,7 +161,8 @@ function pickRandom<T>(arr: T[], count: number): T[] {
 }
 
 function isPhase2AllowedDay(): boolean {
-  const day = new Date().getDay();
+  const chicagoTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+  const day = new Date(chicagoTime).getDay();
   return day === 3 || day === 6 || day === 0;
 }
 
