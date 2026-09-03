@@ -326,21 +326,10 @@ export interface Phase5Day {
 
 export function getPhase5DayNumber(phase5StartDate: string): number {
   if (!phase5StartDate) return 1;
-  const chicagoTz = 'America/Chicago';
   const start = new Date(phase5StartDate + 'T12:00:00');
-  // Use Chicago time for consistency with client expectations
-  const nowUtc = new Date();
-  const nowChicago = new Date(nowUtc.toLocaleString('en-US', { timeZone: chicagoTz }));
-  const diffMs = nowChicago.getTime() - start.getTime();
-  // Handle case where dates are on boundary
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const result = Math.min(14, Math.max(1, diffDays + 1));
-  // Debug logging for Phase 5 day calculation
-  console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate);
-  console.log('[PHASE5-DEBUG] serverNow (UTC):', nowUtc.toISOString());
-  console.log('[PHASE5-DEBUG] chicagoNow:', nowChicago.toISOString());
-  console.log('[PHASE5-DEBUG] diffDays:', diffDays, '=> currentDay:', result);
-  return result;
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.min(14, Math.max(1, diffDays + 1));
 }
 
 export function getPhase5CurrentRule(phase5Plan: Phase5Day[], phase5StartDate: string): Phase5Day | null {
