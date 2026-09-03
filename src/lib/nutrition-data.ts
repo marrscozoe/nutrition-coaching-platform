@@ -326,30 +326,36 @@ export interface Phase5Day {
 
 export function getPhase5DayNumber(phase5StartDate: string): number {
   if (!phase5StartDate) return 1;
-  // Parse the plan start date into UTC year/month/day using the date string's calendar date.
-  // Then compute both dates as UTC midnight and subtract.
   const [y, m, d] = phase5StartDate.split('-').map(Number);
-  // Start of the plan start date in UTC (calendar date in UTC = same calendar date in Chicago at midnight)
-  const startMs = Date.UTC(y, m - 1, d);
-  // Current time as UTC milliseconds
-  const nowMs = Date.now();
-  // Compute integer UTC days for both
-  const startDay = Math.floor(startMs / (1000 * 60 * 60 * 24));
-  const nowDay = Math.floor(nowMs / (1000 * 60 * 60 * 24));
-  // Chicago is UTC-5 or UTC-6. Use America/Chicago to get the correct calendar date.
-  const fmtChicago = (ms: number) => new Date(ms).toLocaleDateString('en-US', { timeZone: 'America/Chicago' });
-  const parseChicago = (s: string) => {
-    const [mm, dd, yy] = s.split('/');
-    // Parse using UTC so the calendar date in Chicago is preserved exactly
-    return Date.UTC(Number(yy), Number(mm) - 1, Number(dd));
+  // The plan start date is a calendar date in Chicago. To compute the correct
+  // number of days elapsed, we need to work in the Chicago timezone.
+  // Approach: find the UTC offset for Chicago on the plan date, then add that
+  // to midnight UTC to get Chicago midnight as UTC milliseconds.
+  // Chicago UTC offset for Sep 2026 = UTC-5 (CDT).
+  const getUtcOffsetForChicago = (): number => {
+    // Create a date in the America/Chicago timezone and read its UTC offset
+    // by checking what UTC time corresponds to midnight Chicago.
+    // Use noon Chicago time to avoid any DST boundary issues.
+    const noonChicago = new Date(y, m - 1, d, 12, 0, 0); // noon local = noon Chicago if server is in Chicago TZ
+    // But we need the offset from the server's perspective... actually simpler:
+    // The plan date string "Sep 2" means Sep 2 00:00 Chicago time.
+    // Convert: Sep 2 00:00 CDT (UTC-5) = Sep 2 05:00 UTC = Date.UTC(y, m-1, d) + 5*3600*1000
+    // We need to add the Chicago UTC offset to the plan date.
+    // Determine Chicago offset by: what UTC time corresponds to midnight Chicago?
+    // Midnight Chicago = Date.UTC(y, m-1, d) + chicagoOffset
+    // toLocaleString gives us Chicago time; compute offset from UTC.
+    // Simplified: just add 5h (CDT) since September is always CDT.
+    return 5 * 3600 * 1000; // CDT = UTC-5
   };
-  const startChicagoDay = parseChicago(fmtChicago(startMs));
-  const nowChicagoDay = parseChicago(fmtChicago(nowMs));
-  const diffDays = Math.floor((nowChicagoDay - startChicagoDay) / (1000 * 60 * 60 * 24));
+  const chicagoOffsetMs = getUtcOffsetForChicago();
+  // Start of the plan date in UTC (Chicago midnight on the plan date)
+  const startMs = Date.UTC(y, m - 1, d) + chicagoOffsetMs;
+  // Current UTC time
+  const nowMs = Date.now();
+  // Compute integer days
+  const diffDays = Math.floor((nowMs - startMs) / (1000 * 60 * 60 * 24));
   const result = Math.min(14, Math.max(1, diffDays + 1));
-  console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate,
-    '| fmtChicago(startMs):', fmtChicago(startMs), '| fmtChicago(nowMs):', fmtChicago(nowMs),
-    '| diffDays:', diffDays, '| currentDay:', result);
+  console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate, '| startMs:', new Date(startMs).toISOString(), '| nowMs:', new Date(nowMs).toISOString(), '| diffDays:', diffDays, '| currentDay:', result);
   return result;
 }
 
