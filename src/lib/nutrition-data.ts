@@ -547,7 +547,22 @@ export function isSnackAllowed(food: string, phase: number): { allowed: boolean;
   // NEVER ban a food that appears on the approved list
   if (isOnApprovedList(food)) return { allowed: true };
 
-  if (rules.starch && STARCH_KEYWORDS.some(k => lowerFood.includes(k))) {
+  // Phase 2: snacks follow the same starch rules as meals
+  // Only block starch on non-starch days OR after 8pm Chicago time
+  if (phase === 2 && rules.starch && STARCH_KEYWORDS.some(k => lowerFood.includes(k))) {
+    const isStarchDay = isPhase2AllowedDay();
+    if (!isStarchDay) {
+      return { allowed: false, reason: `No starch in Phase ${phase}` };
+    }
+    // It's a starch day — check if it's a daytime snack (not after 8pm Chicago)
+    const chicagoTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+    const hour = new Date(chicagoTime).getHours();
+    if (hour >= 20) {
+      return { allowed: false, reason: `No starch in Phase ${phase} after 8pm` };
+    }
+    // Daytime starch day snack — allowed
+    return { allowed: true };
+  } else if (rules.starch && STARCH_KEYWORDS.some(k => lowerFood.includes(k))) {
     return { allowed: false, reason: `No starch in Phase ${phase}` };
   }
   if (rules.dairy && DAIRY_KEYWORDS.some(k => lowerFood.includes(k))) {
