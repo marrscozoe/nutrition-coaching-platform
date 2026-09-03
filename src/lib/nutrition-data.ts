@@ -326,28 +326,30 @@ export interface Phase5Day {
 
 export function getPhase5DayNumber(phase5StartDate: string): number {
   if (!phase5StartDate) return 1;
-  // Use calendar-day arithmetic in the Chicago timezone.
-  // Format the UTC date components (which represent the calendar date)
-  // into a Chicago-time representation to get the correct Chicago calendar date.
-  // We use a fixed-time (T00:00:00Z) UTC date so that the toLocaleString
-  // conversion gives us the correct calendar date in Chicago.
+  // Parse the plan start date into UTC year/month/day using the date string's calendar date.
+  // Then compute both dates as UTC midnight and subtract.
   const [y, m, d] = phase5StartDate.split('-').map(Number);
-  // Get the Chicago calendar date for this UTC date
-  const startChicagoDateStr = new Date(y, m - 1, d, 0, 0, 0)
-    .toLocaleDateString('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric' });
-  // Get the Chicago calendar date for "now"
-  const nowChicagoDateStr = new Date()
-    .toLocaleDateString('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric' });
-  // Parse both as YYYY-MM-DD
-  const parseDate = (s: string) => {
+  // Start of the plan start date in UTC (calendar date in UTC = same calendar date in Chicago at midnight)
+  const startMs = Date.UTC(y, m - 1, d);
+  // Current time as UTC milliseconds
+  const nowMs = Date.now();
+  // Compute integer UTC days for both
+  const startDay = Math.floor(startMs / (1000 * 60 * 60 * 24));
+  const nowDay = Math.floor(nowMs / (1000 * 60 * 60 * 24));
+  // Chicago is UTC-5 or UTC-6. Use America/Chicago to get the correct calendar date.
+  const fmtChicago = (ms: number) => new Date(ms).toLocaleDateString('en-US', { timeZone: 'America/Chicago' });
+  const parseChicago = (s: string) => {
     const [mm, dd, yy] = s.split('/');
-    return new Date(Number(yy), Number(mm) - 1, Number(dd));
+    // Parse using UTC so the calendar date in Chicago is preserved exactly
+    return Date.UTC(Number(yy), Number(mm) - 1, Number(dd));
   };
-  const startDate = parseDate(startChicagoDateStr);
-  const nowDate = parseDate(nowChicagoDateStr);
-  const diffDays = Math.floor((nowDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const startChicagoDay = parseChicago(fmtChicago(startMs));
+  const nowChicagoDay = parseChicago(fmtChicago(nowMs));
+  const diffDays = Math.floor((nowChicagoDay - startChicagoDay) / (1000 * 60 * 60 * 24));
   const result = Math.min(14, Math.max(1, diffDays + 1));
-  console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate, '| startChicago:', startChicagoDateStr, '| nowChicago:', nowChicagoDateStr, '| diffDays:', diffDays, '| day:', result);
+  console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate,
+    '| fmtChicago(startMs):', fmtChicago(startMs), '| fmtChicago(nowMs):', fmtChicago(nowMs),
+    '| diffDays:', diffDays, '| currentDay:', result);
   return result;
 }
 
