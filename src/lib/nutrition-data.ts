@@ -129,7 +129,7 @@ export function getPortions(gender: 'male' | 'female', phase: number): PortionSi
   // Phase 1: NO starch
   // Phase 2: starch on Wed/Sat/Sun B/L only
   // Phase 4: starch every meal
-  // Phase 5: NO starch (same as Phase 1 for starch rules)
+  // Phase 5: starch rules vary by day type (phase1/phase2/phase4 sub-phases)
   if (gender === 'male') {
     return {
       protein: '6 ounces',
@@ -231,12 +231,21 @@ export function generateMealSuggestion(
     starchAllowed = allowedDay && isFirstTwoMeals;
   } else if (currentPhase === 5) {
     // Phase 5: check sub-phase for starch rules
-    // 'phase1' sub-phase: no starch
-    // 'phase2' sub-phase: starch at B/L only (but dinner suggestion = no starch)
+    // 'phase1' sub-phase: no starch ever
+    // 'phase2' sub-phase: starch at BREAKFAST and LUNCH only (not dinner, not snack)
     // 'phase4' sub-phase: starch every meal
     if (context.phase5StartDate && context.phase5Plan) {
       const phase5Rule = getPhase5CurrentRule(context.phase5Plan, context.phase5StartDate);
-      starchAllowed = phase5Rule?.type === 'phase4';
+      if (phase5Rule?.type === 'phase1') {
+        starchAllowed = false;
+      } else if (phase5Rule?.type === 'phase2') {
+        // Starch allowed only at breakfast and lunch (not dinner, not snack)
+        starchAllowed = mealType === 'breakfast' || mealType === 'lunch';
+      } else if (phase5Rule?.type === 'phase4') {
+        starchAllowed = true;
+      } else {
+        starchAllowed = false;
+      }
     } else {
       starchAllowed = false; // Default to no starch if phase 5 data not available
     }
