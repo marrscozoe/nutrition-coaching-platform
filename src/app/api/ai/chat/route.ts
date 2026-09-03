@@ -16,7 +16,7 @@ import {
   FIBROUS_VEGETABLES,
   HEALTHY_FATS,
 } from '@/lib/ai-coach';
-import { generateMealSuggestion, formatMealSuggestion, getPortions } from '@/lib/nutrition-data';
+import { generateMealSuggestion, formatMealSuggestion, getPortions, getPhase5CurrentRule } from '@/lib/nutrition-data';
 
 export async function POST(request: NextRequest) {
   try {
@@ -174,8 +174,24 @@ export async function POST(request: NextRequest) {
         starchNote = 'Not allowed in Phase 1';
       } else if (context.currentPhase === 2) {
         starchNote = `${isMale ? starchMale : starchFemale} (allowed Wed/Sat/Sun only)`;
+      } else if (context.currentPhase === 5) {
+        // Phase 5 starch rules vary by day type
+        if (context.phase5Plan && context.phase5StartDate) {
+          const phase5Rule = getPhase5CurrentRule(context.phase5Plan, context.phase5StartDate);
+          if (phase5Rule?.type === 'phase1') {
+            starchNote = 'Not allowed today (Phase 1 day)';
+          } else if (phase5Rule?.type === 'phase2') {
+            starchNote = `${isMale ? starchMale : starchFemale} (allowed breakfast/lunch only today — Phase 2 day)`;
+          } else if (phase5Rule?.type === 'phase4') {
+            starchNote = `${isMale ? starchMale : starchFemale} every meal (Phase 4 day)`;
+          } else {
+            starchNote = 'Not allowed today (plan data unavailable)';
+          }
+        } else {
+          starchNote = 'Not allowed today (plan data unavailable)';
+        }
       } else {
-        // Phase 4, 5, 6 - all allow starch every meal
+        // Phase 4, 6 - all allow starch every meal
         starchNote = `${isMale ? starchMale : starchFemale} every meal`;
       }
       
