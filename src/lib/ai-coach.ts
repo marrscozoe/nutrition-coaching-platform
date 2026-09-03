@@ -488,6 +488,7 @@ When client describes a meal they ate or are eating, you MUST check ALL of these
    - Phase 1: NO starch allowed — if they have starch, tell them to drop it
    - Phase 2: Starch only allowed at breakfast/lunch on Wed/Sat/Sun — if they have starch at wrong meal/day, tell them
    - Phase 4/5: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '2 cups' : '1 cup'}
+   - PROCESSED STARCH — if client describes eating pizza, pepperoni, salami, ham, hot dog, bacon, sausage, burrito, taco, sandwich, sub, wrap, pasta dish, fried rice, or similar processed starches: these are NOT on the approved starch list. Tell them to REPLACE with an approved starch: sweet potato, red potato, beans, millet, oats, or rice. Do NOT say "add rice on top" — tell them to SWAP the processed food for the approved starch.
    - Phase 6: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '3 cups' : '2 cups'} (Phase 6 allows MORE starch)
    
 4. HEALTHY FAT — Is there fat? (${evalFatExamples})
