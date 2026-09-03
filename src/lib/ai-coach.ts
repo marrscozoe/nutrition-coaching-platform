@@ -1616,9 +1616,10 @@ export async function analyzeMealPortion(
         // Truly missing starch - no processed starches in unrecognized items
         missingCategories.push('starch');
         corrections.push(`💡 Phase 4 requires starch every meal — add ${context.gender === 'male' ? '2 cups' : '1 cup'} rice, potato, or sweet potato.`);
+      } else {
+        // Processed starch detected — tell client to replace with approved starches
+        corrections.push(`💡 Replace the processed starch with an approved starch: rice, beans, potatoes, or sweet potato.`);
       }
-      // If hasProcessedStarchInUnrecognized is true, don't add 'starch' to missingCategories
-      // The processed starch will be handled in getMealEvaluationPrompt as "PROCESSED STARCH - NOT ON APPROVED LIST"
     }
   }
 
