@@ -326,27 +326,28 @@ export interface Phase5Day {
 
 export function getPhase5DayNumber(phase5StartDate: string): number {
   if (!phase5StartDate) return 1;
-  const chicagoTz = 'America/Chicago';
-  // Get Chicago timezone offset (negative = west of UTC)
-  // Build a "noon Chicago" timestamp as UTC milliseconds
+  // Use calendar-day arithmetic in the Chicago timezone.
+  // Format the UTC date components (which represent the calendar date)
+  // into a Chicago-time representation to get the correct Chicago calendar date.
+  // We use a fixed-time (T00:00:00Z) UTC date so that the toLocaleString
+  // conversion gives us the correct calendar date in Chicago.
   const [y, m, d] = phase5StartDate.split('-').map(Number);
-  // Format the start date in Chicago time, then parse as UTC
-  const startChicagoFormatted = new Date(y, m - 1, d, 12, 0, 0).toLocaleString('en-US', { timeZone: chicagoTz, hour12: false });
-  // Parse that formatted string back as a Date (it represents Chicago local time)
-  const [startDatePart, startTimePart] = startChicagoFormatted.split(', ');
-  const [sm, sd, sy] = startDatePart.split('/').map(Number);
-  const [sh, sMin, sSec] = startTimePart.split(':').map(Number);
-  const start = new Date(sy, sm - 1, sd, sh, sMin, sSec);
-
-  // Get current time in Chicago
-  const nowChicagoFormatted = new Date().toLocaleString('en-US', { timeZone: chicagoTz, hour12: false });
-  const [nm, nd, ny] = nowChicagoFormatted.split(', ')[0].split('/').map(Number);
-  const [nh, nMin, nSec] = nowChicagoFormatted.split(', ')[1].split(':').map(Number);
-  const now = new Date(ny, nm - 1, nd, nh, nMin, nSec);
-
-  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  // Get the Chicago calendar date for this UTC date
+  const startChicagoDateStr = new Date(y, m - 1, d, 0, 0, 0)
+    .toLocaleDateString('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric' });
+  // Get the Chicago calendar date for "now"
+  const nowChicagoDateStr = new Date()
+    .toLocaleDateString('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric' });
+  // Parse both as YYYY-MM-DD
+  const parseDate = (s: string) => {
+    const [mm, dd, yy] = s.split('/');
+    return new Date(Number(yy), Number(mm) - 1, Number(dd));
+  };
+  const startDate = parseDate(startChicagoDateStr);
+  const nowDate = parseDate(nowChicagoDateStr);
+  const diffDays = Math.floor((nowDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
   const result = Math.min(14, Math.max(1, diffDays + 1));
-  console.log('[PHASE5-DEBUG] startDate:', phase5StartDate, 'chicagoNoon:', start.toLocaleString('en-US', {timeZone:'America/Chicago'}), 'nowChicago:', now.toLocaleString('en-US',{timeZone:'America/Chicago'}), 'diffDays:', diffDays, 'currentDay:', result);
+  console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate, '| startChicago:', startChicagoDateStr, '| nowChicago:', nowChicagoDateStr, '| diffDays:', diffDays, '| day:', result);
   return result;
 }
 
