@@ -1731,7 +1731,7 @@ export function getMealEvaluationPrompt(
   // flag it explicitly so the AI doesn't give generic "add starch" advice
   // EXCEPTION: In Phase 6, tortillas are explicitly allowed, so don't flag them
   if (analysis.unrecognizedItems.length > 0) {
-    const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle'];
+    const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'pepperoni', 'salami', 'bacon', 'ham', 'hot dog', 'sausage', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub ', 'hoagie', 'pasta dish', 'fried rice'];
     const processedStarches = analysis.unrecognizedItems.filter(item => {
       const lower = item.toLowerCase();
       return processedStarchKeywords.some(kw => lower.includes(kw));
