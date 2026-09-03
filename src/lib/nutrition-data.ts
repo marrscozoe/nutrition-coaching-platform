@@ -181,7 +181,7 @@ export function generateMealSuggestion(
     phase5StartDate?: string;
     phase5Plan?: Phase5Day[];
   },
-  mealType: 'breakfast' | 'lunch' | 'dinner' = 'lunch'
+  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' = 'lunch'
 ): MealSuggestion {
   const { gender, currentPhase } = context;
   const isMale = gender === 'male';
