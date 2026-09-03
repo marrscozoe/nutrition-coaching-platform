@@ -327,19 +327,26 @@ export interface Phase5Day {
 export function getPhase5DayNumber(phase5StartDate: string): number {
   if (!phase5StartDate) return 1;
   const chicagoTz = 'America/Chicago';
-  const start = new Date(phase5StartDate + 'T12:00:00');
-  // Use Chicago time for consistency with client expectations
-  const nowUtc = new Date();
-  const nowChicago = new Date(nowUtc.toLocaleString('en-US', { timeZone: chicagoTz }));
-  const diffMs = nowChicago.getTime() - start.getTime();
-  // Handle case where dates are on boundary
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  // Get Chicago timezone offset (negative = west of UTC)
+  // Build a "noon Chicago" timestamp as UTC milliseconds
+  const [y, m, d] = phase5StartDate.split('-').map(Number);
+  // Format the start date in Chicago time, then parse as UTC
+  const startChicagoFormatted = new Date(y, m - 1, d, 12, 0, 0).toLocaleString('en-US', { timeZone: chicagoTz, hour12: false });
+  // Parse that formatted string back as a Date (it represents Chicago local time)
+  const [startDatePart, startTimePart] = startChicagoFormatted.split(', ');
+  const [sm, sd, sy] = startDatePart.split('/').map(Number);
+  const [sh, sMin, sSec] = startTimePart.split(':').map(Number);
+  const start = new Date(sy, sm - 1, sd, sh, sMin, sSec);
+
+  // Get current time in Chicago
+  const nowChicagoFormatted = new Date().toLocaleString('en-US', { timeZone: chicagoTz, hour12: false });
+  const [nm, nd, ny] = nowChicagoFormatted.split(', ')[0].split('/').map(Number);
+  const [nh, nMin, nSec] = nowChicagoFormatted.split(', ')[1].split(':').map(Number);
+  const now = new Date(ny, nm - 1, nd, nh, nMin, nSec);
+
+  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   const result = Math.min(14, Math.max(1, diffDays + 1));
-  // Debug logging for Phase 5 day calculation
-  console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate);
-  console.log('[PHASE5-DEBUG] serverNow (UTC):', nowUtc.toISOString());
-  console.log('[PHASE5-DEBUG] chicagoNow:', nowChicago.toISOString());
-  console.log('[PHASE5-DEBUG] diffDays:', diffDays, '=> currentDay:', result);
+  console.log('[PHASE5-DEBUG] startDate:', phase5StartDate, 'chicagoNoon:', start.toLocaleString('en-US', {timeZone:'America/Chicago'}), 'nowChicago:', now.toLocaleString('en-US',{timeZone:'America/Chicago'}), 'diffDays:', diffDays, 'currentDay:', result);
   return result;
 }
 
