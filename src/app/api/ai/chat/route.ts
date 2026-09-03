@@ -62,6 +62,8 @@ export async function POST(request: NextRequest) {
         const raw = typeof client.phase5_plan === 'string'
           ? JSON.parse(client.phase5_plan)
           : client.phase5_plan;
+        console.log('[PHASE5] route extraction — raw type:', typeof raw, 'isArray:', Array.isArray(raw), 'keys:', raw && typeof raw === 'object' ? Object.keys(raw) : 'N/A');
+        console.log('[PHASE5] route extraction — raw.days length:', raw?.days?.length);
         return Array.isArray(raw) ? raw : (raw.days || undefined);
       })(),
       phase5StartDate: client.phase5_start_date || undefined,
@@ -184,6 +186,14 @@ export async function POST(request: NextRequest) {
         // Phase 5 starch rules vary by day type
         if (context.phase5Plan && context.phase5StartDate) {
           const phase5Rule = getPhase5CurrentRule(context.phase5Plan, context.phase5StartDate);
+          console.log('[PHASE5] portion-sizes — phase5StartDate:', context.phase5StartDate);
+          console.log('[PHASE5] portion-sizes — phase5Plan type:', typeof context.phase5Plan, 'isArray:', Array.isArray(context.phase5Plan), 'length:', context.phase5Plan?.length);
+          console.log('[PHASE5] portion-sizes — currentDay:', (() => {
+            const start = new Date(context.phase5StartDate + 'T12:00:00');
+            const now = new Date();
+            return Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          })());
+          console.log('[PHASE5] portion-sizes — phase5Rule:', JSON.stringify(phase5Rule));
           if (phase5Rule?.type === 'phase1') {
             starchNote = 'Not allowed today (Phase 1 day)';
           } else if (phase5Rule?.type === 'phase2') {

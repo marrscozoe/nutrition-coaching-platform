@@ -237,6 +237,14 @@ export function generateMealSuggestion(
     // 'phase4' sub-phase: starch every meal
     if (context.phase5StartDate && context.phase5Plan) {
       const phase5Rule = getPhase5CurrentRule(context.phase5Plan, context.phase5StartDate);
+      console.log('[PHASE5] generateMealSuggestion — phase5StartDate:', context.phase5StartDate);
+      console.log('[PHASE5] generateMealSuggestion — phase5Plan type:', typeof context.phase5Plan, 'isArray:', Array.isArray(context.phase5Plan), 'length:', context.phase5Plan?.length);
+      console.log('[PHASE5] generateMealSuggestion — currentDay:', (() => {
+        const start = new Date(context.phase5StartDate + 'T12:00:00');
+        const now = new Date();
+        return Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      })());
+      console.log('[PHASE5] generateMealSuggestion — phase5Rule:', JSON.stringify(phase5Rule));
       if (phase5Rule?.type === 'phase1') {
         starchAllowed = false;
       } else if (phase5Rule?.type === 'phase2') {
@@ -279,7 +287,7 @@ export function generateMealSuggestion(
       } else if (phase5Rule?.type === 'phase4') {
         message = 'Phase 5 (Phase 4 day) — starch every meal! 🎉';
       } else {
-        message = 'Phase 5 — check your plan for starch rules!';
+        message = 'Phase 5 — no starch today (plan data unavailable)! 💪';
       }
     } else {
       message = 'Phase 5 — no starch today (plan data unavailable)! 💪';
