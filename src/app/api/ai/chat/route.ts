@@ -460,7 +460,9 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
       lower.includes('breakfast') || lower.includes('lunch') || lower.includes('dinner') ||
       lower.includes('snack') || lower.includes('chicken') || lower.includes('beef') ||
       lower.includes('veggie') || lower.includes('vegetable') ||
-      lower.includes('fat') || lower.includes('starch')) {
+      lower.includes('fat') || lower.includes('starch') ||
+      lower.includes('banana') || lower.includes('apple') || lower.includes('orange') ||
+      lower.includes('yogurt') || lower.includes('fruit')) {
     const fallback = await analyzeMealPortion(message, context);
     return fallback.portionAdvice;
   }

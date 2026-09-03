@@ -523,7 +523,7 @@ PHASE RULES (for YOUR reference only — give personalized advice for THIS clien
 - Phase 1: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, NO starch, NO dairy, NO sugar, ${context.gender === 'male' ? '32oz per meal' : '20oz per meal'} water
 - Phase 2: Same as Phase 1 + starch for BREAKFAST & LUNCH ONLY on Wed/Sat/Sun. Dinner and snack NEVER get starch in Phase 2!
 - Phase 4: Add starch every meal, weigh Fri only
-- Phase 5: 14-day plan with 3-day blocks rotating through strict/strict/lenient rules. Same portions as other phases.
+- Phase 5: 14-day plan with 3-day blocks rotating through strict/strict/lenient rules. Client is currently on a ${context.currentPhase === 5 && context.phase5Plan ? context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown' : 'Unknown'} day. Same portions as other phases.
 
 CLIENT'S MESSAGE: "${message}"
 
