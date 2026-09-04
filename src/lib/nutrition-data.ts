@@ -39,7 +39,7 @@ const ALLERGY_BAN_PATTERNS: Record<string, { list: string; patterns: string[] }[
     { list: 'LEAN_PROTEINS', patterns: ['shrimp', 'crab', 'lobster', 'crawfish', 'scallop', 'clam', 'mussel', 'oyster', 'crawfish', 'crayfish', 'shellfish'] },
   ],
   nuts: [
-    { list: 'HEALTHY_FATS', patterns: ['almond', 'walnut', 'pecan', 'cashew', 'macadamia', 'hazelnut', 'brazil nut', 'pine nut', 'pistachio', 'nuttzo', 'nut butter', 'nut butter'] },
+    { list: 'HEALTHY_FATS', patterns: ['almond', 'walnut', 'pecan', 'cashew', 'macadamia', 'hazelnut', 'brazil nut', 'pine nut', 'pistachio', 'nuttzo', 'nut butter', 'mixed', 'nut'] },
   ],
   peanuts: [
     { list: 'HEALTHY_FATS', patterns: ['peanut'] },

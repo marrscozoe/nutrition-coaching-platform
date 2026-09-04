@@ -35,11 +35,12 @@ export async function POST(request: NextRequest) {
     }
 
     const allergies: string[] = client.allergies || [];
-    const phase = client.current_phase || 1;
+    const phase = Number(client.current_phase) || 1;
     const gender = client.gender === 'female' ? 'female' : 'male';
 
     // Determine if starch is allowed in current phase
     const starchAllowed = isStarchAllowedForPhase(phase, client);
+    console.log('[GroceryGenerate] phase:', phase, 'type:', typeof phase, 'starchAllowed:', starchAllowed, 'allergies:', allergies);
 
     // Get filtered food lists
     const proteins = filterFoodsForAllergies(LEAN_PROTEINS, allergies);
@@ -82,6 +83,7 @@ export async function POST(request: NextRequest) {
 
     // Starch: only if allowed
     if (starchAllowed && starches.length > 0) {
+      console.log('[GroceryGenerate] INSERTING starch items, count:', starches.length, 'first few:', starches.slice(0,3));
       items.push({ client_id: clientId, item_name: `${portions.starch} per meal × 7 days — select your starches below`, category: 'starch' });
       starches.forEach(s => {
         items.push({ client_id: clientId, item_name: s, category: 'starch' });
