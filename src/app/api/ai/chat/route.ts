@@ -86,24 +86,30 @@ export async function POST(request: NextRequest) {
       })(),
       // Allergies — hard-ban food allergies
       allergies: client.allergies || [],
+      allergy_discovery_enabled: client.allergy_discovery_enabled ?? false,
     };
 
-    // Get recent symptoms for allergy discovery
-    const nowChicago = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }));
-    const sevenDaysAgo = new Date(nowChicago.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: recentSymptoms } = await supabase
-      .from('symptoms')
-      .select('type, created_at')
-      .eq('client_id', clientId)
-      .gte('created_at', sevenDaysAgo)
-      .order('created_at', { ascending: false });
-    const symptomCount = recentSymptoms?.length || 0;
-    const hasBloatingPattern = symptomCount >= 2;
+    // Get recent symptoms for allergy discovery — only when discovery is enabled
+    let symptomCount = 0;
+    let hasBloatingPattern = false;
+    if (context.allergy_discovery_enabled) {
+      const nowChicago = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+      const sevenDaysAgo = new Date(nowChicago.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: recentSymptoms } = await supabase
+        .from('symptoms')
+        .select('type, created_at')
+        .eq('client_id', clientId)
+        .gte('created_at', sevenDaysAgo)
+        .order('created_at', { ascending: false });
+      symptomCount = recentSymptoms?.length || 0;
+      hasBloatingPattern = symptomCount >= 2;
+    }
 
     // Discovery tip: if client mentions bloating/stomach pain and has 2+ logged symptoms in last 7 days
     const lowerMessage = message.toLowerCase();
     const mentionsDigestiveIssue = lowerMessage.includes('bloated') || lowerMessage.includes('bloating') || lowerMessage.includes('stomach pain') || lowerMessage.includes('stomach ache') || lowerMessage.includes('gassy') || lowerMessage.includes('gut hurts');
-    const showDiscoveryTip = mentionsDigestiveIssue && hasBloatingPattern;
+    // Discovery tip only shows when the client has opted in via Profile (allergy_discovery_enabled = true)
+    const showDiscoveryTip = context.allergy_discovery_enabled && mentionsDigestiveIssue && hasBloatingPattern;
 
     // Handle meal analysis request - HYBRID FLOW (code + AI)
     if (mealData) {

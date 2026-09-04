@@ -21,6 +21,7 @@ interface ClientData {
   event_date?: string;
   notes?: string;
   allergies?: string[];
+  allergy_discovery_enabled?: boolean;
   created_at: string;
 }
 
@@ -48,6 +49,39 @@ export default function ProfilePage() {
   const [editEventDate, setEditEventDate] = useState('');
   const [showProgramInfo, setShowProgramInfo] = useState<string | null>(null);
   const [showAllergyEdit, setShowAllergyEdit] = useState(false);
+  const [discoveryToggling, setDiscoveryToggling] = useState(false);
+
+  async function handleDiscoveryToggle() {
+    if (!client || discoveryToggling) return;
+    const newValue = !client.allergy_discovery_enabled;
+    setDiscoveryToggling(true);
+    try {
+      const res = await fetch('/api/client/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-client-id': client.id },
+        body: JSON.stringify({ allergy_discovery_enabled: newValue }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.client) {
+          setClient(data.client);
+          sessionStorage.setItem('client_user', JSON.stringify(data.client));
+        }
+        setToast({
+          message: newValue
+            ? 'Allergy discovery enabled — tips will appear when patterns are found.'
+            : 'Allergy discovery disabled.',
+          type: 'success',
+        });
+      } else {
+        setToast({ message: 'Failed to update setting.', type: 'error' });
+      }
+    } catch {
+      setToast({ message: 'Failed to update setting.', type: 'error' });
+    } finally {
+      setDiscoveryToggling(false);
+    }
+  }
 
   async function fetchClientData(clientId: string) {
     try {
@@ -290,6 +324,34 @@ export default function ProfilePage() {
             <p className="text-brand-cream/50 text-sm">No allergies set. Tap Edit to add.</p>
           )}
           <p className="text-brand-cream/40 text-xs mt-2">Allergy foods are hard-banned — never suggested in meals.</p>
+        </div>
+
+        {/* Allergy Discovery Toggle */}
+        <div className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 pr-4">
+              <h3 className="text-sm font-semibold text-brand-cream/60 uppercase tracking-wider">🔍 Allergy Discovery</h3>
+              <p className="text-brand-cream/40 text-xs mt-1">
+                {client.allergy_discovery_enabled
+                  ? 'ON — I want help finding food triggers (bloating, patterns).'
+                  : 'OFF — I already know my allergies.'}
+              </p>
+            </div>
+            <button
+              onClick={handleDiscoveryToggle}
+              disabled={discoveryToggling}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                client.allergy_discovery_enabled ? 'bg-brand-orange' : 'bg-brand-cream/20'
+              } disabled:opacity-50`}
+              aria-label="Toggle allergy discovery"
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                  client.allergy_discovery_enabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Report Problem */}

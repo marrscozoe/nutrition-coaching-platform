@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
       event_date: client.event_date,
       notes: client.notes,
       allergies: client.allergies || [],
+      allergy_discovery_enabled: client.allergy_discovery_enabled ?? false,
       created_at: client.created_at,
     });
   } catch (error) {
@@ -52,13 +53,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { allergies, name, gender, goal_weight, starting_weight, program_type, event_date } = body;
+    const { allergies, allergy_discovery_enabled, name, gender, goal_weight, starting_weight, program_type, event_date } = body;
 
     const supabase = getAdminClient();
 
     // Build update object — only include provided fields
     const updates: Record<string, any> = {};
     if (allergies !== undefined) updates.allergies = allergies;
+    if (allergy_discovery_enabled !== undefined) updates.allergy_discovery_enabled = allergy_discovery_enabled;
     if (name !== undefined) updates.name = name;
     if (gender !== undefined) updates.gender = gender;
     if (goal_weight !== undefined) updates.goal_weight = goal_weight;
@@ -85,12 +87,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({
-      id: updated.id,
-      name: updated.name,
-      email: updated.email,
-      gender: updated.gender,
-      allergies: updated.allergies || [],
-      current_phase: updated.current_phase,
+      client: {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        gender: updated.gender,
+        allergies: updated.allergies || [],
+        allergy_discovery_enabled: updated.allergy_discovery_enabled ?? false,
+        current_phase: updated.current_phase,
+      },
     });
   } catch (error) {
     console.error('PATCH /api/client/profile error:', error);
