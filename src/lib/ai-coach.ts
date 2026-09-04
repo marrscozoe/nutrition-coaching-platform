@@ -458,6 +458,11 @@ ${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep cr
 Ask me anything about specific foods!`;
   }
 
+  // Gate allergy discovery tips — never suggest adding foods as allergies unless client has opted in
+  const discoveryGate = !context.allergy_discovery_enabled
+    ? `\n\n⚠️ IMPORTANT: Allergy discovery is DISABLED for this client. NEVER suggest adding foods as allergies. NEVER say "want me to add X as a hard allergy" or similar. Hard bans (actual allergies) still apply — never suggest those foods.`
+    : '';
+
   // Build allergy-filtered food lists for the evaluation protocol
   const allergies = context.allergies || [];
   const filteredLists = allergies.length > 0 ? getFilteredFoodLists(allergies) : null;
@@ -543,7 +548,7 @@ PHASE RULES (for YOUR reference only — give personalized advice for THIS clien
 - Phase 5: 14-day plan. TODAY is a "${context.phase5RuleType === 'phase1' ? 'No starch today' : context.phase5RuleType === 'phase2' ? 'Starch breakfast/lunch only' : context.phase5RuleType === 'phase4' ? 'Starch every meal' : 'Unknown' }" day (Phase 5 day ${getPhase5DayNumber(context.phase5StartDate || '')}). Same portions as other phases.
 - Phase 6: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, ${portions.starch} starch every meal, ${context.gender === 'male' ? '128oz' : '80oz'} daily water. Muscle gain phase — higher carbs and fats to fuel growth.
 
-CLIENT'S MESSAGE: "${message}"
+CLIENT'S MESSAGE: "${message}"${discoveryGate}
 
 Respond as Allen would. Short. Direct. Helpful. Tell them what to do NEXT. Only reference THIS CLIENT'S portions — never mention male/female side by side.`;
 }
@@ -594,6 +599,7 @@ ${isMaintained ? `- MAINTAINED: Acknowledge it positively. "Holding steady! Cons
 - Never lecture, never long paragraphs
 - Use emoji sparingly: 🎉 🔥 💪
 
+${!context.allergy_discovery_enabled ? '⚠️ IMPORTANT: Allergy discovery is DISABLED for this client. NEVER suggest adding foods as allergies. NEVER say "want me to add X as a hard allergy" or similar.\n' : ''}
 Give coaching feedback now:`;
 }
 export function getWeightResponse(
@@ -1865,6 +1871,12 @@ export function getMealEvaluationPrompt(
     p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
     p += `- NEVER mention a food unless it appears in CORRECTIONS, REMOVE, or MISSING above\n`;
   }
+
+  // Gate allergy discovery tips — never suggest adding foods as allergies unless client has opted in
+  if (!context.allergy_discovery_enabled) {
+    p += `\n⚠️ IMPORTANT: Allergy discovery is DISABLED for this client. NEVER suggest adding foods as allergies. NEVER say "want me to add X as a hard allergy" or similar. Hard bans (actual allergies) still apply — never suggest those foods.\n`;
+  }
+
   p += `\nRespond now:`;
 
   return p;
@@ -1883,12 +1895,17 @@ export function getSnackEvaluationPrompt(
   const unrecognizedList = snackData.unrecognizedItems.join(', ');
   const disallowedList = snackData.disallowedItems.join(', ');
 
+  // Gate allergy discovery tips
+  const discoveryGate = !context.allergy_discovery_enabled
+    ? `\n⚠️ IMPORTANT: Allergy discovery is DISABLED for this client. NEVER suggest adding foods as allergies. NEVER say "want me to add X as a hard allergy" or similar.`
+    : '';
+
   return `*** THIS IS A SNACK - EVALUATE AS SNACK ONLY ***
 Phase: ${context.currentPhase} (${phaseAdvice})
 
 Recognized items: ${recognizedList || 'none'}
 Unrecognized items: ${unrecognizedList || 'none'}
-Disallowed items: ${disallowedList || 'none'}
+Disallowed items: ${disallowedList || 'none'}${discoveryGate}
 
 If all items are allowed (no disallowed, no unrecognized that are problems): say "Good snack! 💪"
 If there are problems (disallowed or unrecognized items that violate phase): explain what's wrong
