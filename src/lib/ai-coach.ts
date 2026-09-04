@@ -294,6 +294,7 @@ export interface CoachContext {
   // Phase 5 tracking
   phase5Plan?: Phase5Day[]; // 14-day plan with daily type assignment
   phase5StartDate?: string; // YYYY-MM-DD when the current 14-day plan started
+  phase5RuleType?: 'phase1' | 'phase2' | 'phase4'; // current day type in Phase 5 (computed from plan)
 }
 
 // Phase 5: 14-day plan where each day is randomly assigned ONE of three behaviors:
@@ -408,6 +409,7 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
     const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - 14 days of lean protein, veggies, healthy fats only' :
                             context.currentPhase === 2 ? 'STARCH ONLY for BREAKFAST & LUNCH on Wed/Sat/Sun - dinner & snack NEVER get starch' :
                             context.currentPhase === 5 ? `AGGRESSIVE FAT LOSS - 14-day rotating plan with 3-day blocks${phase5PlanDesc}` :
+                            context.currentPhase === 6 ? 'MUSCLE GAIN - higher carbs and fats to fuel muscle growth' :
                             'MAINTENANCE - starch every meal, weigh Fri only';
     
     const proteinExamples = context.gender === 'male' 
@@ -425,7 +427,7 @@ Portions per meal:
 Protein: ${portions.protein} (${proteinExamples})
 Veggies: ${portions.fibrousVegetables} (${veggieList})
 Fat: ${portions.fat} (${fatList})
-Starch: ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : context.currentPhase === 2 ? 'Only on Wed/Sat/Sun breakfast & lunch' : 'Every meal'}
+Starch: ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : context.currentPhase === 2 ? 'Only on Wed/Sat/Sun breakfast & lunch' : context.currentPhase === 5 ? 'Varies by day - check your plan for today' : context.currentPhase === 6 ? (context.gender === 'male' ? '3 cups every meal (Phase 6)' : '2 cups every meal (Phase 6)') : 'Every meal'}
 Water: ${context.gender === 'male' ? '32oz' : '20oz'} per meal
 
 YOUR APPROVED FOODS:
@@ -487,7 +489,8 @@ When client describes a meal they ate or are eating, you MUST check ALL of these
 3. STARCH — Is starch present? (${evalStarchExamples})
    - Phase 1: NO starch allowed — if they have starch, tell them to drop it
    - Phase 2: Starch only allowed at breakfast/lunch on Wed/Sat/Sun — if they have starch at wrong meal/day, tell them
-   - Phase 4/5: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '2 cups' : '1 cup'}
+   - Phase 5: Starch rules vary by day — today is ${context.phase5RuleType === 'phase1' ? 'a Phase 1 day (NO starch)' : context.phase5RuleType === 'phase2' ? 'a Phase 2 day (starch breakfast/lunch only)' : context.phase5RuleType === 'phase4' ? 'a Phase 4 day (starch every meal)' : 'an unknown day type (check plan)'}
+   - Phase 4: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '2 cups' : '1 cup'}
    - PROCESSED STARCH — if client describes eating pizza, pepperoni, salami, ham, hot dog, bacon, sausage, burrito, taco, sandwich, sub, wrap, pasta dish, fried rice, or similar processed starches: these are NOT on the approved starch list. Tell them to REPLACE with an approved starch: sweet potato, red potato, beans, millet, oats, or rice. Do NOT say "add rice on top" — tell them to SWAP the processed food for the approved starch.
    - Phase 6: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '3 cups' : '2 cups'} (Phase 6 allows MORE starch)
    
@@ -515,7 +518,7 @@ COACHING RULES:
 
 CLIENT CONTEXT:
 - Name: ${context.clientName || 'Client'}
-- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 4 = maintenance${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 14-day rotating plan (3-day blocks)${context.currentPhase === 5 && context.phase5Plan ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})
+- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 4 = maintenance, Phase 6 = muscle gain (higher carbs & fat)${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 14-day rotating plan (3-day blocks)${context.currentPhase === 5 && context.phase5Plan ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})
 - Gender: ${context.gender} (${context.gender === 'male' ? 'MALE — use MALE portions only' : 'FEMALE — use FEMALE portions only'})
 - Goal: ${context.goalWeight}lbs, Started: ${context.startingWeight}lbs, Current: ${context.currentWeight}lbs
 ${isEventClient ? `- Event in ${weeksUntilEvent} weeks` : ''}
@@ -525,6 +528,7 @@ PHASE RULES (for YOUR reference only — give personalized advice for THIS clien
 - Phase 2: Same as Phase 1 + starch for BREAKFAST & LUNCH ONLY on Wed/Sat/Sun. Dinner and snack NEVER get starch in Phase 2!
 - Phase 4: Add starch every meal, weigh Fri only
 - Phase 5: 14-day plan with 3-day blocks rotating through strict/strict/lenient rules. Client is currently on a ${context.currentPhase === 5 && context.phase5Plan ? context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown' : 'Unknown'} day. Same portions as other phases.
+- Phase 6: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, ${portions.starch} starch every meal, ${context.gender === 'male' ? '128oz' : '80oz'} daily water. Muscle gain phase — higher carbs and fats to fuel growth.
 
 CLIENT'S MESSAGE: "${message}"
 

@@ -67,6 +67,22 @@ export async function POST(request: NextRequest) {
         return Array.isArray(raw) ? raw : (raw.days || undefined);
       })(),
       phase5StartDate: client.phase5_start_date || undefined,
+      phase5RuleType: (() => {
+        if (client.current_phase !== 5 || !client.phase5_plan || !client.phase5_start_date) return undefined;
+        const raw = typeof client.phase5_plan === 'string'
+          ? JSON.parse(client.phase5_plan)
+          : client.phase5_plan;
+        const plan = Array.isArray(raw) ? raw : (raw.days || []);
+        const startDate = client.phase5_start_date;
+        const currentDay = (() => {
+          const [y, m, d] = startDate.split('-').map(Number);
+          const start = new Date(y, m - 1, d, 0, 0, 0);
+          const now = new Date();
+          return Math.min(14, Math.max(1, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1));
+        })();
+        const todayRule = plan.find((d: { day: number }) => d.day === currentDay);
+        return todayRule?.type as 'phase1' | 'phase2' | 'phase4' | undefined;
+      })(),
     };
 
     // Handle meal analysis request - HYBRID FLOW (code + AI)
