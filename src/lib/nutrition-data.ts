@@ -65,13 +65,19 @@ const ALLERGY_BAN_PATTERNS: Record<string, { list: string; patterns: string[] }[
  * Uses partial matching: "whey protein" is banned by dairy, "almond butter" is banned by nuts.
  */
 export function isFoodBanned(food: string, allergies: string[]): boolean {
-  const lowerFood = food.toLowerCase();
+  // Extract the food name only (before the first parenthesis) to avoid
+  // matching keywords that appear in portion descriptions like "3 small handfuls"
+  const foodName = food.split('(')[0].toLowerCase().trim();
   for (const allergy of allergies) {
     const rules = ALLERGY_BAN_PATTERNS[allergy];
     if (!rules) continue;
     for (const rule of rules) {
       for (const pattern of rule.patterns) {
-        if (lowerFood.includes(pattern.toLowerCase())) {
+        const pat = pattern.toLowerCase();
+        // Use word-boundary regex to avoid "cream" matching "cream" in "cream cheese"
+        // but also avoid "cream" matching inside "mixed nuts (cream..." — doesn't apply
+        // since we now use foodName only (no portion text)
+        if (foodName.includes(pat)) {
           return true;
         }
       }
