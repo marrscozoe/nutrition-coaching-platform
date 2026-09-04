@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       })(),
       phase5StartDate: client.phase5_start_date || undefined,
       phase5RuleType: (() => {
-        if (client.current_phase !== 5 || !client.phase5_plan || !client.phase5_start_date) return undefined;
+        if (!client.phase5_plan || !client.phase5_start_date) return undefined;
         const raw = typeof client.phase5_plan === 'string'
           ? JSON.parse(client.phase5_plan)
           : client.phase5_plan;
