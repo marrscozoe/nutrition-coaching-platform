@@ -354,7 +354,7 @@ export async function POST(request: NextRequest) {
     const result = await chatWithChatAI([systemMessage], message, preferredProvider);
     
     if (result.error || !result.text) {
-      const fallback = await getFallbackResponse(message, context);
+      const fallback = await getFallbackResponse(message, context, clientId);
       return NextResponse.json({
         response: fallback,
         type: 'fallback',
@@ -389,7 +389,7 @@ function detectMealType(message: string): 'breakfast' | 'lunch' | 'dinner' | 'sn
   return 'dinner';
 }
 
-async function getFallbackResponse(message: string, context: CoachContext): Promise<string> {
+async function getFallbackResponse(message: string, context: CoachContext, clientId: string): Promise<string> {
   // Normalize apostrophes - replace curly/smart apostrophes with straight apostrophe
   const normalizedMessage = message.replace(/['\u2019]/g, "'");
   const lower = normalizedMessage.toLowerCase();
@@ -406,6 +406,117 @@ async function getFallbackResponse(message: string, context: CoachContext): Prom
       "Everyone falls off track. It's those that get back on track and those that don't. You got this! 💪",
     ];
     return motivational[Math.floor(Math.random() * motivational.length)];
+  }
+
+  // GROCERY LIST GENERATION
+  if (lower.includes('make my grocery list') || lower.includes('generate grocery list') ||
+      lower.includes('grocery list') && (lower.includes('generate') || lower.includes('make') || lower.includes('create') || lower.includes('new'))) {
+    try {
+      const { getAdminClient } = await import('@/lib/db');
+      const supabase = getAdminClient();
+
+      // Get client profile
+      const { data: client, error: clientError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', clientId)
+        .single();
+
+      if (clientError || !client) {
+        return 'Sorry, I could not access your profile to generate a grocery list. Please try again later.';
+      }
+
+      // Import nutrition-data helpers (lazy to avoid circular deps)
+      const {
+        LEAN_PROTEINS,
+        FIBROUS_VEGETABLES,
+        HEALTHY_FATS,
+        STARCHY_CARBOHYDRATES,
+        filterFoodsForAllergies,
+        getPortions,
+      } = await import('@/lib/nutrition-data');
+
+      // Define Phase5Day type locally since it's an interface
+      type Phase5DayRule = { day: number; type: 'phase1' | 'phase2' | 'phase4'; label: string };
+
+      const allergies: string[] = client.allergies || [];
+      const phase = client.current_phase || 1;
+      const gender = client.gender === 'female' ? 'female' : 'male';
+      const portions = getPortions(gender, phase);
+
+      // Determine starch allowed
+      let starchAllowed = false;
+      if (phase === 2 || phase === 3 || phase === 4) starchAllowed = true;
+      if (phase === 5 && client.phase5_plan && client.phase5_start_date) {
+        try {
+          const raw = typeof client.phase5_plan === 'string'
+            ? JSON.parse(client.phase5_plan)
+            : client.phase5_plan;
+          const plan: Phase5DayRule[] = Array.isArray(raw) ? raw : (raw?.days || []);
+          const startDate = client.phase5_start_date;
+          const [y, m, d] = startDate.split('-').map(Number);
+          const start = new Date(y, m - 1, d, 0, 0, 0);
+          const now = new Date();
+          const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          const currentDay = Math.min(14, Math.max(1, diffDays + 1));
+          const todayRule = plan.find((d: { day: number }) => d.day === currentDay);
+          starchAllowed = todayRule?.type === 'phase2' || todayRule?.type === 'phase4';
+        } catch {
+          starchAllowed = false;
+        }
+      }
+
+      const proteins = filterFoodsForAllergies(LEAN_PROTEINS, allergies);
+      const veggies = filterFoodsForAllergies(FIBROUS_VEGETABLES, allergies);
+      const fats = filterFoodsForAllergies(HEALTHY_FATS, allergies);
+      const starches = starchAllowed
+        ? filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies)
+        : [];
+
+      // Build items
+      const items: Array<{ client_id: string; item_name: string; category: 'protein' | 'veggies' | 'starch' | 'fats' }> = [];
+
+      items.push({ client_id: clientId, item_name: `${portions.protein} per meal × 7 days — your proteins:`, category: 'protein' });
+      proteins.forEach(p => items.push({ client_id: clientId, item_name: `• ${p}`, category: 'protein' }));
+
+      items.push({ client_id: clientId, item_name: `${portions.fibrousVegetables} per meal × 7 days — your veggies:`, category: 'veggies' });
+      veggies.forEach(v => items.push({ client_id: clientId, item_name: `• ${v}`, category: 'veggies' }));
+
+      items.push({ client_id: clientId, item_name: `${portions.fat} per meal × 7 days — your fats:`, category: 'fats' });
+      fats.forEach(f => items.push({ client_id: clientId, item_name: `• ${f}`, category: 'fats' }));
+
+      if (starchAllowed && starches.length > 0) {
+        items.push({ client_id: clientId, item_name: `${portions.starch} per meal × 7 days — your starches:`, category: 'starch' });
+        starches.forEach(s => items.push({ client_id: clientId, item_name: `• ${s}`, category: 'starch' }));
+      }
+
+      // Clear and insert
+      await supabase.from('client_grocery_items').delete().eq('client_id', clientId);
+      const { error: insertError } = await supabase.from('client_grocery_items').insert(items);
+
+      if (insertError) {
+        console.error('Chat grocery insert error:', insertError);
+        return 'I had trouble saving your grocery list. Please try again or visit the Grocery page directly.';
+      }
+
+      const totalItems = items.length;
+      const starchNote = starchAllowed
+        ? `${starches.length} starch options`
+        : 'No starch (Phase 1 or 6)';
+
+      return `🛒 Your Smart Grocery List is ready!
+
+I've generated a personalized grocery list for you with:
+• ${proteins.length} protein options
+• ${veggies.length} veggie options
+• ${fats.length} fat options
+• ${starchNote}
+
+Visit the Grocery page (🛒 icon in the nav) to see your full list and check items as you shop. You can generate a new list anytime!`;
+    } catch (err) {
+      console.error('Chat grocery generation error:', err);
+      return 'I had trouble generating your grocery list. Please try again or visit the Grocery page directly.';
+    }
   }
 
   // GENERAL NUTRITION QUESTIONS → give helpful educational answers

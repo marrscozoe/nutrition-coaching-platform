@@ -452,6 +452,10 @@ export default function WeightPage() {
             <span className="text-xl">⚖️</span>
             <span className="text-xs mt-1">Weight</span>
           </Link>
+          <Link href="/client/grocery" className="flex flex-col items-center text-brand-cream/50 hover:text-brand-cream">
+            <span className="text-xl">🛒</span>
+            <span className="text-xs mt-1">Grocery</span>
+          </Link>
           <Link href="/client/profile" className="flex flex-col items-center text-brand-cream/50 hover:text-brand-cream">
             <span className="text-xl">👤</span>
             <span className="text-xs mt-1">Profile</span>
