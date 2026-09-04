@@ -24,6 +24,7 @@ export const ALLERGY_TYPES: Record<string, string> = {
 const ALLERGY_BAN_PATTERNS: Record<string, { list: string; patterns: string[] }[]> = {
   dairy: [
     { list: 'LEAN_PROTEINS', patterns: ['whey', 'yogurt', 'cottage cheese', 'ricotta', 'kefir', 'cream', 'sour cream', 'cheese', 'parmesan', 'mozzarella', 'cheddar', 'swiss', 'gouda', 'feta', 'goat cheese', 'blue cheese', 'cream cheese', 'half and half'] },
+    { list: 'HEALTHY_FATS', patterns: ['kerrygold', 'ghee', 'butter'] },
   ],
   gluten: [
     { list: 'STARCHY_CARBOHYDRATES', patterns: ['bread', 'pasta', 'cracker', 'breaded', 'wheat', 'barley', 'rye', 'oats', 'oatmeal', 'couscous', 'bulgur', 'seitan', 'tortilla', 'pita', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'noodle'] },
