@@ -67,20 +67,6 @@ export async function POST(request: NextRequest) {
         return Array.isArray(raw) ? raw : (raw.days || undefined);
       })(),
       phase5StartDate: client.phase5_start_date || undefined,
-      // DEBUG
-      _debugPhase5: (() => {
-        if (!client.phase5_plan || !client.phase5_start_date) return 'no plan';
-        const raw = typeof client.phase5_plan === 'string' ? JSON.parse(client.phase5_plan) : client.phase5_plan;
-        const plan = Array.isArray(raw) ? raw : (raw.days || []);
-        const startDate = client.phase5_start_date;
-        const [y, m, d] = startDate.split('-').map(Number);
-        const start = new Date(y, m - 1, d, 0, 0, 0);
-        const now = new Date();
-        const diff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-        const currentDay = Math.min(14, Math.max(1, diff + 1));
-        const todayRule = plan.find((r: { day: number }) => r.day === currentDay);
-        return `today=${currentDay}, phase5StartDate=${startDate}, nowLocal=${now.toLocaleDateString()}, rule=${todayRule?.type || 'undefined'}`;
-      })(),
       phase5RuleType: (() => {
         if (!client.phase5_plan || !client.phase5_start_date) return undefined;
         const raw = typeof client.phase5_plan === 'string'
@@ -95,6 +81,7 @@ export async function POST(request: NextRequest) {
           return Math.min(14, Math.max(1, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1));
         })();
         const todayRule = plan.find((d: { day: number }) => d.day === currentDay);
+        console.log('[PHASE5-DEBUG] phase5StartDate:', startDate, '| currentDay:', currentDay, '| todayRule:', todayRule?.type, '| label:', todayRule?.label);
         return todayRule?.type as 'phase1' | 'phase2' | 'phase4' | undefined;
       })(),
     };
