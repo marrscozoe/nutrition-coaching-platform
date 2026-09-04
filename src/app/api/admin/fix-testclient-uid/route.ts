@@ -16,9 +16,13 @@ export async function POST(request: NextRequest) {
     const supabase = getAdminClient();
 
     // Step 1: Drop FK on weigh_ins
-    await supabase.rpc('exec', {
-      sql: 'ALTER TABLE weigh_ins DROP CONSTRAINT IF EXISTS weigh_ins_client_id_fkey;',
-    }).catch(() => null); // rpc may not exist, continue anyway
+    try {
+      await supabase.rpc('exec', {
+        sql: 'ALTER TABLE weigh_ins DROP CONSTRAINT IF EXISTS weigh_ins_client_id_fkey;',
+      });
+    } catch (_) {
+      // rpc may not exist in this env
+    }
 
     // Step 2: Update clients.id
     const { error: updateError } = await supabase
@@ -31,9 +35,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 3: Recreate FK with ON UPDATE CASCADE
-    await supabase.rpc('exec', {
-      sql: `ALTER TABLE weigh_ins ADD CONSTRAINT weigh_ins_client_id_fkey FOREIGN KEY (client_id) REFERENCES clients(id) ON UPDATE CASCADE;`,
-    }).catch(() => null);
+    try {
+      await supabase.rpc('exec', {
+        sql: `ALTER TABLE weigh_ins ADD CONSTRAINT weigh_ins_client_id_fkey FOREIGN KEY (client_id) REFERENCES clients(id) ON UPDATE CASCADE;`,
+      });
+    } catch (_) {
+      // ignore
+    }
 
     // Step 4: Verify
     const { data: client } = await supabase
