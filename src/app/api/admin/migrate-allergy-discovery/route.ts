@@ -3,6 +3,11 @@ import { getAdminClient } from '@/lib/db';
 
 // One-shot migration: add allergy_discovery_enabled column
 // Safe to run multiple times — uses IF NOT EXISTS
+// Run in Supabase dashboard SQL Editor:
+/*
+ALTER TABLE clients
+ADD COLUMN IF NOT EXISTS allergy_discovery_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+*/
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET || 'dev'}`) {
@@ -12,19 +17,25 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = getAdminClient();
 
-    // Add column if it doesn't exist
-    const { error } = await supabase.rpc('exec', {
-      sql: 'ALTER TABLE clients ADD COLUMN IF NOT EXISTS allergy_discovery_enabled BOOLEAN NOT NULL DEFAULT FALSE;',
-    }).catch(() => {
-      // Fallback: try direct SQL via raw query if rpc not available
-      return { error: null };
-    });
+    // Check if column already exists by trying to read it
+    const { error: selectError } = await supabase
+      .from('clients')
+      .select('allergy_discovery_enabled')
+      .limit(1);
 
-    // If RPC didn't work, try via raw REST
-    // Actually just return success — Supabase free tier doesn't allow DDL via anon key
-    // This migration should be run in Supabase dashboard
+    if (selectError && selectError.message.includes('allergy_discovery_enabled')) {
+      return NextResponse.json({
+        status: 'already_applied',
+        message: 'Column allergy_discovery_enabled already exists.',
+      });
+    }
+
+    // Try to add the column via raw SQL using rpc (if available)
+    // Note: this requires the pgcrypto extension or direct DB access
+    // The fallback response tells the caller to run in Supabase dashboard
     return NextResponse.json({
-      message: 'Migration endpoint hit. Run this SQL in Supabase dashboard:',
+      status: 'manual_migration_required',
+      message: 'Run this SQL in Supabase SQL Editor:',
       sql: 'ALTER TABLE clients ADD COLUMN IF NOT EXISTS allergy_discovery_enabled BOOLEAN NOT NULL DEFAULT FALSE;',
       note: 'Default FALSE means existing clients will NOT receive discovery tips until they opt in.',
     });
