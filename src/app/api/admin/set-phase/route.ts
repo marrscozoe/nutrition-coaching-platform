@@ -16,9 +16,14 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = getAdminClient();
+    const updateObj: Record<string, unknown> = { current_phase: phase };
+    const programType = searchParams.get('program_type');
+    if (programType) {
+      updateObj.program_type = programType;
+    }
     const { error } = await supabase
       .from('clients')
-      .update({ current_phase: phase })
+      .update(updateObj)
       .eq('id', clientId);
 
     if (error) {

@@ -275,7 +275,7 @@ export function generateMealSuggestion(
   } else if (currentPhase === 2 && starchAllowed) {
     message = `Starch allowed today! ${portions.starch} — eat up! 🔥`;
   } else if (currentPhase === 4) {
-    message = "Every meal gets starch — you're in Phase 6 muscle gain mode! 🎉";
+    message = "Every meal gets starch — you're in Phase 4 maintenance mode! 🎉";
   } else if (currentPhase === 5) {
     // Phase 5 message depends on sub-phase
     if (context.phase5StartDate && context.phase5Plan) {
