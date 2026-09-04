@@ -303,6 +303,7 @@ export interface CoachContext {
   phase5RuleType?: 'phase1' | 'phase2' | 'phase4'; // current day type in Phase 5 (computed from plan)
   // Allergies
   allergies?: string[]; // hard-ban food allergies (never suggest these foods)
+  allergy_discovery_enabled?: boolean; // whether client wants discovery tips (default false)
 }
 
 // Phase 5: 14-day plan where each day is randomly assigned ONE of three behaviors:
