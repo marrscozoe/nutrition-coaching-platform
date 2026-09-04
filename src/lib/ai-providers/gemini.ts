@@ -2,7 +2,7 @@ import { AIResponse, AIMessage } from '../ai-coach';
 
 const apiKey = process.env.GEMINI_API_KEY || '';
 // Gemini 1.5 Flash is free tier eligible: 15 req/min, 1,500/day
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
 
 /**
  * Google Gemini Vision API Provider
@@ -146,6 +146,44 @@ export async function analyzeImageWithGemini(
         return { 
           text: '', 
           error: 'GEMINI_QUOTA_EXCEEDED',
+          provider: 'gemini',
+          retryable: true 
+        };
+      }
+      
+      // Check for 403 forbidden/denied errors
+      if (response.status === 403) {
+        return { 
+          text: '', 
+          error: `Gemini API error: ${response.status} - ${errorMsg}`,
+          provider: 'gemini',
+          retryable: true 
+        };
+      }
+      
+      // Check for 404 model not found/gone errors
+      if (response.status === 404) {
+        return { 
+          text: '', 
+          error: `Gemini API error: ${response.status} - ${errorMsg}`,
+          provider: 'gemini',
+          retryable: true 
+        };
+      }
+      
+      // Check for retryable error patterns in the message
+      const retryablePatterns = [
+        'forbidden', 'denied', 'not found', 'model not found',
+        'PERMISSION_DENIED', 'RESOURCE_EXHAUSTED'
+      ];
+      const isRetryableError = retryablePatterns.some(pattern => 
+        errorMsg?.toLowerCase().includes(pattern.toLowerCase())
+      );
+      
+      if (isRetryableError) {
+        return { 
+          text: '', 
+          error: `Gemini API error: ${response.status} - ${errorMsg}`,
           provider: 'gemini',
           retryable: true 
         };

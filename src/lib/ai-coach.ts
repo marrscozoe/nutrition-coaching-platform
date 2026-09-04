@@ -184,7 +184,20 @@ export async function analyzeImageWithPhotoAI(
     try {
       const result = await provider.analyzeImage(imageBase64, prompt);
       
-      if (result.error && (result.retryable || result.error.includes('429') || result.error.includes('rate_limit') || result.error.includes('quota'))) {
+      if (result.error && (result.retryable || 
+        result.error.includes('429') || 
+        result.error.includes('rate_limit') || 
+        result.error.includes('quota') ||
+        result.error.includes('403') ||
+        result.error.includes('404') ||
+        result.error.includes('forbidden') ||
+        result.error.includes('denied') ||
+        result.error.includes('not found') ||
+        result.error.includes('PERMISSION_DENIED') ||
+        result.error.includes('RESOURCE_EXHAUSTED') ||
+        result.error.includes('network') ||
+        result.error.includes('connection refused') ||
+        result.error.includes('ECONNREFUSED'))) {
         console.warn(`Photo AI ${providerName} failed with retryable error: ${result.error}`);
         errors.push(`${providerName}: ${result.error}`);
         continue;
@@ -233,6 +246,25 @@ export async function chatWithChatAI(
     
     try {
       const result = await provider.chat(messages, prompt);
+      
+      if (result.error && (result.retryable || 
+        result.error.includes('429') || 
+        result.error.includes('rate_limit') || 
+        result.error.includes('quota') ||
+        result.error.includes('403') ||
+        result.error.includes('404') ||
+        result.error.includes('forbidden') ||
+        result.error.includes('denied') ||
+        result.error.includes('not found') ||
+        result.error.includes('PERMISSION_DENIED') ||
+        result.error.includes('RESOURCE_EXHAUSTED') ||
+        result.error.includes('network') ||
+        result.error.includes('connection refused') ||
+        result.error.includes('ECONNREFUSED'))) {
+        console.warn(`Chat AI ${providerName} failed with retryable error: ${result.error}`);
+        errors.push(`${providerName}: ${result.error}`);
+        continue;
+      }
       
       if (result.error) {
         errors.push(`${providerName}: ${result.error}`);
@@ -1682,7 +1714,7 @@ export async function analyzeMealPortion(
       // Starch is REQUIRED in Phase 4 - every meal needs starch
       // BUT: if unrecognized items contain processed starches (tortillas, bread, etc.),
       // DON'T add 'starch' to missingCategories - the person had starch, just not on approved list
-      const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'pepperoni', 'salami', 'bacon', 'ham', 'hot dog', 'sausage', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub ', 'hoagie', 'pasta dish', 'fried rice'];
+      const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'pepperoni', 'salami', 'bacon', 'ham', 'hot dog', 'sausage', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
       const hasProcessedStarchInUnrecognized = unrecognizedItems.some(item => {
         const lower = item.toLowerCase();
         return processedStarchKeywords.some(kw => lower.includes(kw));
@@ -1808,7 +1840,7 @@ export function getMealEvaluationPrompt(
   // flag it explicitly so the AI doesn't give generic "add starch" advice
   // EXCEPTION: In Phase 6, tortillas are explicitly allowed, so don't flag them
   if (analysis.unrecognizedItems.length > 0) {
-    const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'pepperoni', 'salami', 'bacon', 'ham', 'hot dog', 'sausage', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub ', 'hoagie', 'pasta dish', 'fried rice'];
+    const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'pepperoni', 'salami', 'bacon', 'ham', 'hot dog', 'sausage', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
     const processedStarches = analysis.unrecognizedItems.filter(item => {
       const lower = item.toLowerCase();
       return processedStarchKeywords.some(kw => lower.includes(kw));
