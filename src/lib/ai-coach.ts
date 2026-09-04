@@ -1665,8 +1665,11 @@ export async function analyzeMealPortion(
       corrections.push(`💡 Notice: Adding some fibrous vegetables would be great for your meal.`);
     }
     if (!hasFat) {
+      console.log('[DEBUG Phase4 FAT] !hasFat is TRUE - adding fat to missingCategories and corrections');
       missingCategories.push('fat');
       corrections.push(`💡 Notice: Don't forget healthy fat like olive oil, avocado, or nuts. Stay hydrated with water too!`);
+    } else {
+      console.log('[DEBUG Phase4 FAT] hasFat is TRUE - NOT adding fat correction');
     }
     if (!hasStarch) {
       // Starch is REQUIRED in Phase 4 - every meal needs starch

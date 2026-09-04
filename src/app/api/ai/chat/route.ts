@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
         response: result.text,
         type: 'meal_analysis',
         provider: result.provider,
-        _debug: { hasFat: analysis.hasFat, recognizedItems: mealDataStructured.recognizedItems, missingCategories: analysis.missingCategories, corrections: analysis.corrections },
+        _debug: { phase: mealContext.currentPhase, hasFat: analysis.hasFat, recognizedItems: mealDataStructured.recognizedItems, missingCategories: analysis.missingCategories, corrections: analysis.corrections },
       });
     }
 
