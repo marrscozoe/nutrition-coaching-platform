@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
         phase5_plan: { type: 'phase5', days: plan },
         phase5_start_date: phase5StartDate,
       })
-      .eq('email', 'testclient_delete_test@test.com');
+      .eq('email', 'testclient_delet_test@test.com');
 
     if (updateError) {
       console.error('[Set Phase Day] Error updating client:', updateError);
