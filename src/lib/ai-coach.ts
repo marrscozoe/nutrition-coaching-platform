@@ -689,14 +689,23 @@ function splitIntoFoodItems(foodDescription: string): string[] {
  * - "white fish" matches "white fish" -> TRUE (exact match)
  */
 function itemMatchesFoodList(itemLower: string, foodList: string[]): boolean {
+  // Strip portion descriptions before matching (e.g. "Almonds (3 small handfuls...)" → "Almonds")
+  const stripPortion = (s: string) => s.split('(')[0].toLowerCase().trim();
+  const itemClean = stripPortion(itemLower);
   for (const foodEntry of foodList) {
-    const entryLower = foodEntry.toLowerCase();
-    // Direct match: item contains the full food entry
-    if (itemLower.includes(entryLower)) return true;
-    // Check for common food words that might be embedded
-    const foodWords = entryLower.split(/[\s,]+/).filter(w => w.length > 3);
+    const entryClean = stripPortion(foodEntry);
+    // Direct match after stripping portion text
+    if (itemClean.includes(entryClean)) return true;
+    // Also try the item against the entry (e.g. "mixed nuts" vs "Mixed nuts (3 small...)")
+    if (itemLower.includes(entryClean)) return true;
+    // Also try entry against item (e.g. "almonds" in "mixed nuts"? no — but "almond" in "almonds"? yes)
+    if (entryClean.includes(itemClean)) return true;
+    // Check for embedded food words (e.g. "almond" in "almond butter")
+    const foodWords = entryClean.split(/[\s,]+/).filter(w => w.length > 2);
     for (const word of foodWords) {
-      if (word.length > 3 && itemLower.includes(word)) return true;
+      if (word.length > 2 && itemLower.includes(word)) return true;
+      // Also check plural/singular: if item is longer, check if word is in it
+      if (word.length > 2 && itemClean.includes(word)) return true;
     }
   }
   return false;
