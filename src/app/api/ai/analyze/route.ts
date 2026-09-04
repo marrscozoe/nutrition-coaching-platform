@@ -15,6 +15,8 @@ import {
   getSnackEvaluationPrompt,
   getPhase5DayNumber,
   typeToNumericPhase,
+  isFoodBanned,
+  filterFoodsForAllergies,
 } from '@/lib/ai-coach';
 import { initializeCorrectionsCache } from '@/lib/food-corrections-cache';
 import { existsSync, unlinkSync, mkdirSync } from 'fs';
@@ -139,6 +141,7 @@ export async function POST(request: NextRequest) {
       mealType,
       phase5Plan, // 14-day Phase 5 plan array
       phase5StartDate, // YYYY-MM-DD when Phase 5 started
+      allergies, // client's hard-ban allergies
     } = body;
     
     // BUG #6 FIX: Validate mealType - only allow valid values, default to undefined otherwise
@@ -174,6 +177,7 @@ export async function POST(request: NextRequest) {
         mealType: validatedMealType,
         phase5Plan: phase5Plan as Phase5Day[] | undefined,
         phase5StartDate,
+        allergies: allergies || [],
       };
     } else {
       // Try to get from Redis
@@ -198,6 +202,7 @@ export async function POST(request: NextRequest) {
           })(),
           trainerNotes: clientData.notes,
           mealType: validatedMealType,
+          allergies: clientData.allergies || [],
         };
       } else {
         // Default context
@@ -215,6 +220,7 @@ export async function POST(request: NextRequest) {
           mealType: validatedMealType,
           phase5Plan: phase5Plan as Phase5Day[] | undefined,
           phase5StartDate,
+          allergies: allergies || [],
         };
       }
     }

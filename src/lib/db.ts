@@ -411,6 +411,7 @@ export interface Client {
   lead_source?: string;
   is_tester?: boolean;
   phase2_start_weight?: number;
+  allergies?: string[];
   created_at: string;
   updated_at: string;
 }

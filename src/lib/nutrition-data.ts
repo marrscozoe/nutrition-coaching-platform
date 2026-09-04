@@ -1,4 +1,129 @@
 // ============================================
+// ALLERGY TYPES — hard ban keys → display names
+// ============================================
+
+export const ALLERGY_TYPES: Record<string, string> = {
+  dairy: 'Dairy',
+  gluten: 'Gluten/Wheat',
+  eggs: 'Eggs',
+  soy: 'Soy',
+  shellfish: 'Shellfish',
+  nuts: 'Tree Nuts',
+  peanuts: 'Peanuts',
+  fish: 'Fish',
+  nightshades: 'Nightshades (tomatoes, peppers, eggplant)',
+  histamine: 'Histamine',
+};
+
+// ============================================
+// ALLERGY → FOOD REMOVAL MAPPINGS
+// which allergy removes which foods from which list
+// ============================================
+
+// Keyword patterns banned per allergy (partial match on food string)
+const ALLERGY_BAN_PATTERNS: Record<string, { list: string; patterns: string[] }[]> = {
+  dairy: [
+    { list: 'LEAN_PROTEINS', patterns: ['whey', 'yogurt', 'cottage cheese', 'ricotta', 'kefir', 'cream', 'sour cream', 'cheese', 'parmesan', 'mozzarella', 'cheddar', 'swiss', 'gouda', 'feta', 'goat cheese', 'blue cheese', 'cream cheese', 'half and half'] },
+  ],
+  gluten: [
+    { list: 'STARCHY_CARBOHYDRATES', patterns: ['bread', 'pasta', 'cracker', 'breaded', 'wheat', 'barley', 'rye', 'oats', 'oatmeal', 'couscous', 'bulgur', 'seitan', 'tortilla', 'pita', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'noodle'] },
+  ],
+  eggs: [
+    { list: 'LEAN_PROTEINS', patterns: ['egg', 'mayo', 'aioli', 'quiche', 'meringue', 'custard', 'hollandaise', 'egg white'] },
+  ],
+  soy: [
+    { list: 'STARCHY_CARBOHYDRATES', patterns: ['soybean', 'tofu', 'tempeh', 'edamame', 'soy milk', 'soy sauce', 'soybean', 'soya'] },
+  ],
+  shellfish: [
+    { list: 'LEAN_PROTEINS', patterns: ['shrimp', 'crab', 'lobster', 'crawfish', 'scallop', 'clam', 'mussel', 'oyster', 'crawfish', 'crayfish', 'shellfish'] },
+  ],
+  nuts: [
+    { list: 'HEALTHY_FATS', patterns: ['almond', 'walnut', 'pecan', 'cashew', 'macadamia', 'hazelnut', 'brazil nut', 'pine nut', 'pistachio', 'nuttzo', 'nut butter', 'nut butter'] },
+  ],
+  peanuts: [
+    { list: 'HEALTHY_FATS', patterns: ['peanut'] },
+  ],
+  fish: [
+    { list: 'LEAN_PROTEINS', patterns: ['salmon', 'tuna', 'cod', 'halibut', 'tilapia', 'bass', 'trout', 'sardine', 'anchovy', 'mackerel', 'catfish', 'mahi', 'swordfish', 'redfish', 'fish', 'red snapper', 'orange roughy', 'perch', 'pollock', 'herring'] },
+  ],
+  nightshades: [
+    { list: 'FIBROUS_VEGETABLES', patterns: ['tomato', 'tomatillo', 'pepper', 'eggplant', 'potato'] },
+  ],
+  histamine: [
+    { list: 'FIBROUS_VEGETABLES', patterns: ['spinach', 'kale', 'avocado'] },
+    { list: 'STARCHY_CARBOHYDRATES', patterns: ['fermented'] },
+    { list: 'HEALTHY_FATS', patterns: ['aged cheese', 'leftover cooked meat'] },
+  ],
+};
+
+// ============================================
+// ALLERGY FILTERING FUNCTIONS
+// ============================================
+
+/**
+ * Returns true if a food is banned by any of the given allergies.
+ * Uses partial matching: "whey protein" is banned by dairy, "almond butter" is banned by nuts.
+ */
+export function isFoodBanned(food: string, allergies: string[]): boolean {
+  const lowerFood = food.toLowerCase();
+  for (const allergy of allergies) {
+    const rules = ALLERGY_BAN_PATTERNS[allergy];
+    if (!rules) continue;
+    for (const rule of rules) {
+      for (const pattern of rule.patterns) {
+        if (lowerFood.includes(pattern.toLowerCase())) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Filters a list of foods, removing any that are banned by the given allergies.
+ * Logs removed items at debug level.
+ */
+export function filterFoodsForAllergies(foods: string[], allergies: string[]): string[] {
+  if (!allergies || allergies.length === 0) return foods;
+  const removed: string[] = [];
+  const filtered = foods.filter(food => {
+    if (isFoodBanned(food, allergies)) {
+      removed.push(food);
+      return false;
+    }
+    return true;
+  });
+  if (removed.length > 0) {
+    console.debug(`[AllergyFilter] Removed ${removed.length} foods: ${removed.join(', ')}`);
+  }
+  return filtered;
+}
+
+/**
+ * Returns the filtered STARCHY_CARBOHYDRATES list for pizza-swap purposes,
+ * excluding any items banned by the given allergies.
+ * Also returns the starch portion description.
+ */
+export function getAllowedStarches(allergies: string[]): string {
+  const filtered = filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies);
+  return filtered.join(', ');
+}
+
+/**
+ * Get filtered food lists based on allergies.
+ * Returns a copy of each list with banned items removed.
+ */
+export function getFilteredFoodLists(allergies: string[]) {
+  return {
+    leanProteins: filterFoodsForAllergies(LEAN_PROTEINS, allergies),
+    starchyCarbohydrates: filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies),
+    fibrousVegetables: filterFoodsForAllergies(FIBROUS_VEGETABLES, allergies),
+    healthyFats: filterFoodsForAllergies(HEALTHY_FATS, allergies),
+  };
+}
+
+// ============================================
 // ALL FOOD CATEGORIES (same for all phases)
 // ============================================
 
@@ -180,20 +305,23 @@ export function generateMealSuggestion(
     currentPhase: number;
     phase5StartDate?: string;
     phase5Plan?: Phase5Day[];
+    allergies?: string[];
   },
   mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' = 'lunch'
 ): MealSuggestion {
-  const { gender, currentPhase } = context;
+  const { gender, currentPhase, allergies = [] } = context;
   const isMale = gender === 'male';
   const portions = getPortions(gender, currentPhase);
 
-  const mainProteins = LEAN_PROTEINS.filter(
+  // Filter food lists by allergies
+  const filtered = getFilteredFoodLists(allergies);
+  const mainProteins = filtered.leanProteins.filter(
     p => !p.includes('Whey') && !p.includes('Bacon') && !p.includes('Protein powder')
   );
-  const proteinChoice = pickRandom(mainProteins, 1)[0];
-  const veggiesChoice = pickRandom(FIBROUS_VEGETABLES, 2).join(' & ');
-  const fatOptions = HEALTHY_FATS.filter(f => !f.includes('MCT'));
-  const fatChoice = pickRandom(fatOptions, 1)[0];
+  const proteinChoice = mainProteins.length > 0 ? pickRandom(mainProteins, 1)[0] : 'Chicken breast';
+  const veggiesChoice = pickRandom(filtered.fibrousVegetables, 2).join(' & ');
+  const fatOptions = filtered.healthyFats.filter(f => !f.includes('MCT'));
+  const fatChoice = fatOptions.length > 0 ? pickRandom(fatOptions, 1)[0] : 'Olive oil';
   // Scale avocado amount proportionally based on fat portion
   // 1 tbsp fat → 1/4 avocado; 2 tbsp fat → 1/2 avocado; 3 tbsp fat → 3/4 avocado
   const getAvocadoDisplay = () => {
@@ -263,7 +391,7 @@ export function generateMealSuggestion(
   }
 
   if (starchAllowed) {
-    const starchChoice = pickRandom(STARCHY_CARBOHYDRATES, 1)[0];
+    const starchChoice = pickRandom(filtered.starchyCarbohydrates, 1)[0];
     starchDisplay = `${portions.starch} ${starchChoice.toLowerCase()}`;
   }
 
@@ -368,7 +496,8 @@ export function getPhaseGuidance(
   phase: number,
   gender: 'male' | 'female',
   phase5Plan?: Phase5Day[],
-  phase5StartDate?: string
+  phase5StartDate?: string,
+  allergies: string[] = []
 ): PhaseGuidance {
   const p = getPortions(gender, phase);
   const isMale = gender === 'male';
@@ -377,11 +506,12 @@ export function getPhaseGuidance(
   const fatPortion = p.fat;
   const starchPortion = p.starch;
 
-  // Build food lists from actual food lists
-  const proteinList = LEAN_PROTEINS.join(', ');
-  const veggieList = FIBROUS_VEGETABLES.join(', ');
-  const starchList = STARCHY_CARBOHYDRATES.join(', ');
-  const fatList = HEALTHY_FATS.join(', ');
+  // Build food lists from actual food lists (filtered by allergies)
+  const filtered = getFilteredFoodLists(allergies);
+  const proteinList = filtered.leanProteins.join(', ');
+  const veggieList = filtered.fibrousVegetables.join(', ');
+  const starchList = filtered.starchyCarbohydrates.join(', ');
+  const fatList = filtered.healthyFats.join(', ');
 
   switch (phase) {
     case 1:
@@ -443,7 +573,7 @@ export function getPhaseGuidance(
         const dayNum = getPhase5DayNumber(phase5StartDate);
         if (currentRule) {
           // Delegate to the sub-phase's guidance (1, 2, or 4) with Phase 5 day context
-          const subPhaseGuidance = getPhaseGuidance(typeToPhase(currentRule.type), gender);
+          const subPhaseGuidance = getPhaseGuidance(typeToPhase(currentRule.type), gender, undefined, undefined, allergies);
           return {
             ...subPhaseGuidance,
             advice: `Day ${dayNum} of 14 — ${currentRule.label}`,

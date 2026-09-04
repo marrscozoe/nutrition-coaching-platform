@@ -84,7 +84,26 @@ export async function POST(request: NextRequest) {
         console.log('[PHASE5-DEBUG] phase5StartDate:', startDate, '| currentDay:', currentDay, '| todayRule:', todayRule?.type, '| label:', todayRule?.label);
         return todayRule?.type as 'phase1' | 'phase2' | 'phase4' | undefined;
       })(),
+      // Allergies — hard-ban food allergies
+      allergies: client.allergies || [],
     };
+
+    // Get recent symptoms for allergy discovery
+    const nowChicago = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+    const sevenDaysAgo = new Date(nowChicago.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: recentSymptoms } = await supabase
+      .from('symptoms')
+      .select('type, created_at')
+      .eq('client_id', clientId)
+      .gte('created_at', sevenDaysAgo)
+      .order('created_at', { ascending: false });
+    const symptomCount = recentSymptoms?.length || 0;
+    const hasBloatingPattern = symptomCount >= 2;
+
+    // Discovery tip: if client mentions bloating/stomach pain and has 2+ logged symptoms in last 7 days
+    const lowerMessage = message.toLowerCase();
+    const mentionsDigestiveIssue = lowerMessage.includes('bloated') || lowerMessage.includes('bloating') || lowerMessage.includes('stomach pain') || lowerMessage.includes('stomach ache') || lowerMessage.includes('gassy') || lowerMessage.includes('gut hurts');
+    const showDiscoveryTip = mentionsDigestiveIssue && hasBloatingPattern;
 
     // Handle meal analysis request - HYBRID FLOW (code + AI)
     if (mealData) {
@@ -267,7 +286,7 @@ export async function POST(request: NextRequest) {
       try {
         const detectedMealType = detectMealType(message);
         const suggestion = generateMealSuggestion(
-          { gender: context.gender as 'male' | 'female', currentPhase: context.currentPhase, phase5StartDate: context.phase5StartDate, phase5Plan: context.phase5Plan },
+          { gender: context.gender as 'male' | 'female', currentPhase: context.currentPhase, phase5StartDate: context.phase5StartDate, phase5Plan: context.phase5Plan, allergies: context.allergies },
           detectedMealType
         );
         const response = formatMealSuggestion(suggestion);
@@ -319,7 +338,12 @@ export async function POST(request: NextRequest) {
     }
 
     const coachPrompt = getCoachPrompt(context, message);
-    const systemMessage: AIMessage = { role: 'system', content: coachPrompt };
+    // Add discovery tip if client mentions digestive issues and has 2+ symptoms in last 7 days
+    let discoveryTip = '';
+    if (showDiscoveryTip) {
+      discoveryTip = `\n\n⚠️ ALLERGY DISCOVERY TIP: This client has reported ${symptomCount} digestive symptoms in the last 7 days (bloating/stomach pain). If you suspect a food intolerance, say: "I'm noticing you mentioned bloating a few times lately. Some foods like dairy or gluten can cause that. Want me to add [suspected food] as a hard allergy so I'll never suggest it?"`;
+    }
+    const systemMessage: AIMessage = { role: 'system', content: coachPrompt + discoveryTip };
     const result = await chatWithChatAI([systemMessage], message, preferredProvider);
     
     if (result.error || !result.text) {
@@ -460,6 +484,7 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
           currentPhase: context.currentPhase,
           phase5StartDate: context.phase5StartDate,
           phase5Plan: context.phase5Plan,
+          allergies: context.allergies,
         },
         detectedMealType
       );

@@ -18,11 +18,17 @@ import {
   Phase5Day,
   getPhase5DayNumber,
   getPhase5CurrentRule,
+  ALLERGY_TYPES,
+  isFoodBanned,
+  filterFoodsForAllergies,
+  getAllowedStarches,
+  getFilteredFoodLists,
 } from './nutrition-data';
 
 // Re-export Phase5Day and phase 5 helpers for backward compatibility
 export type { Phase5Day } from './nutrition-data';
 export { getPhase5DayNumber, getPhase5CurrentRule } from './nutrition-data';
+export { ALLERGY_TYPES, isFoodBanned, filterFoodsForAllergies, getAllowedStarches, getFilteredFoodLists } from './nutrition-data';
 
 // Initialize corrections cache on module load (server-only)
 if (typeof process !== 'undefined' && process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -295,6 +301,8 @@ export interface CoachContext {
   phase5Plan?: Phase5Day[]; // 14-day plan with daily type assignment
   phase5StartDate?: string; // YYYY-MM-DD when the current 14-day plan started
   phase5RuleType?: 'phase1' | 'phase2' | 'phase4'; // current day type in Phase 5 (computed from plan)
+  // Allergies
+  allergies?: string[]; // hard-ban food allergies (never suggest these foods)
 }
 
 // Phase 5: 14-day plan where each day is randomly assigned ONE of three behaviors:
@@ -449,11 +457,13 @@ ${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep cr
 Ask me anything about specific foods!`;
   }
 
-  // Build dynamic food lists for the evaluation protocol
-  const evalProteinExamples = LEAN_PROTEINS.join(', ');
-  const evalVegExamples = FIBROUS_VEGETABLES.join(', ');
-  const evalStarchExamples = STARCHY_CARBOHYDRATES.join(', ');
-  const evalFatExamples = HEALTHY_FATS.join(', ');
+  // Build allergy-filtered food lists for the evaluation protocol
+  const allergies = context.allergies || [];
+  const filteredLists = allergies.length > 0 ? getFilteredFoodLists(allergies) : null;
+  const evalProteinExamples = (filteredLists?.leanProteins || LEAN_PROTEINS).join(', ');
+  const evalVegExamples = (filteredLists?.fibrousVegetables || FIBROUS_VEGETABLES).join(', ');
+  const evalStarchExamples = (filteredLists?.starchyCarbohydrates || STARCHY_CARBOHYDRATES).join(', ');
+  const evalFatExamples = (filteredLists?.healthyFats || HEALTHY_FATS).join(', ');
 
   return `You are ALLEN'S AI NUTRITION COACH. You act exactly like Allen would in a text conversation with a client.
 
@@ -523,6 +533,7 @@ CLIENT CONTEXT:
 - Gender: ${context.gender} (${context.gender === 'male' ? 'MALE — use MALE portions only' : 'FEMALE — use FEMALE portions only'})
 - Goal: ${context.goalWeight}lbs, Started: ${context.startingWeight}lbs, Current: ${context.currentWeight}lbs
 ${isEventClient ? `- Event in ${weeksUntilEvent} weeks` : ''}
+${allergies.length > 0 ? `- ⚠️ ALLERGIES (HARD BAN — NEVER suggest these foods): ${allergies.map(a => `${a} (${ALLERGY_TYPES[a] || a})`).join(', ')}. These foods must NEVER appear in meal suggestions.` : '- No allergies on file'}
 
 PHASE RULES (for YOUR reference only — give personalized advice for THIS client, not generic phase descriptions):
 - Phase 1: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, NO starch, NO dairy, NO sugar, ${context.gender === 'male' ? '32oz per meal' : '20oz per meal'} water
@@ -1455,6 +1466,42 @@ export async function analyzeMealPortion(
   // Phase 6: starch allowed every meal (tortillas now allowed)
   if (phase === 6) {
     // No restrictions on tortillas in Phase 6
+  }
+
+  // =============================================
+  // ALLERGY CHECK — flag foods banned by hard allergies
+  // =============================================
+  const allergies = context.allergies || [];
+  if (allergies.length > 0) {
+    const allergyBannedItems: string[] = [];
+    for (const item of foodItems) {
+      // Check each recognized food item against allergy bans
+      const itemLower = item.toLowerCase();
+      for (const protein of LEAN_PROTEINS) {
+        if (itemLower.includes(protein.toLowerCase()) && isFoodBanned(protein, allergies)) {
+          if (!allergyBannedItems.includes(protein)) allergyBannedItems.push(protein);
+        }
+      }
+      for (const veg of FIBROUS_VEGETABLES) {
+        if (itemLower.includes(veg.toLowerCase()) && isFoodBanned(veg, allergies)) {
+          if (!allergyBannedItems.includes(veg)) allergyBannedItems.push(veg);
+        }
+      }
+      for (const starch of STARCHY_CARBOHYDRATES) {
+        if (itemLower.includes(starch.toLowerCase()) && isFoodBanned(starch, allergies)) {
+          if (!allergyBannedItems.includes(starch)) allergyBannedItems.push(starch);
+        }
+      }
+      for (const fat of HEALTHY_FATS) {
+        if (itemLower.includes(fat.toLowerCase()) && isFoodBanned(fat, allergies)) {
+          if (!allergyBannedItems.includes(fat)) allergyBannedItems.push(fat);
+        }
+      }
+    }
+    if (allergyBannedItems.length > 0) {
+      disallowedItems.push(...allergyBannedItems);
+      corrections.push(`⚠️ ALLERGY ALERT — you have a hard allergy to: ${allergyBannedItems.join(', ')}. Do NOT eat these foods!`);
+    }
   }
 
   // =============================================

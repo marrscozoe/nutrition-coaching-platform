@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Toast from '@/components/Toast';
 import { logout } from '@/lib/auth';
+import AllergyEditModal from '@/components/AllergyEditModal';
 
 interface ClientData {
   id: string;
@@ -19,6 +20,7 @@ interface ClientData {
   goal_start_date?: string;
   event_date?: string;
   notes?: string;
+  allergies?: string[];
   created_at: string;
 }
 
@@ -45,6 +47,7 @@ export default function ProfilePage() {
   const [showEventDateModal, setShowEventDateModal] = useState(false);
   const [editEventDate, setEditEventDate] = useState('');
   const [showProgramInfo, setShowProgramInfo] = useState<string | null>(null);
+  const [showAllergyEdit, setShowAllergyEdit] = useState(false);
 
   async function fetchClientData(clientId: string) {
     try {
@@ -259,6 +262,34 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Food Allergies */}
+        <div className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-brand-cream/60 uppercase tracking-wider">🍽️ Food Allergies</h3>
+            <button
+              onClick={() => setShowAllergyEdit(true)}
+              className="text-brand-orange text-sm hover:underline"
+            >
+              {client.allergies && client.allergies.length > 0 ? 'Edit ✏️' : 'Add ✏️'}
+            </button>
+          </div>
+          {client.allergies && client.allergies.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {client.allergies.map((allergy: string) => (
+                <span
+                  key={allergy}
+                  className="inline-flex items-center px-3 py-1 rounded-full bg-red-500/20 border border-red-500/30 text-red-400 text-sm"
+                >
+                  {allergy}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-brand-cream/50 text-sm">No allergies set. Tap Edit to add.</p>
+          )}
+          <p className="text-brand-cream/40 text-xs mt-2">Allergy foods are hard-banned — never suggested in meals.</p>
         </div>
 
         {/* Report Problem */}
@@ -689,6 +720,21 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Allergy Edit Modal */}
+      {showAllergyEdit && (
+        <AllergyEditModal
+          currentAllergies={client.allergies || []}
+          clientId={client.id}
+          onClose={() => setShowAllergyEdit(false)}
+          onSave={(newAllergies) => {
+            setClient({ ...client, allergies: newAllergies });
+            sessionStorage.setItem('client_user', JSON.stringify({ ...client, allergies: newAllergies }));
+            setShowAllergyEdit(false);
+            setToast({ message: 'Allergies updated!', type: 'success' });
+          }}
+        />
       )}
 
       {/* Delete Account Modal */}
