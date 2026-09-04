@@ -518,7 +518,8 @@ COACHING RULES:
 
 CLIENT CONTEXT:
 - Name: ${context.clientName || 'Client'}
-- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 4 = maintenance, Phase 6 = muscle gain (higher carbs & fat)${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 14-day rotating plan (3-day blocks)${context.currentPhase === 5 && context.phase5Plan ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})
+- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 4 = maintenance, Phase 6 = muscle gain (higher carbs & fat)${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 14-day rotating plan (3-day blocks)${context.currentPhase === 5 && context.phase5Plan ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})${context.currentPhase === 5 && context.phase5RuleType ? `
+- TODAY'S STARCH RULE: Phase 5 day ${getPhase5DayNumber(context.phase5StartDate || '')} is a "${context.phase5Plan?.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || context.phase5RuleType}" day — ${context.phase5RuleType === 'phase1' ? 'NO STARCH today (protein + veggies + fat only)' : context.phase5RuleType === 'phase2' ? 'STARCH at breakfast & lunch only (no starch at dinner)' : 'STARCH at every meal'}` : ''}
 - Gender: ${context.gender} (${context.gender === 'male' ? 'MALE — use MALE portions only' : 'FEMALE — use FEMALE portions only'})
 - Goal: ${context.goalWeight}lbs, Started: ${context.startingWeight}lbs, Current: ${context.currentWeight}lbs
 ${isEventClient ? `- Event in ${weeksUntilEvent} weeks` : ''}
@@ -527,7 +528,7 @@ PHASE RULES (for YOUR reference only — give personalized advice for THIS clien
 - Phase 1: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, NO starch, NO dairy, NO sugar, ${context.gender === 'male' ? '32oz per meal' : '20oz per meal'} water
 - Phase 2: Same as Phase 1 + starch for BREAKFAST & LUNCH ONLY on Wed/Sat/Sun. Dinner and snack NEVER get starch in Phase 2!
 - Phase 4: Add starch every meal, weigh Fri only
-- Phase 5: 14-day plan with 3-day blocks rotating through strict/strict/lenient rules. Client is currently on a ${context.currentPhase === 5 && context.phase5Plan ? context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown' : 'Unknown'} day. Same portions as other phases.
+- Phase 5: 14-day plan. TODAY is a "${context.phase5RuleType === 'phase1' ? 'No starch today' : context.phase5RuleType === 'phase2' ? 'Starch breakfast/lunch only' : context.phase5RuleType === 'phase4' ? 'Starch every meal' : 'Unknown' }" day (Phase 5 day ${getPhase5DayNumber(context.phase5StartDate || '')}). Same portions as other phases.
 - Phase 6: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, ${portions.starch} starch every meal, ${context.gender === 'male' ? '128oz' : '80oz'} daily water. Muscle gain phase — higher carbs and fats to fuel growth.
 
 CLIENT'S MESSAGE: "${message}"
