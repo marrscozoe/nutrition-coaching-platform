@@ -1319,15 +1319,19 @@ export async function analyzeMealPortion(
     // Match against food lists using proper item matching
     // Split into food items and check each one
     const mealFoodItems = splitIntoFoodItems(foodDescription);
+    console.log('[DEBUG analyzeMealPortion] foodItems:', JSON.stringify(mealFoodItems));
     for (const item of mealFoodItems) {
       const itemLower = item.toLowerCase();
+      const matchedFat = itemMatchesFoodList(itemLower, HEALTHY_FATS);
+      console.log('[DEBUG analyzeMealPortion] item:', item, '| matched HEALTHY_FATS:', matchedFat, '| hasFat before:', hasFat);
       if (itemLower.includes('egg') && !itemLower.includes('eggplant')) { hasProtein = true; hasFat = true; }
       if (itemMatchesFoodList(itemLower, LEAN_PROTEINS)) hasProtein = true;
       if (itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) hasVeg = true;
       if (itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) hasStarch = true;
-      if (itemMatchesFoodList(itemLower, HEALTHY_FATS)) hasFat = true;
+      if (matchedFat) hasFat = true;
       if (itemMatchesFoodList(itemLower, SUPPLEMENTS)) hasSupplement = true;
     }
+    console.log('[DEBUG analyzeMealPortion] AFTER MATCHING: hasFat:', hasFat, '| hasProtein:', hasProtein, '| hasVeg:', hasVeg, '| hasStarch:', hasStarch);
   }
 
   // Build unrecognized items list
