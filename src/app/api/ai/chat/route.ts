@@ -16,7 +16,7 @@ import {
   FIBROUS_VEGETABLES,
   HEALTHY_FATS,
 } from '@/lib/ai-coach';
-import { generateMealSuggestion, formatMealSuggestion, getPortions, getPhase5CurrentRule } from '@/lib/nutrition-data';
+import { generateMealSuggestion, formatMealSuggestion, getPortions, getPhase5CurrentRule, findAllergyKeyForFood } from '@/lib/nutrition-data';
 
 export async function POST(request: NextRequest) {
   try {
@@ -363,6 +363,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Persist any accepted hard-allergy additions to the DB
+    await persistAcceptedAllergies(supabase, message, client.allergies || [], clientId);
+
     return NextResponse.json({
       response: result.text,
       type: 'coach',
@@ -372,6 +375,77 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('AI chat error:', error);
     return NextResponse.json({ error: 'Chat failed' }, { status: 500 });
+  }
+}
+
+/**
+ * Parses the user message for allergy-acceptance patterns and persists
+ * any newly accepted foods as hard allergies in the clients DB row.
+ *
+ * Acceptance patterns (case-insensitive):
+ *   - "yes add [food] as a hard allergy"
+ *   - "please add [food] as a hard allergy"
+ *   - "add [food] as a hard allergy"
+ *   - "yes add [food] and [food] as hard allergies"
+ *   - "yes please add [food]..."
+ */
+async function persistAcceptedAllergies(
+  supabase: ReturnType<typeof getAdminClient>,
+  message: string,
+  currentAllergies: string[],
+  clientId: string
+): Promise<void> {
+  const lower = message.toLowerCase();
+
+  // Check for allergy-acceptance intent
+  const acceptPatterns = [
+    /yes\s+(?:please\s+)?add\s+(.+?)\s+(?:as\s+a?\s*)?hard\s+allergies?/i,
+    /add\s+(.+?)\s+(?:as\s+a?\s*)?hard\s+allergies?/i,
+    /please\s+add\s+(.+?)\s+(?:as\s+a?\s*)?hard\s+allergies?/i,
+    /yes\s+(?:please\s+)?add\s+(.+?)$/i,
+  ];
+
+  let foodListRaw: string | null = null;
+  for (const pattern of acceptPatterns) {
+    const m = lower.match(pattern);
+    if (m) {
+      foodListRaw = m[1];
+      break;
+    }
+  }
+
+  if (!foodListRaw) return;
+
+  // Split on "," or "and" to get individual food names
+  const foodNames = foodListRaw
+    .split(/\s+and\s+|\s*,\s*/)
+    .map(f => f.trim())
+    .filter(f => f.length > 0);
+
+  if (foodNames.length === 0) return;
+
+  const newAllergyKeys: string[] = [];
+  for (const foodName of foodNames) {
+    const allergyKey = findAllergyKeyForFood(foodName);
+    if (allergyKey && !currentAllergies.includes(allergyKey)) {
+      newAllergyKeys.push(allergyKey);
+    }
+  }
+
+  if (newAllergyKeys.length === 0) return;
+
+  const updatedAllergies = Array.from(new Set([...currentAllergies, ...newAllergyKeys]));
+  console.log(`[ALLERGY DISCOVERY] Adding allergies for client ${clientId}:`, newAllergyKeys);
+
+  const { error } = await supabase
+    .from('clients')
+    .update({ allergies: updatedAllergies })
+    .eq('id', clientId);
+
+  if (error) {
+    console.error('[ALLERGY DISCOVERY] Failed to persist allergies:', error);
+  } else {
+    console.log('[ALLERGY DISCOVERY] Successfully persisted allergies:', updatedAllergies);
   }
 }
 

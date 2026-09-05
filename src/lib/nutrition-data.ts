@@ -108,6 +108,24 @@ export function filterFoodsForAllergies(foods: string[], allergies: string[]): s
 }
 
 /**
+ * Given a food name (e.g. "shrimp", "cottage cheese", "almond butter"),
+ * returns the matching allergy key from ALLERGY_BAN_PATTERNS, or null if no match.
+ */
+export function findAllergyKeyForFood(foodName: string): string | null {
+  const lower = foodName.toLowerCase();
+  for (const [allergyKey, rules] of Object.entries(ALLERGY_BAN_PATTERNS)) {
+    for (const rule of rules) {
+      for (const pattern of rule.patterns) {
+        if (lower.includes(pattern.toLowerCase())) {
+          return allergyKey;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Returns the filtered STARCHY_CARBOHYDRATES list for pizza-swap purposes,
  * excluding any items banned by the given allergies.
  * Also returns the starch portion description.
