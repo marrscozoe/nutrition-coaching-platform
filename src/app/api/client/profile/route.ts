@@ -96,6 +96,7 @@ export async function PATCH(request: NextRequest) {
         gender: updated.gender,
         allergies: updated.allergies || [],
         allergy_discovery_enabled: updated.allergy_discovery_enabled ?? false,
+        photo_meal_log_enabled: updated.photo_meal_log_enabled ?? false,
         current_phase: updated.current_phase,
       },
     });
