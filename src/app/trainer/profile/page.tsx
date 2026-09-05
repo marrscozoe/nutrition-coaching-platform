@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { logout } from '@/lib/auth';
+import Toast from '@/components/Toast';
 
 interface TrainerData {
   id: string;
@@ -24,6 +25,18 @@ export default function TrainerProfilePage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  // Security section state
+  const [showSecurity, setShowSecurity] = useState(false);
+  const [securityTab, setSecurityTab] = useState<'email' | 'password'>('email');
+  const [newEmail, setNewEmail] = useState('');
+  const [emailCurrentPassword, setEmailCurrentPassword] = useState('');
+  const [changingEmail, setChangingEmail] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordCurrentPassword, setPasswordCurrentPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     const userData = sessionStorage.getItem('trainer_user');
@@ -156,6 +169,201 @@ export default function TrainerProfilePage() {
           </div>
         </div>
 
+        {/* Security Section */}
+        <div className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-brand-cream/60 uppercase tracking-wider">🔐 Login & Security</h3>
+            <button
+              onClick={() => {
+                setShowSecurity(!showSecurity);
+                if (!showSecurity) {
+                  setNewEmail(trainer.email);
+                  setEmailCurrentPassword('');
+                  setNewPassword('');
+                  setConfirmPassword('');
+                  setPasswordCurrentPassword('');
+                }
+              }}
+              className="text-brand-orange text-sm hover:underline"
+            >
+              {showSecurity ? 'Cancel' : 'Edit ✏️'}
+            </button>
+          </div>
+          {!showSecurity ? (
+            <div className="space-y-2">
+              <div className="flex justify-between py-2 border-b border-brand-cream/10">
+                <span className="text-brand-cream/60 text-sm">Email</span>
+                <span className="text-brand-cream text-sm">{trainer.email}</span>
+              </div>
+              <p className="text-brand-cream/40 text-xs">Password: ••••••••</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Tab switcher */}
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => setSecurityTab('email')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    securityTab === 'email'
+                      ? 'bg-brand-orange text-white'
+                      : 'bg-brand-charcoal/60 text-brand-cream/60 hover:text-brand-cream'
+                  }`}
+                >
+                  Change Email
+                </button>
+                <button
+                  onClick={() => setSecurityTab('password')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    securityTab === 'password'
+                      ? 'bg-brand-orange text-white'
+                      : 'bg-brand-charcoal/60 text-brand-cream/60 hover:text-brand-cream'
+                  }`}
+                >
+                  Change Password
+                </button>
+              </div>
+
+              {securityTab === 'email' ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-brand-cream/60 mb-1">New Email</label>
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream text-sm focus:outline-none focus:border-brand-orange"
+                      placeholder="new@email.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-brand-cream/60 mb-1">Current Password</label>
+                    <input
+                      type="password"
+                      value={emailCurrentPassword}
+                      onChange={(e) => setEmailCurrentPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream text-sm focus:outline-none focus:border-brand-orange"
+                      placeholder="Enter current password"
+                    />
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!newEmail || !emailCurrentPassword) {
+                        setToast({ message: 'Please fill in all fields', type: 'error' });
+                        return;
+                      }
+                      setChangingEmail(true);
+                      try {
+                        const res = await fetch('/api/trainer/change-email', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'x-trainer-id': trainer.id },
+                          body: JSON.stringify({ newEmail, currentPassword: emailCurrentPassword }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          const updated = { ...trainer, email: newEmail };
+                          setTrainer(updated);
+                          sessionStorage.setItem('trainer_user', JSON.stringify(updated));
+                          setShowSecurity(false);
+                          setToast({ message: 'Email changed successfully!', type: 'success' });
+                        } else {
+                          setToast({ message: data.error || 'Failed to change email', type: 'error' });
+                        }
+                      } catch {
+                        setToast({ message: 'Failed to change email', type: 'error' });
+                      } finally {
+                        setChangingEmail(false);
+                      }
+                    }}
+                    disabled={changingEmail || !newEmail || !emailCurrentPassword}
+                    className="w-full py-2.5 rounded-lg bg-brand-orange text-white text-sm font-semibold hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
+                  >
+                    {changingEmail ? 'Changing Email...' : 'Change Email'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-brand-cream/60 mb-1">Current Password</label>
+                    <input
+                      type="password"
+                      value={passwordCurrentPassword}
+                      onChange={(e) => setPasswordCurrentPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream text-sm focus:outline-none focus:border-brand-orange"
+                      placeholder="Enter current password"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-brand-cream/60 mb-1">New Password</label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream text-sm focus:outline-none focus:border-brand-orange"
+                      placeholder="Min 8 chars, letter & number"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-brand-cream/60 mb-1">Confirm New Password</label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream text-sm focus:outline-none focus:border-brand-orange"
+                      placeholder="Repeat new password"
+                    />
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!passwordCurrentPassword || !newPassword || !confirmPassword) {
+                        setToast({ message: 'Please fill in all fields', type: 'error' });
+                        return;
+                      }
+                      if (newPassword !== confirmPassword) {
+                        setToast({ message: 'Passwords do not match', type: 'error' });
+                        return;
+                      }
+                      if (newPassword.length < 8) {
+                        setToast({ message: 'Password must be at least 8 characters', type: 'error' });
+                        return;
+                      }
+                      if (!/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+                        setToast({ message: 'Password must contain a letter and a number', type: 'error' });
+                        return;
+                      }
+                      setChangingPassword(true);
+                      try {
+                        const res = await fetch('/api/trainer/change-password', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'x-trainer-id': trainer.id },
+                          body: JSON.stringify({ currentPassword: passwordCurrentPassword, newPassword }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setShowSecurity(false);
+                          setNewPassword('');
+                          setConfirmPassword('');
+                          setPasswordCurrentPassword('');
+                          setToast({ message: 'Password changed successfully!', type: 'success' });
+                        } else {
+                          setToast({ message: data.error || 'Failed to change password', type: 'error' });
+                        }
+                      } catch {
+                        setToast({ message: 'Failed to change password', type: 'error' });
+                      } finally {
+                        setChangingPassword(false);
+                      }
+                    }}
+                    disabled={changingPassword || !passwordCurrentPassword || !newPassword || !confirmPassword}
+                    className="w-full py-2.5 rounded-lg bg-brand-orange text-white text-sm font-semibold hover:bg-brand-orange-dark transition-colors disabled:opacity-50"
+                  >
+                    {changingPassword ? 'Changing Password...' : 'Change Password'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Quick Actions */}
         <div className="p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
           <h3 className="text-sm font-semibold text-brand-cream/60 uppercase tracking-wider mb-4">Quick Actions</h3>
@@ -259,6 +467,15 @@ export default function TrainerProfilePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
       {/* Bottom Navigation */}
