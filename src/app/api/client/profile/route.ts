@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
       notes: client.notes,
       allergies: client.allergies || [],
       allergy_discovery_enabled: client.allergy_discovery_enabled ?? false,
+      photo_meal_log_enabled: client.photo_meal_log_enabled ?? false,
       created_at: client.created_at,
     });
   } catch (error) {
@@ -53,7 +54,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { allergies, allergy_discovery_enabled, name, gender, goal_weight, starting_weight, program_type, event_date } = body;
+    const { allergies, allergy_discovery_enabled, photo_meal_log_enabled, name, gender, goal_weight, starting_weight, program_type, event_date } = body;
 
     const supabase = getAdminClient();
 
@@ -61,6 +62,7 @@ export async function PATCH(request: NextRequest) {
     const updates: Record<string, any> = {};
     if (allergies !== undefined) updates.allergies = allergies;
     if (allergy_discovery_enabled !== undefined) updates.allergy_discovery_enabled = allergy_discovery_enabled;
+    if (photo_meal_log_enabled !== undefined) updates.photo_meal_log_enabled = photo_meal_log_enabled;
     if (name !== undefined) updates.name = name;
     if (gender !== undefined) updates.gender = gender;
     if (goal_weight !== undefined) updates.goal_weight = goal_weight;

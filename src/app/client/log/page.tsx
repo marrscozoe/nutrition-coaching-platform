@@ -18,6 +18,7 @@ interface ClientData {
   current_week: number;
   notes?: string;
   is_tester?: boolean;
+  photo_meal_log_enabled?: boolean;
 }
 
 export default function LogMealPage() {
@@ -487,50 +488,52 @@ export default function LogMealPage() {
           />
         </div>
 
-        {/* Photo Upload */}
-        <div>
-          <label className="block text-sm text-brand-cream/60 mb-2">
-            Or snap a photo 📸
-          </label>
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            ref={fileInputRef}
-            onChange={handlePhotoCapture}
-            className="hidden"
-          />
-          
-          {photoPreview ? (
-            <div className="relative">
-              <img
-                src={photoPreview}
-                alt="Meal preview"
-                className="w-full h-48 object-contain rounded-lg bg-black/20"
-              />
+        {/* Photo Upload - Only show if photo_meal_log_enabled */}
+        {client.photo_meal_log_enabled && (
+          <div>
+            <label className="block text-sm text-brand-cream/60 mb-2">
+              Or snap a photo 📸
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              ref={fileInputRef}
+              onChange={handlePhotoCapture}
+              className="hidden"
+            />
+            
+            {photoPreview ? (
+              <div className="relative">
+                <img
+                  src={photoPreview}
+                  alt="Meal preview"
+                  className="w-full h-48 object-contain rounded-lg bg-black/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhotoPreview(null);
+                    setPhotoBase64(null);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                  className="absolute top-2 right-2 w-8 h-8 bg-black/60 rounded-full flex items-center justify-center text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
-                onClick={() => {
-                  setPhotoPreview(null);
-                  setPhotoBase64(null);
-                  if (fileInputRef.current) fileInputRef.current.value = '';
-                }}
-                className="absolute top-2 right-2 w-8 h-8 bg-black/60 rounded-full flex items-center justify-center text-white"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-32 rounded-lg border-2 border-dashed border-brand-cream/20 flex flex-col items-center justify-center text-brand-cream/40 hover:border-brand-orange hover:text-brand-orange transition-colors"
               >
-                ✕
+                <span className="text-3xl mb-2">📷</span>
+                <span className="text-sm">Tap to take photo</span>
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full h-32 rounded-lg border-2 border-dashed border-brand-cream/20 flex flex-col items-center justify-center text-brand-cream/40 hover:border-brand-orange hover:text-brand-orange transition-colors"
-            >
-              <span className="text-3xl mb-2">📷</span>
-              <span className="text-sm">Tap to take photo</span>
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Log Food Button - Simplified single step */}
         {(foodDescription || photoBase64) && (

@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('clients')
-      .select('id, trainer_id, email, name, gender, program_type, starting_weight, current_weight, goal_weight, goal_start_date, goal_type, event_date, current_phase, current_week, waiver_signed, subscription_status, subscription_end_date, notes, lead_source, allergies, allergy_discovery_enabled, created_at, updated_at')
+      .select('id, trainer_id, email, name, gender, program_type, starting_weight, current_weight, goal_weight, goal_start_date, goal_type, event_date, current_phase, current_week, waiver_signed, subscription_status, subscription_end_date, notes, lead_source, allergies, allergy_discovery_enabled, photo_meal_log_enabled, created_at, updated_at')
       .eq('id', clientId)
       .single();
 
