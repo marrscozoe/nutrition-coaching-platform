@@ -6,7 +6,7 @@ import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
 import { logout } from '@/lib/auth';
-import { getPhaseGuidance, getPortions, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES } from '@/lib/nutrition-data';
+import { getPhaseGuidance, getPortions, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies } from '@/lib/nutrition-data';
 
 interface ClientData {
   id: string;
@@ -22,6 +22,7 @@ interface ClientData {
   gender: string;
   phase5_plan?: string;
   phase5_start_date?: string;
+  allergies?: string[];
 }
 
 interface MealLog {
@@ -39,6 +40,9 @@ export default function ClientDashboard() {
   const [client, setClient] = useState<ClientData | null>(null);
   const [recentMeals, setRecentMeals] = useState<MealLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalFoods, setModalFoods] = useState<string[]>([]);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
 
   // Handle returning to the dashboard (e.g., after logging a meal or switching programs)
   // This catches cases where client-side navigation brings user back without pathname changing
@@ -130,6 +134,18 @@ export default function ClientDashboard() {
     await logout();
   }
 
+  function openFoodModal(title: string, foods: string[]) {
+    setModalTitle(title);
+    setModalFoods(foods);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setModalFoods([]);
+    setModalTitle('');
+  }
+
   if (loading || !client) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -180,52 +196,67 @@ export default function ClientDashboard() {
         <h2 className="text-sm font-semibold text-brand-cream/80 uppercase tracking-wider mb-3">Your 4 Food Groups</h2>
         <div className="grid grid-cols-2 gap-3">
           {/* Lean Protein */}
-          <div className="p-4 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/10 border border-red-500/30">
+          <button
+            onClick={() => openFoodModal('Lean Protein 🍗', filterFoodsForAllergies(LEAN_PROTEINS, client.allergies || []))}
+            className="p-4 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/10 border border-red-500/30 text-left w-full hover:border-red-500/60 transition-colors cursor-pointer"
+          >
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">🍗</span>
               <h3 className="text-sm font-bold text-red-400">Lean Protein</h3>
             </div>
             <p className="text-xs text-brand-cream/70 mb-2">{client.gender === 'male' ? '6 oz' : '4 oz'} per meal</p>
             <p className="text-xs text-brand-cream/50 leading-relaxed">
-              {LEAN_PROTEINS.slice(0, 5).join(', ')}...
+              {filterFoodsForAllergies(LEAN_PROTEINS, client.allergies || []).slice(0, 5).join(', ')}...
             </p>
-          </div>
+          </button>
 
           {/* Fibrous Vegetables */}
-          <div className="p-4 rounded-xl bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/30">
+          <button
+            onClick={() => openFoodModal('Fibrous Veggies 🥬', filterFoodsForAllergies(FIBROUS_VEGETABLES, client.allergies || []))}
+            className="p-4 rounded-xl bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/30 text-left w-full hover:border-green-500/60 transition-colors cursor-pointer"
+          >
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">🥬</span>
               <h3 className="text-sm font-bold text-green-400">Fibrous Veggies</h3>
             </div>
             <p className="text-xs text-brand-cream/70 mb-2">{client.gender === 'male' ? '2 cups' : '1-2 cups'} per meal</p>
             <p className="text-xs text-brand-cream/50 leading-relaxed">
-              {FIBROUS_VEGETABLES.slice(0, 5).join(', ')}...
+              {filterFoodsForAllergies(FIBROUS_VEGETABLES, client.allergies || []).slice(0, 5).join(', ')}...
             </p>
-          </div>
+          </button>
 
           {/* Healthy Fats */}
-          <div className="p-4 rounded-xl bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30">
+          <button
+            onClick={() => openFoodModal('Healthy Fats 🥑', filterFoodsForAllergies(HEALTHY_FATS, client.allergies || []))}
+            className="p-4 rounded-xl bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30 text-left w-full hover:border-yellow-500/60 transition-colors cursor-pointer"
+          >
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">🥑</span>
               <h3 className="text-sm font-bold text-yellow-400">Healthy Fats</h3>
             </div>
             <p className="text-xs text-brand-cream/70 mb-2">{getPortions(client.gender as 'male' | 'female', client.current_phase).fat} per meal</p>
             <p className="text-xs text-brand-cream/50 leading-relaxed">
-              {HEALTHY_FATS.slice(0, 4).join(', ')}...
+              {filterFoodsForAllergies(HEALTHY_FATS, client.allergies || []).slice(0, 4).join(', ')}...
             </p>
-          </div>
+          </button>
 
           {/* Starchy Carbohydrates */}
-          <div className="p-4 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/30">
+          <button
+            onClick={() => {
+              const safeStarch = filterFoodsForAllergies(STARCHY_CARBOHYDRATES, client.allergies || []);
+              openFoodModal('Starchy Carbs 🍠', safeStarch);
+            }}
+            className="p-4 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/30 text-left w-full hover:border-orange-500/60 transition-colors cursor-pointer"
+          >
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">🍠</span>
               <h3 className="text-sm font-bold text-orange-400">Starchy Carbs</h3>
             </div>
             <p className="text-xs text-brand-cream/70 mb-2">{getPortions(client.gender as 'male' | 'female', client.current_phase).starch} per meal</p>
             <p className="text-xs text-brand-cream/50 leading-relaxed">
-              {STARCHY_CARBOHYDRATES.slice(0, 4).join(', ')}...
+              {filterFoodsForAllergies(STARCHY_CARBOHYDRATES, client.allergies || []).slice(0, 4).join(', ')}...
             </p>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -408,6 +439,61 @@ export default function ClientDashboard() {
       </nav>
 
       <AddToHomeScreenBanner />
+
+      {/* Food Category Modal */}
+      {modalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          onClick={closeModal}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+
+          {/* Modal */}
+          <div
+            className="relative bg-brand-charcoal border border-brand-cream/20 rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-brand-cream/10">
+              <h2 className="text-lg font-bold text-brand-cream">{modalTitle}</h2>
+              <button
+                onClick={closeModal}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-brand-cream/10 text-brand-cream/70 hover:bg-brand-cream/20 hover:text-brand-cream transition-colors text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Phase note for Starchy Carbs */}
+            {modalTitle.includes('Starchy') && client && client.current_phase === 1 && (
+              <div className="mx-5 mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                <p className="text-xs text-red-400 font-semibold">⚠️ Starch not allowed in Phase 1</p>
+              </div>
+            )}
+
+            {/* Food List */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {modalFoods.length === 0 ? (
+                <p className="text-brand-cream/50 text-sm text-center py-4">No foods available for your allergies in this category.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {modalFoods.map((food, i) => (
+                    <li key={i} className="text-sm text-brand-cream/90 py-2 px-3 rounded-lg bg-brand-cream/5 hover:bg-brand-cream/10 transition-colors">
+                      {food}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Footer hint */}
+            <div className="p-4 border-t border-brand-cream/10 text-center">
+              <p className="text-xs text-brand-cream/40">Tap outside or ✕ to close</p>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
