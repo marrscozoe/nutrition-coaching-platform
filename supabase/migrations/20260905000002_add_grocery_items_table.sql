@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS client_grocery_items (
 
 ALTER TABLE client_grocery_items ENABLE ROW LEVEL SECURITY;
 
--- Policy: clients can only manage their own grocery items
+-- Policy: clients can only manage their own grocery items (idempotent)
+DROP POLICY IF EXISTS "Clients can manage own grocery items" ON client_grocery_items;
 CREATE POLICY "Clients can manage own grocery items" ON client_grocery_items
   FOR ALL USING (client_id = auth.uid());
 
