@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
+import {
+  getPortions,
+  LEAN_PROTEINS,
+  FIBROUS_VEGETABLES,
+  STARCHY_CARBOHYDRATES,
+  HEALTHY_FATS,
+  filterFoodsForAllergies,
+} from '@/lib/nutrition-data';
 
 interface ClientData {
   id: string;
@@ -18,7 +26,12 @@ interface ClientData {
   program_type: string;
   phase5_plan?: string | null;
   phase5_start_date?: string | null;
+  allergies?: string[];
 }
+
+const MEALS_PER_DAY = 3;
+const DAYS_PER_WEEK = 7;
+const MEALS_PER_WEEK = MEALS_PER_DAY * DAYS_PER_WEEK; // 21
 
 interface GroceryItem {
   id: string;
@@ -196,6 +209,58 @@ export default function GroceryPage() {
                 </Link>
               </div>
             </header>
+
+            {/* Weekly Grocery Totals */}
+            {(() => {
+              const safeGender: 'male' | 'female' = client.gender === 'female' ? 'female' : 'male';
+              const portions = getPortions(safeGender, client.current_phase);
+              const starchAllowed = isStarchAllowedForPhase(client);
+              const clientAllergies = client.allergies || [];
+              const filteredProteins = filterFoodsForAllergies(LEAN_PROTEINS, clientAllergies);
+              const filteredVeggies = filterFoodsForAllergies(FIBROUS_VEGETABLES, clientAllergies);
+              const filteredStarches = filterFoodsForAllergies(STARCHY_CARBOHYDRATES, clientAllergies);
+              const filteredFats = filterFoodsForAllergies(HEALTHY_FATS, clientAllergies);
+
+              const weeklyProtein = portions.protein;
+              const weeklyVeggies = portions.fibrousVegetables;
+              const weeklyStarch = starchAllowed ? portions.starch : 'Not available';
+              const weeklyFats = portions.fat;
+
+              return (
+                <div className="mx-4 mt-4 p-4 rounded-xl bg-blue-50 border border-blue-200">
+                  <h3 className="text-base font-bold text-blue-800 mb-1">📊 Weekly Grocery Totals</h3>
+                  <p className="text-xs text-blue-600 mb-3">Based on 3 meals/day × 7 days = 21 meals/week</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="text-xs text-gray-500">Protein</div>
+                      <div className="text-lg font-bold text-red-500">{weeklyProtein}</div>
+                      <div className="text-xs text-gray-400">{filteredProteins.length} options available</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="text-xs text-gray-500">Fibrous Vegetables</div>
+                      <div className="text-lg font-bold text-green-500">{weeklyVeggies}</div>
+                      <div className="text-xs text-gray-400">{filteredVeggies.length} options available</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="text-xs text-gray-500">Starchy Carbs</div>
+                      <div className="text-lg font-bold text-amber-500">{weeklyStarch}</div>
+                      <div className="text-xs text-gray-400">
+                        {!starchAllowed
+                          ? client.current_phase === 1 || client.current_phase === 6
+                            ? `⚠️ Not in Phase ${client.current_phase}`
+                            : `⚠️ Starch only with Phase 5 plan`
+                          : `${filteredStarches.length} options`}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3">
+                      <div className="text-xs text-gray-500">Healthy Fats</div>
+                      <div className="text-lg font-bold text-purple-500">{weeklyFats}</div>
+                      <div className="text-xs text-gray-400">{filteredFats.length} options (allergy-filtered)</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Phase info banner */}
             {!phaseInfo.starchIncluded && (
