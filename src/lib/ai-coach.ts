@@ -487,27 +487,7 @@ Example: ${mealExample}
 
 ${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
 
-${lowerMessage.includes('restaurant') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonald') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('eating-out') || lowerMessage.includes('at a restaurant') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru') ? `
-RESTAURANT & EATING-OUT SWAPS:
-When a client asks about eating at a restaurant or names a specific restaurant:
-1. Ask what they're thinking of ordering (or help them identify the closest menu item)
-2. Map it to their approved food lists (protein → lean protein, etc.)
-3. Give SPECIFIC swaps they can say to the server
-
-COMMON RESTAURANT SWAPS (use client's approved lists above):
-• Any fried/protein dish → grilled chicken breast, grilled salmon, lean steak
-• Rice bowl → order without rice, double veggies, add approved protein
-• Sandwich/bread → lettuce wrap or naked (no bun)
-• French fries → side of vegetables or salad
-• Mayo/aioli → skip or request olive oil on side
-• Dessert → fresh berries or skip
-• Pizza → thin crust + lean toppings, or skip starch entirely
-• Pasta → zoodles (zucchini noodles) or skip starch
-• Sauce/dressing → request on side, use olive oil if unsure
-
-Phase-specific note: ${context.currentPhase === 1 ? 'Phase 1 = NO STARCH. At restaurants, skip rice/pasta/bread entirely. Focus on protein + vegetables.' : context.currentPhase === 2 ? 'Phase 2 = starch only Wed/Sat/Sun breakfast & lunch. No starch at dinner.' : context.currentPhase === 5 ? 'Phase 5 = follow your 14-day plan for today.' : context.currentPhase === 6 ? 'Phase 6 = higher carb allowance. Starch every meal is fine.' : 'Starch is allowed every meal.'}
-
-Allergy note: ${context.allergies && context.allergies.length > 0 ? 'Client has allergies: ' + context.allergies.join(', ') + '. Avoid any menu items with these ingredients.' : 'No allergies on file.'}` : ''}
+${(lowerMessage.includes('restaurant') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('eating-out') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru')) ? ((lowerMessage.includes("i'm at a restaurant") && !lowerMessage.includes('chipotle') && !lowerMessage.includes('mcdonalds') && !lowerMessage.includes('wendys') && !lowerMessage.includes('panera') && !lowerMessage.includes('chick-fil-a') && !lowerMessage.includes('qdoba') && !lowerMessage.includes('moes') && !lowerMessage.includes('taco bell') && !lowerMessage.includes('subway') && !lowerMessage.includes('burger king') && !lowerMessage.includes('kfc') && !lowerMessage.includes('pizza') && !lowerMessage.includes('wing') && !lowerMessage.includes('sushi') && !lowerMessage.includes('thai') && !lowerMessage.includes('chinese') && !lowerMessage.includes('mexican') && !lowerMessage.includes('italian') && !lowerMessage.includes('sandwich') && !lowerMessage.includes('salad') && !lowerMessage.includes('soup') && !lowerMessage.includes('bowl') && !lowerMessage.includes('burrito') && !lowerMessage.includes('taco') && !lowerMessage.includes('wrap') && !lowerMessage.includes('burger') && !lowerMessage.includes('fries') && !lowerMessage.includes('steak') && !lowerMessage.includes('grill') && !lowerMessage.includes('bbq') && !lowerMessage.includes('wings') && !lowerMessage.includes('fast food') && !lowerMessage.includes('ordering')) ? "RESTAURANT MODE - keep it SHORT: Just ask ONE question - What sounds good? Burger, Mexican, Asian, pizza, sandwich or something else? No swap list. No essay. Just ask." : ((lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonalds') || lowerMessage.includes('wendys') || lowerMessage.includes('panera') || lowerMessage.includes('chick-fil-a') || lowerMessage.includes('qdoba') || lowerMessage.includes('moes') || lowerMessage.includes('taco bell') || lowerMessage.includes('subway') || lowerMessage.includes('burger king') || lowerMessage.includes('kfc') || lowerMessage.includes('pizza') || lowerMessage.includes('sushi') || lowerMessage.includes('thai') || lowerMessage.includes('chinese') || lowerMessage.includes('mexican') || lowerMessage.includes('italian') || lowerMessage.includes('salad') || lowerMessage.includes('soup') || lowerMessage.includes('bowl') || lowerMessage.includes('burrito') || lowerMessage.includes('taco') || lowerMessage.includes('wrap') || lowerMessage.includes('burger') || lowerMessage.includes('fries') || lowerMessage.includes('sandwich') || lowerMessage.includes('steak') || lowerMessage.includes('grill') || lowerMessage.includes('bbq') || lowerMessage.includes('wings') || lowerMessage.includes('fast food') || lowerMessage.includes('ordering') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonald') || lowerMessage.includes('at a restaurant')) ? ("RESTAURANT MODE - be BRIEF: Give 3-5 specific swaps. " + (context.currentPhase === 1 ? "Phase 1 = NO STARCH. Skip rice/pasta/bread." : context.currentPhase === 2 ? "Phase 2 = starch only Wed/Sat/Sun." : context.currentPhase === 5 ? "Check your Phase 5 plan for today." : context.currentPhase === 6 ? "Phase 6 = starch OK every meal." : "") + (context.allergies && context.allergies.length > 0 ? " ALLERGIES: " + context.allergies.join(', ') + "." : "") + " Format: [what they said] -> [approved swap]. Max 3-4 lines. Example: Chipotle bowl: skip rice, double veggies, grilled chicken, add guac. No cheese/sour cream (dairy).") : "")) : ""}
 
 Ask me anything about specific foods!`;
   }
