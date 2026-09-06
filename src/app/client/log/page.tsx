@@ -21,6 +21,17 @@ interface ClientData {
   photo_meal_log_enabled?: boolean;
 }
 
+interface RecentMeal {
+  id: string;
+  meal_type: string;
+  food_description: string | null;
+  meal_date: string | null;
+  logged_at: string;
+  messed_up: number;
+  photo_url: string | null;
+  portion_advice: string | null;
+}
+
 export default function LogMealPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +65,7 @@ export default function LogMealPage() {
   const [correctionCategory, setCorrectionCategory] = useState('protein');
   const [canSeeCorrection, setCanSeeCorrection] = useState(false);
   const [submittingCorrection, setSubmittingCorrection] = useState(false);
+  const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
 
   useEffect(() => {
     const userData = sessionStorage.getItem('client_user');
@@ -70,7 +82,31 @@ export default function LogMealPage() {
     
     // Check if user can see correction button
     checkCorrectionStatus(user.id);
+
+    // Fetch recent meals
+    fetchRecentMeals(user.id);
   }, [router]);
+
+  async function fetchRecentMeals(clientId: string) {
+    try {
+      const res = await fetch('/api/meals?limit=10', {
+        headers: { 'x-client-id': clientId }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRecentMeals(data.meals || []);
+      }
+    } catch (e) {
+      console.error('Error fetching recent meals:', e);
+    }
+  }
+
+  function handleRecentMealClick(meal: RecentMeal) {
+    if (meal.food_description) {
+      setFoodDescription(meal.food_description);
+      setToast({ message: 'Meal copied! Edit as needed, then log.', type: 'success' });
+    }
+  }
   
   async function checkCorrectionStatus(clientId: string) {
     try {
@@ -634,6 +670,50 @@ export default function LogMealPage() {
             : "Log every meal consistently for best results. Stay mindful of your portions."}
         </p>
       </div>
+
+      {/* Recent Meals */}
+      {recentMeals.length > 0 && (
+        <div className="px-4 pb-4 space-y-3">
+          <h3 className="text-sm font-semibold text-brand-cream/70 uppercase tracking-wide">Recent Meals</h3>
+          <div className="space-y-2">
+            {recentMeals.map((meal) => (
+              <button
+                key={meal.id}
+                type="button"
+                onClick={() => handleRecentMealClick(meal)}
+                className="w-full text-left px-4 py-3 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 hover:border-brand-orange/50 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex flex-col items-center min-w-[2.5rem]">
+                    <span className="text-lg">
+                      {meal.meal_type === 'breakfast' ? '🌅' :
+                       meal.meal_type === 'lunch' ? '☀️' :
+                       meal.meal_type === 'dinner' ? '🌙' : '🍎'}
+                    </span>
+                    <span className="text-[10px] text-brand-cream/40 capitalize">{meal.meal_type}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-brand-cream/90 line-clamp-2 leading-tight">
+                      {meal.food_description || 'Photo meal'}
+                    </p>
+                    <p className="text-xs text-brand-cream/40 mt-1">
+                      {meal.meal_date
+                        ? new Date(meal.meal_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        : new Date(meal.logged_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {meal.messed_up === 1 && ' · 😅'}
+                    </p>
+                  </div>
+                  <div className="text-brand-cream/30">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-brand-charcoal/95 backdrop-blur-sm border-t border-brand-cream/10 safe-bottom">
