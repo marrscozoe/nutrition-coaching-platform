@@ -335,6 +335,7 @@ export interface CoachContext {
   phase5RuleType?: 'phase1' | 'phase2' | 'phase4'; // current day type in Phase 5 (computed from plan)
   // Allergies
   allergies?: string[]; // hard-ban food allergies (never suggest these foods)
+  custom_allergy_bans?: string[]; // client-typed hard ban items (never suggest these foods)
   allergy_discovery_enabled?: boolean; // whether client wants discovery tips (default false)
 }
 
@@ -477,7 +478,8 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
                           context.currentPhase === 2 ? '⚠️ Phase 2 = starch only Wed/Sat/Sun.' :
                           context.currentPhase === 5 ? 'Check your Phase 5 plan for today.' :
                           context.currentPhase === 6 ? 'Phase 6 = starch OK every meal.' : '';
-        const allergyNote = context.allergies && context.allergies.length > 0 ? '⚠️ ALLERGIES: ' + context.allergies.join(', ') + '.' : '';
+        const allHardBans = [...(context.allergies || []), ...(context.custom_allergy_bans || [])];
+        const allergyNote = allHardBans.length > 0 ? '⚠️ ALLERGIES: ' + allHardBans.join(', ') + '.' : '';
         restaurantSection = '\n\nRESTAURANT SWAPS — keep it brief:\n' + (phaseNote ? phaseNote + ' ' : '') + (allergyNote ? allergyNote + ' ' : '') + 'Give 3-5 terse swaps. Example: "Chipotle bowl → skip rice, double veggies, grilled chicken, guac. No cheese (dairy)."';
       }
     }
@@ -518,7 +520,8 @@ Ask me anything about specific foods!`;
     : '';
 
   // Build allergy-filtered food lists for the evaluation protocol
-  const allergies = context.allergies || [];
+  // Combine preset allergies + custom bans into one hard-ban list for the AI
+  const allergies = [...(context.allergies || []), ...(context.custom_allergy_bans || [])];
   const filteredLists = allergies.length > 0 ? getFilteredFoodLists(allergies) : null;
   const evalProteinExamples = (filteredLists?.leanProteins || LEAN_PROTEINS).join(', ');
   const evalVegExamples = (filteredLists?.fibrousVegetables || FIBROUS_VEGETABLES).join(', ');

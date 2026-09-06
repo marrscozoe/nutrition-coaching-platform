@@ -445,15 +445,17 @@ export function generateMealSuggestion(
     phase5StartDate?: string;
     phase5Plan?: Phase5Day[];
     allergies?: string[];
+    custom_allergy_bans?: string[];
   },
   mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' = 'lunch'
 ): MealSuggestion {
-  const { gender, currentPhase, allergies = [] } = context;
+  const { gender, currentPhase, allergies = [], custom_allergy_bans = [] } = context;
   const isMale = gender === 'male';
   const portions = getPortions(gender, currentPhase);
 
-  // Filter food lists by allergies
-  const filtered = getFilteredFoodLists(allergies);
+  // Filter food lists by allergies AND custom bans
+  const allHardBans = [...allergies, ...custom_allergy_bans];
+  const filtered = getFilteredFoodLists(allHardBans);
   const mainProteins = filtered.leanProteins.filter(
     p => !p.includes('Whey') && !p.includes('Bacon') && !p.includes('Protein powder')
   );

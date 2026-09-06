@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
       })(),
       // Allergies — hard-ban food allergies
       allergies: client.allergies || [],
+      custom_allergy_bans: client.custom_allergy_bans || [],
       allergy_discovery_enabled: client.allergy_discovery_enabled ?? false,
     };
 
@@ -293,7 +294,7 @@ export async function POST(request: NextRequest) {
       try {
         const detectedMealType = detectMealType(message);
         const suggestion = generateMealSuggestion(
-          { gender: context.gender as 'male' | 'female', currentPhase: context.currentPhase, phase5StartDate: context.phase5StartDate, phase5Plan: context.phase5Plan, allergies: context.allergies },
+          { gender: context.gender as 'male' | 'female', currentPhase: context.currentPhase, phase5StartDate: context.phase5StartDate, phase5Plan: context.phase5Plan, allergies: context.allergies, custom_allergy_bans: context.custom_allergy_bans },
           detectedMealType
         );
         const response = formatMealSuggestion(suggestion);
@@ -692,6 +693,7 @@ Use sparingly! Good fats support hormone health and nutrient absorption. 💪`;
           phase5StartDate: context.phase5StartDate,
           phase5Plan: context.phase5Plan,
           allergies: context.allergies,
+          custom_allergy_bans: context.custom_allergy_bans,
         },
         detectedMealType
       );
