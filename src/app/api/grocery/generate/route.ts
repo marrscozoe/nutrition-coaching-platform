@@ -91,11 +91,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Clear existing items
+    // Clear existing SUGGESTION items only (shop_amount IS NULL).
+    // This preserves items the user explicitly added (shop_amount > 0).
     await supabase
       .from('client_grocery_items')
       .delete()
-      .eq('client_id', clientId);
+      .eq('client_id', clientId)
+      .is('shop_amount', null);
 
     // Insert new items
     const { data: insertedItems, error: insertError } = await supabase

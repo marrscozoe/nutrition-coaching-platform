@@ -366,7 +366,7 @@ export default function GroceryPage() {
                   <input
                     type="number"
                     value={mealCountVal}
-                    onChange={e => setMealCountVal(parseInt(e.target.value) || 12)}
+                    onChange={e => setMealCountVal(parseInt(e.target.value) || 0)}
                     onBlur={() => {
                       setMealCountEditing(false);
                       if (mealCountVal > 0 && mealCountVal !== mealCount) {
@@ -523,7 +523,7 @@ export default function GroceryPage() {
             ) : (
               <div className="space-y-3">
                 {(Object.keys(CATEGORY_LABELS) as TabKey[]).map(cat => {
-                  const catItems = items.filter(i => i.category === cat);
+                  const catItems = items.filter(i => i.category === cat && (i.shop_amount ?? 0) > 0);
                   if (catItems.length === 0) return null;
                   return (
                     <div key={cat} className="rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 p-3">
