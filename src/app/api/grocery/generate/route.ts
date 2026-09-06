@@ -6,7 +6,6 @@ import {
   HEALTHY_FATS,
   STARCHY_CARBOHYDRATES,
   filterFoodsForAllergies,
-  getPortions,
   Phase5Day,
 } from '@/lib/nutrition-data';
 
