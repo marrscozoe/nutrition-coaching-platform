@@ -399,6 +399,25 @@ export default function ProfilePage() {
               />
             </button>
           </div>
+          {client.allergy_discovery_enabled && (
+            <div className="mt-4 p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
+              <h4 className="text-sm font-semibold text-blue-400 mb-2">🔍 How Allergy Discovery Works</h4>
+              <p className="text-brand-cream/70 text-sm mb-2">
+                When you log meals without specifying ingredients, our AI will:
+              </p>
+              <ul className="text-brand-cream/60 text-sm space-y-1 mb-3 pl-4">
+                <li>• Analyze what you ate to identify potential food sensitivities</li>
+                <li>• Look for patterns in how you feel after eating</li>
+                <li>• Suggest foods that might be causing issues</li>
+              </ul>
+              <p className="text-brand-cream/70 text-sm mb-2">
+                Look for suggestions in your chat with the AI coach. The AI may ask follow-up questions about how certain foods make you feel.
+              </p>
+              <p className="text-brand-cream/40 text-xs">
+                <strong>Note:</strong> This is for discovery only — always consult a healthcare provider for official allergy diagnosis.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Photo Meal Log Toggle */}
