@@ -237,7 +237,12 @@ export default function GroceryPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setItems(data.items || []);
+        // MERGE: keep existing items, add new suggestions only
+        const existingNames = new Set(items.map(i => i.item_name));
+        const newSuggestions = (data.items || []).filter(
+          (item: GroceryItem) => !existingNames.has(item.item_name)
+        );
+        setItems(prev => [...prev, ...newSuggestions]);
       }
     } catch (err) {
       console.error('Regenerate error:', err);
@@ -364,20 +369,31 @@ export default function GroceryPage() {
                 <span className="text-xs font-semibold text-blue-700">Meals:</span>
                 {mealCountEditing ? (
                   <input
-                    type="number"
-                    value={mealCountVal}
-                    onChange={e => setMealCountVal(parseInt(e.target.value) || 0)}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={mealCountVal === 0 ? '' : mealCountVal}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/[^0-9]/g, '');
+                      setMealCountVal(raw === '' ? 0 : parseInt(raw) || 0);
+                    }}
                     onBlur={() => {
-                      setMealCountEditing(false);
-                      if (mealCountVal > 0 && mealCountVal !== mealCount) {
+                      if (mealCountVal === 0 || mealCountVal === mealCount) {
+                        setMealCountVal(mealCount);
+                        setMealCountEditing(false);
+                      } else {
                         handleMealCountChange(mealCountVal);
+                        setMealCountEditing(false);
                       }
                     }}
                     onKeyDown={e => {
                       if (e.key === 'Enter') {
-                        setMealCountEditing(false);
-                        if (mealCountVal > 0 && mealCountVal !== mealCount) {
+                        if (mealCountVal === 0 || mealCountVal === mealCount) {
+                          setMealCountVal(mealCount);
+                          setMealCountEditing(false);
+                        } else {
                           handleMealCountChange(mealCountVal);
+                          setMealCountEditing(false);
                         }
                       }
                       if (e.key === 'Escape') {
@@ -386,7 +402,7 @@ export default function GroceryPage() {
                       }
                     }}
                     className="w-16 px-2 py-1 rounded-lg text-base font-bold text-center border-2 border-blue-400 bg-white focus:border-blue-600 focus:outline-none shadow-sm text-gray-900"
-                    autoFocus min="1" max="60"
+                    autoFocus
                   />
                 ) : (
                   <button

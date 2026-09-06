@@ -51,80 +51,54 @@ export async function POST(request: NextRequest) {
       ? filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies, customBans)
       : [];
 
-    // Build grocery items with quantities based on portions
-    const portions = getPortions(gender, phase);
-    const items: Array<{
-      client_id: string;
-      item_name: string;
-      category: 'protein' | 'veggies' | 'starch' | 'fats';
-    }> = [];
-
-    // Proteins: ~42oz for 7 days (6oz × 7 meals, one per day as baseline)
-    if (gender === 'male') {
-      items.push({ client_id: clientId, item_name: `${portions.protein} per meal × 7 days — select your proteins below`, category: 'protein' });
-    } else {
-      items.push({ client_id: clientId, item_name: `${portions.protein} per meal × 7 days — select your proteins below`, category: 'protein' });
-    }
-    // Add individual protein options
-    proteins.forEach(p => {
-      items.push({ client_id: clientId, item_name: p, category: 'protein' });
-    });
-
-    // Veggies: ~14 cups for 7 days
-    items.push({ client_id: clientId, item_name: `${portions.fibrousVegetables} per meal × 7 days — select your veggies below`, category: 'veggies' });
-    veggies.forEach(v => {
-      items.push({ client_id: clientId, item_name: v, category: 'veggies' });
-    });
-
-    // Fats: ~14 servings for 7 days
-    items.push({ client_id: clientId, item_name: `${portions.fat} per meal × 7 days — select your fats below`, category: 'fats' });
-    fats.forEach(f => {
-      items.push({ client_id: clientId, item_name: f, category: 'fats' });
-    });
-
-    // Starch: only if allowed
-    if (starchAllowed && starches.length > 0) {
-      console.log('[GroceryGenerate] INSERTING starch items, count:', starches.length, 'first few:', starches.slice(0,3));
-      items.push({ client_id: clientId, item_name: `${portions.starch} per meal × 7 days — select your starches below`, category: 'starch' });
-      starches.forEach(s => {
-        items.push({ client_id: clientId, item_name: s, category: 'starch' });
-      });
-    }
-
-    // Clear existing SUGGESTION items only (shop_amount IS NULL).
-    // This preserves items the user explicitly added (shop_amount > 0).
-    await supabase
+    // Get existing item names to avoid duplicates
+    const { data: existingItems } = await supabase
       .from('client_grocery_items')
-      .delete()
+      .select('item_name')
+      .eq('client_id', clientId);
+
+    const existingNames = new Set((existingItems || []).map((i: any) => i.item_name));
+
+    // Only add a reasonable subset as suggestions (not the full catalog)
+    const suggestedProteins = proteins.slice(0, 4).filter(p => !existingNames.has(p));
+    const suggestedVeggies = veggies.slice(0, 4).filter(v => !existingNames.has(v));
+    const suggestedFats = fats.slice(0, 3).filter(f => !existingNames.has(f));
+    const suggestedStarches = (starchAllowed ? starches.slice(0, 3) : []).filter(s => !existingNames.has(s));
+
+    const allSuggestions = [
+      ...suggestedProteins.map(p => ({ client_id: clientId, item_name: p, category: 'protein' as const })),
+      ...suggestedVeggies.map(v => ({ client_id: clientId, item_name: v, category: 'veggies' as const })),
+      ...suggestedFats.map(f => ({ client_id: clientId, item_name: f, category: 'fats' as const })),
+      ...suggestedStarches.map(s => ({ client_id: clientId, item_name: s, category: 'starch' as const })),
+    ];
+
+    // REMOVE the DELETE call — just INSERT new suggestions
+    if (allSuggestions.length > 0) {
+      const { error: insertErr } = await supabase.from('client_grocery_items').insert(allSuggestions);
+      if (insertErr) console.error('Insert suggestions error:', insertErr);
+    }
+
+    // After insert, fetch the NEW suggestions (not existing items)
+    const { data: newSuggestions } = await supabase
+      .from('client_grocery_items')
+      .select('*')
       .eq('client_id', clientId)
-      .is('shop_amount', null);
-
-    // Insert new items
-    const { data: insertedItems, error: insertError } = await supabase
-      .from('client_grocery_items')
-      .insert(items)
-      .select()
-      .order('category', { ascending: true })
-      .order('item_name', { ascending: true });
-
-    if (insertError) {
-      console.error('Insert grocery items error:', insertError);
-      return NextResponse.json({ error: 'Failed to generate grocery list' }, { status: 500 });
-    }
+      .order('created_at', { ascending: false })
+      .limit(20); // only recent ones = the new suggestions
 
     // Build summary
     const summary = {
-      totalItems: insertedItems?.length || 0,
-      proteinCount: proteins.length,
-      veggieCount: veggies.length,
-      fatCount: fats.length,
-      starchCount: starchAllowed ? starches.length : 0,
+      totalItems: allSuggestions.length,
+      proteinCount: suggestedProteins.length,
+      veggieCount: suggestedVeggies.length,
+      fatCount: suggestedFats.length,
+      starchCount: suggestedStarches.length,
       starchIncluded: starchAllowed,
     };
 
     return NextResponse.json({
       success: true,
-      items: insertedItems || [],
+      items: newSuggestions || [],
       summary,
     });
   } catch (error) {
