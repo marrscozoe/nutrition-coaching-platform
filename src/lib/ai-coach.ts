@@ -462,7 +462,27 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
 
     // IMPORTANT: The fat source must ALWAYS be specified. Never let AI drop "olive oil" from the response.
     // Using explicit wording to prevent AI from rephrasing it away.
-    return `You're in PHASE ${context.currentPhase}: ${phaseDescription}
+
+    // Restaurant step-by-step logic — terse
+    const asksAboutRestaurant = lowerMessage.includes('restaurant') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonal') || lowerMessage.includes('wendy') || lowerMessage.includes('panera') || lowerMessage.includes('chick-fil') || lowerMessage.includes('qdoba') || lowerMessage.includes('moe') || lowerMessage.includes('taco bell') || lowerMessage.includes('subway') || lowerMessage.includes('burger') || lowerMessage.includes('fries') || lowerMessage.includes('steak') || lowerMessage.includes('bowl') || lowerMessage.includes('burrito') || lowerMessage.includes('taco') || lowerMessage.includes('wrap') || lowerMessage.includes('pizza') || lowerMessage.includes('sushi') || lowerMessage.includes('thai') || lowerMessage.includes('chinese') || lowerMessage.includes('mexican') || lowerMessage.includes('italian') || lowerMessage.includes('sandwich');
+    const isFirstRestaurantAsk = asksAboutRestaurant && !lowerMessage.includes('chipotle') && !lowerMessage.includes('mcdonal') && !lowerMessage.includes('wendy') && !lowerMessage.includes('panera') && !lowerMessage.includes('chick-fil') && !lowerMessage.includes('qdoba') && !lowerMessage.includes('moe') && !lowerMessage.includes('taco bell') && !lowerMessage.includes('subway') && !lowerMessage.includes('burger') && !lowerMessage.includes('fries') && !lowerMessage.includes('steak') && !lowerMessage.includes('bowl') && !lowerMessage.includes('burrito') && !lowerMessage.includes('taco') && !lowerMessage.includes('wrap') && !lowerMessage.includes('pizza') && !lowerMessage.includes('sushi') && !lowerMessage.includes('thai') && !lowerMessage.includes('chinese') && !lowerMessage.includes('mexican') && !lowerMessage.includes('italian');
+    const hasSpecificFood = lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonal') || lowerMessage.includes('wendy') || lowerMessage.includes('panera') || lowerMessage.includes('chick-fil') || lowerMessage.includes('qdoba') || lowerMessage.includes('moe') || lowerMessage.includes('taco bell') || lowerMessage.includes('subway') || lowerMessage.includes('burger') || lowerMessage.includes('fries') || lowerMessage.includes('steak') || lowerMessage.includes('bowl') || lowerMessage.includes('burrito') || lowerMessage.includes('taco') || lowerMessage.includes('wrap') || lowerMessage.includes('pizza') || lowerMessage.includes('sushi') || lowerMessage.includes('thai') || lowerMessage.includes('chinese') || lowerMessage.includes('mexican') || lowerMessage.includes('italian') || lowerMessage.includes('sandwich');
+
+    let restaurantSection = '';
+    if (asksAboutRestaurant) {
+      if (isFirstRestaurantAsk) {
+        restaurantSection = '\n\nRESTAURANT MODE — just ask one question back:\n"What sounds good — burger place, Mexican, Asian, pizza, sandwich, or something else?"\nDo NOT give a swap list. Do NOT write an essay. No fluff. Just ask.';
+      } else if (hasSpecificFood) {
+        const phaseNote = context.currentPhase === 1 ? '⚠️ Phase 1 = NO STARCH. Skip rice/pasta/bread.' :
+                          context.currentPhase === 2 ? '⚠️ Phase 2 = starch only Wed/Sat/Sun.' :
+                          context.currentPhase === 5 ? 'Check your Phase 5 plan for today.' :
+                          context.currentPhase === 6 ? 'Phase 6 = starch OK every meal.' : '';
+        const allergyNote = context.allergies && context.allergies.length > 0 ? '⚠️ ALLERGIES: ' + context.allergies.join(', ') + '.' : '';
+        restaurantSection = '\n\nRESTAURANT SWAPS — keep it brief:\n' + (phaseNote ? phaseNote + ' ' : '') + (allergyNote ? allergyNote + ' ' : '') + 'Give 3-5 terse swaps. Example: "Chipotle bowl → skip rice, double veggies, grilled chicken, guac. No cheese (dairy)."';
+      }
+    }
+
+    return `You're in PHASE ${context.currentPhase}: ${phaseDescription}${restaurantSection}
 
 Portions per meal:
 Protein: ${portions.protein} (${proteinExamples})
