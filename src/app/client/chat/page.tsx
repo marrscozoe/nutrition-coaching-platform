@@ -62,6 +62,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showSupplements, setShowSupplements] = useState(false);
+  const [showRestaurantHelp, setShowRestaurantHelp] = useState(false);
   const [chatClearedAt, setChatClearedAt] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -852,12 +853,15 @@ export default function ChatPage() {
 
       {/* Quick Actions */}
       <div className="px-4 py-2 pr-12 flex gap-2 overflow-x-auto bg-brand-charcoal/60 fixed top-[calc(64px+env(safe-area-inset-top))] left-0 right-0 z-40 scrollbar-hide">
-        {['What can I eat?', 'Portion sizes?', 'Tips?', 'Motivate me!', '💊 Supplements'].map((q) => (
+        {['What can I eat?', 'Portion sizes?', '🍽️ Restaurant swaps?', 'Tips?', 'Motivate me!', '💊 Supplements'].map((q) => (
           <button
             key={q}
             onClick={() => {
               if (q === '💊 Supplements') {
                 setShowSupplements(true);
+              } else if (q === '🍽️ Restaurant swaps?') {
+                setInput("I'm at a restaurant, what can I order?");
+                handleSend("I'm at a restaurant, what can I order?");
               } else {
                 setInput(q);
                 handleSend(q);
@@ -874,6 +878,25 @@ export default function ChatPage() {
         ))}
         {/* Gradient fade scroll indicator */}
         <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-brand-charcoal/60 to-transparent pointer-events-none" />
+      </div>
+
+      {/* Restaurant Help */}
+      <div className="px-4 py-2 bg-brand-charcoal/40">
+        <button
+          onClick={() => setShowRestaurantHelp(!showRestaurantHelp)}
+          className="text-xs text-brand-cream/40 hover:text-brand-cream/70 flex items-center gap-1"
+        >
+          ℹ️ Restaurant swap help {showRestaurantHelp ? '▲' : '▼'}
+        </button>
+        {showRestaurantHelp && (
+          <div className="mt-2 p-3 rounded-lg bg-brand-charcoal/80 border border-brand-cream/10 text-xs text-brand-cream/60">
+            <p className="mb-2"><strong className="text-brand-cream">How restaurant swaps work:</strong></p>
+            <p className="mb-1">1. Tap "🍽️ Restaurant swaps?" or tell me what restaurant you're at</p>
+            <p className="mb-1">2. I'll help you find the closest approved swap for any menu item</p>
+            <p className="mb-1">3. I know your phase and allergies</p>
+            <p>Example: "I'm at Chipotle" → I'll help you build a bowl with approved proteins, veggies, and fats</p>
+          </div>
+        )}
       </div>
 
       {/* Supplements Modal */}

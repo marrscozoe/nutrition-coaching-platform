@@ -430,7 +430,7 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
     : null;
 
   const lowerMessage = message.toLowerCase();
-  const asksAboutPlan = lowerMessage.includes('what can i eat') || lowerMessage.includes('my plan') || lowerMessage.includes('show me') || lowerMessage.includes('what am i') || lowerMessage.includes('meal example') || lowerMessage.includes('example meal') || lowerMessage.includes('phase') || lowerMessage.includes('portion') || lowerMessage.includes('categories') || lowerMessage.includes('what to eat') || lowerMessage.includes('swap') || lowerMessage.includes('exchange');
+  const asksAboutPlan = lowerMessage.includes('what can i eat') || lowerMessage.includes('my plan') || lowerMessage.includes('show me') || lowerMessage.includes('what am i') || lowerMessage.includes('meal example') || lowerMessage.includes('example meal') || lowerMessage.includes('phase') || lowerMessage.includes('portion') || lowerMessage.includes('categories') || lowerMessage.includes('what to eat') || lowerMessage.includes('swap') || lowerMessage.includes('exchange') || lowerMessage.includes('restaurant') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonald') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('eating-out') || lowerMessage.includes('at a restaurant') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru') || lowerMessage.includes(' wendys') || lowerMessage.includes(' panera') || lowerMessage.includes(' chik-fil') || lowerMessage.includes(' qdoba') || lowerMessage.includes(' moe');
 
   // Build dynamic food examples from the actual food lists
   const proteinList = LEAN_PROTEINS.join(', ');
@@ -486,6 +486,28 @@ Example: ${mealExample}
 4. AVOCADO IS A HEALTHY FAT - encourage it!
 
 ${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
+
+${lowerMessage.includes('restaurant') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonald') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('eating-out') || lowerMessage.includes('at a restaurant') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru') ? `
+RESTAURANT & EATING-OUT SWAPS:
+When a client asks about eating at a restaurant or names a specific restaurant:
+1. Ask what they're thinking of ordering (or help them identify the closest menu item)
+2. Map it to their approved food lists (protein → lean protein, etc.)
+3. Give SPECIFIC swaps they can say to the server
+
+COMMON RESTAURANT SWAPS (use client's approved lists above):
+• Any fried/protein dish → grilled chicken breast, grilled salmon, lean steak
+• Rice bowl → order without rice, double veggies, add approved protein
+• Sandwich/bread → lettuce wrap or naked (no bun)
+• French fries → side of vegetables or salad
+• Mayo/aioli → skip or request olive oil on side
+• Dessert → fresh berries or skip
+• Pizza → thin crust + lean toppings, or skip starch entirely
+• Pasta → zoodles (zucchini noodles) or skip starch
+• Sauce/dressing → request on side, use olive oil if unsure
+
+Phase-specific note: ${context.currentPhase === 1 ? 'Phase 1 = NO STARCH. At restaurants, skip rice/pasta/bread entirely. Focus on protein + vegetables.' : context.currentPhase === 2 ? 'Phase 2 = starch only Wed/Sat/Sun breakfast & lunch. No starch at dinner.' : context.currentPhase === 5 ? 'Phase 5 = follow your 14-day plan for today.' : context.currentPhase === 6 ? 'Phase 6 = higher carb allowance. Starch every meal is fine.' : 'Starch is allowed every meal.'}
+
+Allergy note: ${context.allergies && context.allergies.length > 0 ? 'Client has allergies: ' + context.allergies.join(', ') + '. Avoid any menu items with these ingredients.' : 'No allergies on file.'}` : ''}
 
 Ask me anything about specific foods!`;
   }
