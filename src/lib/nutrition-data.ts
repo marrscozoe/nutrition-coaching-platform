@@ -1,3 +1,5 @@
+import type { AdjustedTotals } from './grocery-types';
+
 // ============================================
 // ALLERGY TYPES — hard ban keys → display names
 // ============================================
@@ -835,4 +837,29 @@ export function getPhaseDayLimit(program: keyof typeof PROGRAM_FLOWS, phase: num
 // Helper function to get program info
 export function getProgramInfo(program: keyof typeof PROGRAM_FLOWS) {
   return PROGRAM_FLOWS[program] || null;
+}
+
+/**
+ * Returns default shopping totals for ~12 home meals per week.
+ */
+export function get12MealTotals(gender: 'male' | 'female', phase: number): AdjustedTotals {
+  const protein_lb = gender === 'male' ? 4.5 : 3;
+  const veggies_cups = 24;
+  const starch_cups = [1, 5].includes(phase) ? 0 : 24;
+  const fats_oz = 12;
+  const eggs_carton = 1;
+  return { protein_lb, veggies_cups, starch_cups, fats_oz, eggs_carton };
+}
+
+/**
+ * Convert shop amount to standard units for countdown.
+ */
+export function toStandardUnit(amount: number, unit: string): number {
+  switch (unit) {
+    case 'lb': return amount;
+    case 'oz': return amount / 16;
+    case 'cups': return amount;
+    case 'carton': return amount;
+    default: return amount;
+  }
 }
