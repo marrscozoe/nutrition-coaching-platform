@@ -37,6 +37,18 @@ function isStarchAllowedForPhase(phase: number): boolean {
   return ![1, 5].includes(phase);
 }
 
+/** Scale AdjustedTotals from 12 meals to a target meal count */
+function scaleTotals(totals: AdjustedTotals, mealCount: number): AdjustedTotals {
+  const factor = mealCount / 12;
+  return {
+    protein_lb: Math.round(totals.protein_lb * factor * 10) / 10,
+    veggies_cups: Math.round(totals.veggies_cups * factor * 10) / 10,
+    starch_cups: Math.round(totals.starch_cups * factor * 10) / 10,
+    fats_oz: Math.round(totals.fats_oz * factor * 10) / 10,
+    eggs_carton: Math.max(1, Math.ceil(mealCount / 12)),
+  };
+}
+
 function TotalRow({
   emoji, label, unit, total, remaining, onChange
 }: {
@@ -50,29 +62,29 @@ function TotalRow({
   useEffect(() => { setVal(total); }, [total]);
 
   return (
-    <div className="flex items-center gap-2 mb-2">
-      <span>{emoji}</span>
-      <span className="text-sm text-gray-700 flex-1">{label}</span>
+    <div className="flex items-center gap-2 mb-3">
+      <span className="text-base">{emoji}</span>
+      <span className="text-sm font-semibold text-gray-800 flex-1">{label}</span>
       {editing ? (
         <input
           type="number"
           value={val}
           onChange={e => setVal(parseFloat(e.target.value) || 0)}
           onBlur={() => { onChange(val); setEditing(false); }}
-          className="w-16 px-2 py-1 rounded text-right text-sm border border-blue-300"
+          className="w-20 px-3 py-2 rounded-lg text-base font-mono text-center border-2 border-blue-400 bg-white focus:border-blue-600 focus:outline-none shadow-sm"
           autoFocus min="0" step="0.5"
         />
       ) : (
         <button
           onClick={() => setEditing(true)}
-          className="w-16 text-right text-sm font-mono bg-blue-100 rounded px-1 hover:bg-blue-200"
+          className="w-20 text-center text-base font-mono font-bold bg-white border-2 border-blue-300 rounded-lg px-2 py-1.5 hover:border-blue-500 hover:bg-blue-50 transition-colors text-gray-900 shadow-sm"
         >
           {total} {unit}
         </button>
       )}
-      <span className="text-xs text-gray-500 w-28 text-right">→ {remaining.toFixed(1)} {unit} left</span>
-      <div className="w-20 h-2 bg-blue-200 rounded-full overflow-hidden">
-        <div className="h-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
+      <span className="text-xs text-gray-600 w-28 text-right font-medium">→ {remaining.toFixed(1)} {unit} left</span>
+      <div className="w-20 h-2.5 bg-blue-200 rounded-full overflow-hidden flex-shrink-0">
+        <div className="h-full bg-blue-600 transition-all rounded-full" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -90,12 +102,12 @@ function EggsRow({
   useEffect(() => { setVal(cartons); }, [cartons]);
 
   return (
-    <div className="flex items-center gap-2 mb-2">
-      <span>🥚</span>
-      <span className="text-sm text-gray-700 flex-1">Eggs</span>
+    <div className="flex items-center gap-2 mb-3">
+      <span className="text-base">🥚</span>
+      <span className="text-sm font-semibold text-gray-800 flex-1">Eggs</span>
       <div className="flex gap-1">
         {cartonSizes.map(size => (
-          <span key={size} className="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700">{size}</span>
+          <span key={size} className="px-2 py-0.5 rounded text-xs font-medium bg-purple-200 text-purple-800">{size}</span>
         ))}
       </div>
       {editing ? (
@@ -104,18 +116,18 @@ function EggsRow({
           value={val}
           onChange={e => onChange(parseInt(e.target.value) || 0)}
           onBlur={() => setEditing(false)}
-          className="w-16 px-2 py-1 rounded text-right text-sm border border-purple-300"
+          className="w-20 px-3 py-2 rounded-lg text-base font-mono text-center border-2 border-purple-400 bg-white focus:border-purple-600 focus:outline-none shadow-sm"
           min="1"
         />
       ) : (
         <button
           onClick={() => setEditing(true)}
-          className="w-20 text-right text-sm font-mono bg-purple-100 rounded px-1 hover:bg-purple-200"
+          className="w-20 text-center text-base font-mono font-bold bg-white border-2 border-purple-300 rounded-lg px-2 py-1.5 hover:border-purple-500 hover:bg-purple-50 transition-colors text-gray-900 shadow-sm"
         >
           {cartons} carton{cartons !== 1 ? 's' : ''}
         </button>
       )}
-      <span className="text-xs text-gray-500 w-20 text-right">→ {remaining.toFixed(1)} left</span>
+      <span className="text-xs text-gray-600 w-20 text-right font-medium">→ {remaining.toFixed(1)} left</span>
     </div>
   );
 }
@@ -144,6 +156,10 @@ export default function GroceryPage() {
   const [selectedFood, setSelectedFood] = useState('');
   const [addAmount, setAddAmount] = useState(0);
   const [addUnit, setAddUnit] = useState<'lb' | 'cups' | 'oz' | 'carton'>('lb');
+  const [mealCount, setMealCount] = useState(12);
+  const [mealCountEditing, setMealCountEditing] = useState(false);
+  const [mealCountVal, setMealCountVal] = useState(12);
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     const userData = sessionStorage.getItem('client_user');
@@ -194,6 +210,41 @@ export default function GroceryPage() {
   }
 
   const remaining = computeRemaining();
+
+  async function handleMealCountChange(newCount: number) {
+    if (!client) return;
+    setMealCount(newCount);
+    const base = get12MealTotals(
+      client.gender === 'female' ? 'female' : 'male',
+      client.current_phase
+    );
+    const scaled = scaleTotals(base, newCount);
+    setAdjustedTotals(scaled);
+    await fetch('/api/grocery/list', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-client-id': client.id },
+      body: JSON.stringify({ adjustedTotals: scaled }),
+    });
+  }
+
+  async function handleRegenerateList() {
+    if (!client) return;
+    setRegenerating(true);
+    try {
+      const res = await fetch('/api/grocery/generate', {
+        method: 'POST',
+        headers: { 'x-client-id': client.id },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.items || []);
+      }
+    } catch (err) {
+      console.error('Regenerate error:', err);
+    } finally {
+      setRegenerating(false);
+    }
+  }
 
   async function handleAddItem() {
     if (!client || !selectedFood || addAmount <= 0) return;
@@ -292,7 +343,7 @@ export default function GroceryPage() {
   return (
     <>
       <PullToRefresh onRefresh={() => client ? fetchGroceryList(client.id) : Promise.resolve()}>
-        <div className="min-h-screen pb-[96px] bg-brand-charcoal">
+        <div className="min-h-screen pb-[120px] bg-brand-charcoal">
           {/* Header */}
           <header className="bg-brand-charcoal border-b border-brand-cream/10 px-4 py-3 flex items-center gap-3">
             <Link href="/client/dashboard" className="text-brand-cream/60 hover:text-brand-cream text-sm">←</Link>
@@ -302,11 +353,52 @@ export default function GroceryPage() {
           <AddToHomeScreenBanner />
 
           {/* TOP: Editable Totals with Countdown */}
-          <div className="mx-4 mt-4 p-4 rounded-xl bg-blue-50 border border-blue-200">
-            <h3 className="text-base font-bold text-blue-800 mb-1">
-              📊 Shopping Totals (~12 meals)
-            </h3>
-            <p className="text-xs text-blue-600 mb-3">
+          <div className="mx-4 mt-4 p-4 rounded-xl bg-blue-50 border-2 border-blue-200 overflow-hidden">
+            {/* Header row with meal count */}
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-base font-bold text-blue-900">
+                📊 Shopping Totals
+              </h3>
+              {/* Meal count editor */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-blue-700">Meals:</span>
+                {mealCountEditing ? (
+                  <input
+                    type="number"
+                    value={mealCountVal}
+                    onChange={e => setMealCountVal(parseInt(e.target.value) || 12)}
+                    onBlur={() => {
+                      setMealCountEditing(false);
+                      if (mealCountVal > 0 && mealCountVal !== mealCount) {
+                        handleMealCountChange(mealCountVal);
+                      }
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        setMealCountEditing(false);
+                        if (mealCountVal > 0 && mealCountVal !== mealCount) {
+                          handleMealCountChange(mealCountVal);
+                        }
+                      }
+                      if (e.key === 'Escape') {
+                        setMealCountVal(mealCount);
+                        setMealCountEditing(false);
+                      }
+                    }}
+                    className="w-16 px-2 py-1 rounded-lg text-base font-bold text-center border-2 border-blue-400 bg-white focus:border-blue-600 focus:outline-none shadow-sm text-gray-900"
+                    autoFocus min="1" max="60"
+                  />
+                ) : (
+                  <button
+                    onClick={() => { setMealCountVal(mealCount); setMealCountEditing(true); }}
+                    className="px-3 py-1 rounded-lg text-base font-bold bg-white border-2 border-blue-300 hover:border-blue-500 hover:bg-blue-50 transition-colors text-blue-800 shadow-sm"
+                  >
+                    {mealCount}
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-blue-600 mb-4">
               Tap a number to adjust. Counts down as you add items.
             </p>
 
@@ -328,10 +420,10 @@ export default function GroceryPage() {
               />
             )}
             {(!starchAllowed || adjustedTotals.starch_cups === 0) && (
-              <div className="flex items-center gap-2 mb-2 opacity-50">
-                <span>🍠</span>
-                <span className="text-sm text-gray-500 flex-1">Starch</span>
-                <span className="text-xs text-gray-400 italic">
+              <div className="flex items-center gap-2 mb-3 opacity-60">
+                <span className="text-base">🍠</span>
+                <span className="text-sm font-semibold text-gray-600 flex-1">Starch</span>
+                <span className="text-xs text-gray-500 font-medium italic">
                   {!starchAllowed ? 'Not available in your phase' : '0 cups'}
                 </span>
               </div>
@@ -345,13 +437,24 @@ export default function GroceryPage() {
               cartons={adjustedTotals.eggs_carton} remaining={remaining.eggs_carton}
               onChange={v => handleTotalChange('eggs_carton', v)}
             />
+
+            {/* Regenerate button */}
+            <div className="mt-4 pt-3 border-t border-blue-200">
+              <button
+                onClick={handleRegenerateList}
+                disabled={regenerating}
+                className="w-full py-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 disabled:bg-blue-400 text-white font-semibold text-sm transition-colors shadow-sm"
+              >
+                {regenerating ? 'Regenerating...' : '🔄 Regenerate Suggested Items'}
+              </button>
+            </div>
           </div>
 
           {/* MIDDLE: Add Foods */}
           <div className="mx-4 mt-4">
             <h3 className="text-base font-bold text-brand-cream mb-2">Add Foods</h3>
             {/* Tab bar */}
-            <div className="flex gap-1 overflow-x-auto pb-2">
+            <div className="flex gap-1 overflow-x-auto pb-2 -mx-1 px-1">
               {(Object.keys(CATEGORY_LABELS) as TabKey[]).map(tab => (
                 <button
                   key={tab}
@@ -379,7 +482,7 @@ export default function GroceryPage() {
                   <button
                     key={food}
                     onClick={() => openAddModal(food)}
-                    className="w-full text-left px-3 py-2 rounded-lg bg-brand-charcoal/80 border border-brand-cream/10 hover:border-brand-orange/50 text-brand-cream text-sm transition-colors"
+                    className="w-full text-left px-3 py-2.5 rounded-lg bg-brand-charcoal/80 border border-brand-cream/10 hover:border-brand-orange/50 text-brand-cream text-sm transition-colors"
                   >
                     + {food}
                   </button>
@@ -388,17 +491,35 @@ export default function GroceryPage() {
             </div>
           </div>
 
-          {/* BOTTOM: Checklist */}
+          {/* BOTTOM: Shopping List — VISIBLE PROMINENT SECTION */}
           <div className="mx-4 mt-6 mb-4">
-            <h3 className="text-base font-bold text-brand-cream mb-2">
-              ✅ Your List {items.length > 0 && (
-                <span className="text-brand-orange font-normal text-sm ml-1">
-                  ({items.filter(i => i.checked).length}/{items.length})
-                </span>
-              )}
-            </h3>
+            {/* Prominent section header */}
+            <div className="rounded-xl bg-brand-orange/10 border-2 border-brand-orange/30 p-4 mb-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-brand-cream">
+                  🛒 Your Shopping List
+                  {items.length > 0 && (
+                    <span className="ml-2 text-sm font-normal text-brand-orange">
+                      ({items.filter(i => i.checked).length}/{items.length} checked)
+                    </span>
+                  )}
+                </h3>
+                {items.length > 0 && (
+                  <button
+                    onClick={handleClearAll}
+                    className="text-xs text-red-400/80 hover:text-red-400 font-medium px-2 py-1 rounded border border-red-400/20 hover:bg-red-400/10 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+            </div>
+
             {items.length === 0 ? (
-              <p className="text-sm text-brand-cream/40 italic">Tap foods above to add them to your list.</p>
+              <div className="rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 p-6 text-center">
+                <p className="text-base text-brand-cream/50 mb-2">No items on your list yet.</p>
+                <p className="text-sm text-brand-cream/30">Tap foods above to add them to your list.</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {(Object.keys(CATEGORY_LABELS) as TabKey[]).map(cat => {
@@ -406,18 +527,18 @@ export default function GroceryPage() {
                   if (catItems.length === 0) return null;
                   return (
                     <div key={cat} className="rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 p-3">
-                      <div className="text-xs text-brand-cream/40 uppercase mb-2">
+                      <div className="text-xs text-brand-cream/40 uppercase font-semibold mb-2 tracking-wide">
                         {CATEGORY_LABELS[cat].emoji} {CATEGORY_LABELS[cat].label}
                       </div>
                       {catItems.map(item => (
-                        <div key={item.id} className="flex items-center gap-2 py-1">
+                        <div key={item.id} className="flex items-center gap-3 py-1.5">
                           <input
                             type="checkbox"
                             checked={item.checked}
                             onChange={() => handleToggleItem(item)}
-                            className="accent-brand-orange w-4 h-4"
+                            className="accent-brand-orange w-5 h-5 flex-shrink-0 rounded"
                           />
-                          <span className={`flex-1 text-sm ${
+                          <span className={`flex-1 text-base ${
                             item.checked ? 'line-through text-brand-cream/40' : 'text-brand-cream'
                           }`}>
                             {item.item_name}
@@ -425,7 +546,7 @@ export default function GroceryPage() {
                           </span>
                           <button
                             onClick={() => handleDeleteItem(item)}
-                            className="text-red-400/60 hover:text-red-400 text-xs px-1"
+                            className="text-red-400/60 hover:text-red-400 text-sm px-2 py-0.5 rounded hover:bg-red-400/10 transition-colors flex-shrink-0"
                           >✕</button>
                         </div>
                       ))}
@@ -434,24 +555,18 @@ export default function GroceryPage() {
                 })}
                 {/* Notes */}
                 <div className="mt-3">
-                  <label className="text-xs text-brand-cream/40 uppercase">Notes</label>
+                  <label className="text-sm text-brand-cream/60 uppercase font-semibold tracking-wide">Notes</label>
                   <textarea
                     value={notes}
                     onChange={e => {
                       setNotes(e.target.value);
                       if (client) saveNotesDebounced(client.id, e.target.value);
                     }}
-                    placeholder="Any notes for your shopping trip..."
-                    rows={2}
-                    className="w-full mt-1 px-3 py-2 rounded-lg bg-brand-charcoal/80 border border-brand-cream/10 text-brand-cream text-sm placeholder:text-brand-cream/30 resize-none"
+                    placeholder="Add any notes for your shopping trip..."
+                    rows={3}
+                    className="w-full mt-2 px-4 py-3 rounded-xl bg-brand-charcoal/80 border-2 border-brand-cream/20 text-brand-cream text-base placeholder:text-brand-cream/40 resize-none focus:border-brand-orange/60 focus:outline-none transition-colors"
                   />
                 </div>
-                <button
-                  onClick={handleClearAll}
-                  className="w-full py-2 text-sm text-red-400/60 border border-red-400/20 rounded-lg hover:bg-red-400/5"
-                >
-                  Clear All
-                </button>
               </div>
             )}
           </div>
@@ -501,7 +616,7 @@ export default function GroceryPage() {
                   type="number"
                   value={addAmount || ''}
                   onChange={e => setAddAmount(parseFloat(e.target.value) || 0)}
-                  className="flex-1 px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream"
+                  className="flex-1 px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-base focus:border-brand-orange/60 focus:outline-none"
                   min="0" step="0.5" placeholder="0"
                   autoFocus
                 />
