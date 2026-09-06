@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
       event_date: client.event_date,
       notes: client.notes,
       allergies: client.allergies || [],
+      custom_allergy_bans: client.custom_allergy_bans || [],
       allergy_discovery_enabled: client.allergy_discovery_enabled ?? false,
       photo_meal_log_enabled: client.photo_meal_log_enabled ?? false,
       created_at: client.created_at,
@@ -54,13 +55,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { allergies, allergy_discovery_enabled, photo_meal_log_enabled, name, gender, goal_weight, starting_weight, program_type, event_date } = body;
+    const { allergies, custom_allergy_bans, allergy_discovery_enabled, photo_meal_log_enabled, name, gender, goal_weight, starting_weight, program_type, event_date } = body;
 
     const supabase = getAdminClient();
 
     // Build update object — only include provided fields
     const updates: Record<string, any> = {};
     if (allergies !== undefined) updates.allergies = allergies;
+    if (custom_allergy_bans !== undefined) updates.custom_allergy_bans = custom_allergy_bans;
     if (allergy_discovery_enabled !== undefined) updates.allergy_discovery_enabled = allergy_discovery_enabled;
     if (photo_meal_log_enabled !== undefined) updates.photo_meal_log_enabled = photo_meal_log_enabled;
     if (name !== undefined) updates.name = name;
@@ -95,6 +97,7 @@ export async function PATCH(request: NextRequest) {
         email: updated.email,
         gender: updated.gender,
         allergies: updated.allergies || [],
+        custom_allergy_bans: updated.custom_allergy_bans || [],
         allergy_discovery_enabled: updated.allergy_discovery_enabled ?? false,
         photo_meal_log_enabled: updated.photo_meal_log_enabled ?? false,
         current_phase: updated.current_phase,

@@ -23,6 +23,7 @@ interface ClientData {
   phase5_plan?: string;
   phase5_start_date?: string;
   allergies?: string[];
+  custom_allergy_bans?: string[];
 }
 
 interface MealLog {
@@ -197,7 +198,7 @@ export default function ClientDashboard() {
         <div className="grid grid-cols-2 gap-3">
           {/* Lean Protein */}
           <button
-            onClick={() => openFoodModal('Lean Protein 🍗', filterFoodsForAllergies(LEAN_PROTEINS, client.allergies || []))}
+            onClick={() => openFoodModal('Lean Protein 🍗', filterFoodsForAllergies(LEAN_PROTEINS, client.allergies || [], client.custom_allergy_bans || []))}
             className="p-4 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/10 border border-red-500/30 text-left w-full hover:border-red-500/60 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-2">
@@ -206,13 +207,13 @@ export default function ClientDashboard() {
             </div>
             <p className="text-xs text-brand-cream/70 mb-2">{client.gender === 'male' ? '6 oz' : '4 oz'} per meal</p>
             <p className="text-xs text-brand-cream/50 leading-relaxed">
-              {filterFoodsForAllergies(LEAN_PROTEINS, client.allergies || []).slice(0, 5).join(', ')}...
+              {filterFoodsForAllergies(LEAN_PROTEINS, client.allergies || [], client.custom_allergy_bans || []).slice(0, 5).join(', ')}...
             </p>
           </button>
 
           {/* Fibrous Vegetables */}
           <button
-            onClick={() => openFoodModal('Fibrous Veggies 🥬', filterFoodsForAllergies(FIBROUS_VEGETABLES, client.allergies || []))}
+            onClick={() => openFoodModal('Fibrous Veggies 🥬', filterFoodsForAllergies(FIBROUS_VEGETABLES, client.allergies || [], client.custom_allergy_bans || []))}
             className="p-4 rounded-xl bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/30 text-left w-full hover:border-green-500/60 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-2">
@@ -221,13 +222,13 @@ export default function ClientDashboard() {
             </div>
             <p className="text-xs text-brand-cream/70 mb-2">{client.gender === 'male' ? '2 cups' : '1-2 cups'} per meal</p>
             <p className="text-xs text-brand-cream/50 leading-relaxed">
-              {filterFoodsForAllergies(FIBROUS_VEGETABLES, client.allergies || []).slice(0, 5).join(', ')}...
+              {filterFoodsForAllergies(FIBROUS_VEGETABLES, client.allergies || [], client.custom_allergy_bans || []).slice(0, 5).join(', ')}...
             </p>
           </button>
 
           {/* Healthy Fats */}
           <button
-            onClick={() => openFoodModal('Healthy Fats 🥑', filterFoodsForAllergies(HEALTHY_FATS, client.allergies || []))}
+            onClick={() => openFoodModal('Healthy Fats 🥑', filterFoodsForAllergies(HEALTHY_FATS, client.allergies || [], client.custom_allergy_bans || []))}
             className="p-4 rounded-xl bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30 text-left w-full hover:border-yellow-500/60 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-2">
@@ -236,14 +237,14 @@ export default function ClientDashboard() {
             </div>
             <p className="text-xs text-brand-cream/70 mb-2">{getPortions(client.gender as 'male' | 'female', client.current_phase).fat} per meal</p>
             <p className="text-xs text-brand-cream/50 leading-relaxed">
-              {filterFoodsForAllergies(HEALTHY_FATS, client.allergies || []).slice(0, 4).join(', ')}...
+              {filterFoodsForAllergies(HEALTHY_FATS, client.allergies || [], client.custom_allergy_bans || []).slice(0, 4).join(', ')}...
             </p>
           </button>
 
           {/* Starchy Carbohydrates */}
           <button
             onClick={() => {
-              const safeStarch = filterFoodsForAllergies(STARCHY_CARBOHYDRATES, client.allergies || []);
+              const safeStarch = filterFoodsForAllergies(STARCHY_CARBOHYDRATES, client.allergies || [], client.custom_allergy_bans || []);
               openFoodModal('Starchy Carbs 🍠', safeStarch);
             }}
             className="p-4 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/30 text-left w-full hover:border-orange-500/60 transition-colors cursor-pointer"
@@ -254,7 +255,7 @@ export default function ClientDashboard() {
             </div>
             <p className="text-xs text-brand-cream/70 mb-2">{getPortions(client.gender as 'male' | 'female', client.current_phase).starch} per meal</p>
             <p className="text-xs text-brand-cream/50 leading-relaxed">
-              {filterFoodsForAllergies(STARCHY_CARBOHYDRATES, client.allergies || []).slice(0, 4).join(', ')}...
+              {filterFoodsForAllergies(STARCHY_CARBOHYDRATES, client.allergies || [], client.custom_allergy_bans || []).slice(0, 4).join(', ')}...
             </p>
           </button>
         </div>

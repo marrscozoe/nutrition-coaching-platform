@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const allergies: string[] = client.allergies || [];
+    const customBans: string[] = client.custom_allergy_bans || [];
     const phase = Number(client.current_phase) || 1;
     const gender = client.gender === 'female' ? 'female' : 'male';
 
@@ -43,11 +44,11 @@ export async function POST(request: NextRequest) {
     console.log('[GroceryGenerate] phase:', phase, 'type:', typeof phase, 'starchAllowed:', starchAllowed, 'allergies:', allergies);
 
     // Get filtered food lists
-    const proteins = filterFoodsForAllergies(LEAN_PROTEINS, allergies);
-    const veggies = filterFoodsForAllergies(FIBROUS_VEGETABLES, allergies);
-    const fats = filterFoodsForAllergies(HEALTHY_FATS, allergies);
+    const proteins = filterFoodsForAllergies(LEAN_PROTEINS, allergies, customBans);
+    const veggies = filterFoodsForAllergies(FIBROUS_VEGETABLES, allergies, customBans);
+    const fats = filterFoodsForAllergies(HEALTHY_FATS, allergies, customBans);
     const starches = starchAllowed
-      ? filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies)
+      ? filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies, customBans)
       : [];
 
     // Build grocery items with quantities based on portions

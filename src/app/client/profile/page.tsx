@@ -21,6 +21,7 @@ interface ClientData {
   event_date?: string;
   notes?: string;
   allergies?: string[];
+  custom_allergy_bans?: string[];
   allergy_discovery_enabled?: boolean;
   photo_meal_log_enabled?: boolean;
   created_at: string;
@@ -353,17 +354,25 @@ export default function ProfilePage() {
               onClick={() => setShowAllergyEdit(true)}
               className="text-brand-orange text-sm hover:underline"
             >
-              {client.allergies && client.allergies.length > 0 ? 'Edit ✏️' : 'Add ✏️'}
+              {(client.allergies?.length ?? 0) > 0 || (client.custom_allergy_bans?.length ?? 0) > 0 ? 'Edit ✏️' : 'Add ✏️'}
             </button>
           </div>
-          {client.allergies && client.allergies.length > 0 ? (
+          {((client.allergies?.length ?? 0) > 0 || (client.custom_allergy_bans?.length ?? 0) > 0) ? (
             <div className="flex flex-wrap gap-2">
-              {client.allergies.map((allergy: string) => (
+              {(client.allergies || []).map((allergy: string) => (
                 <span
                   key={allergy}
                   className="inline-flex items-center px-3 py-1 rounded-full bg-red-500/20 border border-red-500/30 text-red-400 text-sm"
                 >
                   {allergy}
+                </span>
+              ))}
+              {(client.custom_allergy_bans || []).map((ban: string) => (
+                <span
+                  key={ban}
+                  className="inline-flex items-center px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-sm"
+                >
+                  {ban}
                 </span>
               ))}
             </div>
@@ -1077,11 +1086,17 @@ export default function ProfilePage() {
       {showAllergyEdit && (
         <AllergyEditModal
           currentAllergies={client.allergies || []}
+          customBans={client.custom_allergy_bans || []}
           clientId={client.id}
           onClose={() => setShowAllergyEdit(false)}
-          onSave={(newAllergies) => {
-            setClient({ ...client, allergies: newAllergies });
-            sessionStorage.setItem('client_user', JSON.stringify({ ...client, allergies: newAllergies }));
+          onSave={(newAllergies, newCustomBans) => {
+            const updated = {
+              ...client,
+              allergies: newAllergies,
+              custom_allergy_bans: newCustomBans,
+            };
+            setClient(updated);
+            sessionStorage.setItem('client_user', JSON.stringify(updated));
             setShowAllergyEdit(false);
             setToast({ message: 'Allergies updated!', type: 'success' });
           }}

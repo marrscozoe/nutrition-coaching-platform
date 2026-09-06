@@ -1,6 +1,97 @@
 import type { AdjustedTotals } from './grocery-types';
 
 // ============================================
+// CUSTOM ALLERGY BANS — client-typed ban items
+// ============================================
+
+// Maps a user-typed ban string (lowercased) to the food keywords it should ban.
+// Used when a client types "meat", "pork", "fried food", etc.
+export const CUSTOM_BAN_MATCHERS: Record<string, string[]> = {
+  meat: [
+    'beef', 'chicken', 'turkey', 'pork', 'steak', 'lamb', 'bacon', 'ham', 'sausage',
+    'ground beef', 'ground turkey', 'ground pork', 'ribeye', 'sirloin', 'breast',
+    'thigh', 'wing', 'drumstick', 'tenderloin', 'veal', 'venison', 'duck', 'goose',
+    'prosciutto', 'salami', 'pepperoni', 'chorizo', 'pastrami', 'meatball', 'kabob',
+    'shawarma', 'gyro', 'bratwurst', 'hot dog', 'frankfurter',
+  ],
+  pork: [
+    'pork', 'bacon', 'ham', 'sausage', 'chorizo', 'prosciutto', 'salami', 'pepperoni',
+    'bratwurst', 'hot dog', 'frankfurter', 'pork chop', 'pork loin', 'pork belly',
+    'pork shoulder', 'spare rib', 'baby back rib',
+  ],
+  'fried food': [
+    'fried', 'crispy', 'deep-fried', 'pan-fried', 'air-fried', 'tempura',
+    'fried chicken', 'french fries', 'fries', 'onion rings', 'fried fish',
+    'fish and chips', 'corn dog', 'funnel cake', 'beignets', 'sufganiyot', 'poutine',
+  ],
+  shellfish: [
+    'shrimp', 'lobster', 'crab', 'crawfish', 'crayfish', 'prawn', 'scallop',
+    'mussel', 'clam', 'oyster', 'squid', 'calamari', 'octopus', 'crab cake',
+    'shrimp cocktail', 'langoustine',
+  ],
+  nuts: [
+    'almond', 'walnut', 'cashew', 'pecan', 'pistachio', 'hazelnut', 'brazil nut',
+    'macadamia', 'pine nut', 'chestnut', 'nut butter', 'almond butter', 'cashew butter',
+  ],
+  dairy: [
+    'milk', 'cheese', 'yogurt', 'butter', 'cream', 'ice cream', 'whey', 'casein',
+    'lactose', 'ghee', 'sour cream', 'cottage cheese', 'ricotta', 'mozzarella',
+    'parmesan', 'cheddar', 'brie', 'gouda', 'feta', 'goat cheese', 'cream cheese',
+  ],
+  gluten: [
+    'wheat', 'barley', 'rye', 'oat', 'bread', 'pasta', 'cracker', 'flour',
+    'tortilla', 'bun', 'roll', 'bagel', 'croissant', 'muffin', 'cake', 'pie',
+    'cookie', 'beer', 'soy sauce',
+  ],
+  eggs: [
+    'egg', 'mayonnaise', 'mayo', 'meringue', 'custard', 'aioli', 'hollandaise', 'eggnog',
+  ],
+  soy: [
+    'soy', 'edamame', 'tofu', 'tempeh', 'miso', 'soy sauce', 'soybean',
+  ],
+  corn: [
+    'corn', 'maize', 'hominy', 'polenta', 'cornmeal', 'cornstarch', 'corn syrup', 'popcorn',
+  ],
+  sugar: [
+    'sugar', 'candy', 'chocolate', 'cocoa', 'sweet', 'dessert', 'pastry', 'donut',
+    'brownie', 'cupcake', 'pie', 'ice cream', 'soda', 'juice', 'nectar',
+  ],
+  alcohol: [
+    'beer', 'wine', 'vodka', 'whiskey', 'rum', 'tequila', 'gin', 'brandy',
+    'champagne', 'cocktail', 'liquor', 'ale', 'stout', 'porter', 'sake',
+  ],
+};
+
+/**
+ * Returns true if a food string is banned by a given custom ban string.
+ * First checks CUSTOM_BAN_MATCHERS for a known ban category;
+ * falls back to treating the ban string itself as a keyword (partial match).
+ * Matching is case-insensitive.
+ */
+export function isFoodBannedByCustomBan(food: string, customBan: string): boolean {
+  const normalizedBan = customBan.toLowerCase().trim();
+  if (!normalizedBan) return false;
+
+  // Check known ban category
+  const patterns = CUSTOM_BAN_MATCHERS[normalizedBan];
+  if (patterns) {
+    const lowerFood = food.toLowerCase();
+    return patterns.some(pattern => lowerFood.includes(pattern.toLowerCase()));
+  }
+
+  // Fallback: treat the ban string itself as a keyword
+  return food.toLowerCase().includes(normalizedBan);
+}
+
+/**
+ * Filters a food list, removing any items that match any of the given custom bans.
+ */
+export function filterFoodsByCustomBans(foods: string[], customBans: string[]): string[] {
+  if (!customBans || customBans.length === 0) return foods;
+  return foods.filter(food => !customBans.some(ban => isFoodBannedByCustomBan(food, ban)));
+}
+
+// ============================================
 // ALLERGY TYPES — hard ban keys → display names
 // ============================================
 
@@ -90,23 +181,44 @@ export function isFoodBanned(food: string, allergies: string[]): boolean {
 }
 
 /**
- * Filters a list of foods, removing any that are banned by the given allergies.
+ * Filters a list of foods, removing any that are banned by the given allergies
+ * OR by any of the given custom bans.
  * Logs removed items at debug level.
  */
-export function filterFoodsForAllergies(foods: string[], allergies: string[]): string[] {
-  if (!allergies || allergies.length === 0) return foods;
-  const removed: string[] = [];
-  const filtered = foods.filter(food => {
-    if (isFoodBanned(food, allergies)) {
-      removed.push(food);
-      return false;
+export function filterFoodsForAllergies(foods: string[], allergies: string[], customBans?: string[]): string[] {
+  let result = foods;
+
+  // Apply preset allergy filters
+  if (allergies && allergies.length > 0) {
+    const removed: string[] = [];
+    result = result.filter(food => {
+      if (isFoodBanned(food, allergies)) {
+        removed.push(food);
+        return false;
+      }
+      return true;
+    });
+    if (removed.length > 0) {
+      console.debug(`[AllergyFilter] Removed ${removed.length} preset-banned foods: ${removed.join(', ')}`);
     }
-    return true;
-  });
-  if (removed.length > 0) {
-    console.debug(`[AllergyFilter] Removed ${removed.length} foods: ${removed.join(', ')}`);
   }
-  return filtered;
+
+  // Apply custom ban filters
+  if (customBans && customBans.length > 0) {
+    const removed: string[] = [];
+    result = result.filter(food => {
+      if (customBans.some(ban => isFoodBannedByCustomBan(food, ban))) {
+        removed.push(food);
+        return false;
+      }
+      return true;
+    });
+    if (removed.length > 0) {
+      console.debug(`[CustomBanFilter] Removed ${removed.length} custom-banned foods: ${removed.join(', ')}`);
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -138,15 +250,15 @@ export function getAllowedStarches(allergies: string[]): string {
 }
 
 /**
- * Get filtered food lists based on allergies.
+ * Get filtered food lists based on allergies AND custom bans.
  * Returns a copy of each list with banned items removed.
  */
-export function getFilteredFoodLists(allergies: string[]) {
+export function getFilteredFoodLists(allergies: string[], customBans?: string[]) {
   return {
-    leanProteins: filterFoodsForAllergies(LEAN_PROTEINS, allergies),
-    starchyCarbohydrates: filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies),
-    fibrousVegetables: filterFoodsForAllergies(FIBROUS_VEGETABLES, allergies),
-    healthyFats: filterFoodsForAllergies(HEALTHY_FATS, allergies),
+    leanProteins: filterFoodsForAllergies(LEAN_PROTEINS, allergies, customBans),
+    starchyCarbohydrates: filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies, customBans),
+    fibrousVegetables: filterFoodsForAllergies(FIBROUS_VEGETABLES, allergies, customBans),
+    healthyFats: filterFoodsForAllergies(HEALTHY_FATS, allergies, customBans),
   };
 }
 

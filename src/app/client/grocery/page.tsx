@@ -22,6 +22,7 @@ interface ClientData {
   gender: string;
   current_phase: number;
   allergies?: string[];
+  custom_allergy_bans?: string[];
 }
 
 function debounce<T extends (...args: any[]) => any>(fn: T, ms: number): T {
@@ -267,13 +268,14 @@ export default function GroceryPage() {
   }
 
   const allergies = client?.allergies || [];
+  const customBans = client?.custom_allergy_bans || [];
   const foodLists: Record<TabKey, string[]> = {
-    protein: filterFoodsForAllergies(LEAN_PROTEINS, allergies),
-    veggies: filterFoodsForAllergies(FIBROUS_VEGETABLES, allergies),
+    protein: filterFoodsForAllergies(LEAN_PROTEINS, allergies, customBans),
+    veggies: filterFoodsForAllergies(FIBROUS_VEGETABLES, allergies, customBans),
     starch: client && isStarchAllowedForPhase(client.current_phase)
-      ? filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies)
+      ? filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies, customBans)
       : [],
-    fats: filterFoodsForAllergies(HEALTHY_FATS, allergies),
+    fats: filterFoodsForAllergies(HEALTHY_FATS, allergies, customBans),
     eggs: ['Eggs (12)', 'Eggs (18)', 'Eggs (24)'],
   };
 

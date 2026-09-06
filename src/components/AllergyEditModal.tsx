@@ -17,18 +17,22 @@ const ALLERGY_OPTIONS = [
 
 interface AllergyEditModalProps {
   currentAllergies: string[];
+  customBans: string[];
   clientId: string;
   onClose: () => void;
-  onSave: (newAllergies: string[]) => void;
+  onSave: (newAllergies: string[], newCustomBans: string[]) => void;
 }
 
 export default function AllergyEditModal({
   currentAllergies,
+  customBans = [],
   clientId,
   onClose,
   onSave,
 }: AllergyEditModalProps) {
   const [selected, setSelected] = useState<string[]>(currentAllergies);
+  const [bans, setBans] = useState<string[]>(customBans);
+  const [newBanInput, setNewBanInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -36,6 +40,21 @@ export default function AllergyEditModal({
     setSelected(prev =>
       prev.includes(key) ? prev.filter(a => a !== key) : [...prev, key]
     );
+  };
+
+  const addCustomBan = () => {
+    const trimmed = newBanInput.trim();
+    if (!trimmed) return;
+    if (bans.map(b => b.toLowerCase()).includes(trimmed.toLowerCase())) {
+      setNewBanInput('');
+      return; // already added
+    }
+    setBans(prev => [...prev, trimmed]);
+    setNewBanInput('');
+  };
+
+  const removeCustomBan = (ban: string) => {
+    setBans(prev => prev.filter(b => b !== ban));
   };
 
   const handleSave = async () => {
@@ -48,11 +67,14 @@ export default function AllergyEditModal({
           'Content-Type': 'application/json',
           'x-client-id': clientId,
         },
-        body: JSON.stringify({ allergies: selected }),
+        body: JSON.stringify({
+          allergies: selected,
+          custom_allergy_bans: bans,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
-        onSave(data.allergies || selected);
+        onSave(data.allergies || selected, data.custom_allergy_bans || bans);
       } else {
         const err = await res.json().catch(() => ({ error: 'Failed to save' }));
         setError(err.error || 'Failed to save allergies');
@@ -66,7 +88,7 @@ export default function AllergyEditModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-md bg-brand-charcoal rounded-2xl border border-brand-cream/20 p-6 max-h-[80vh] overflow-y-auto">
+      <div className="w-full max-w-md bg-brand-charcoal rounded-2xl border border-brand-cream/20 p-6 max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-brand-cream">🍽️ Food Allergies</h3>
           <button onClick={onClose} className="text-brand-cream/50 hover:text-brand-cream text-2xl leading-none">
@@ -81,6 +103,8 @@ export default function AllergyEditModal({
             {error}
           </div>
         )}
+
+        {/* Preset allergy toggles */}
         <div className="space-y-2 mb-6">
           {ALLERGY_OPTIONS.map(opt => (
             <label
@@ -106,6 +130,64 @@ export default function AllergyEditModal({
             </label>
           ))}
         </div>
+
+        {/* Custom bans section */}
+        <div className="border-t border-brand-cream/10 pt-4 mb-6">
+          <h4 className="text-sm font-semibold text-brand-cream/80 mb-2">🚫 Custom Bans</h4>
+          <p className="text-xs text-brand-cream/50 mb-3">
+            Type any food category to hard-ban it. E.g., &quot;meat&quot;, &quot;pork&quot;, &quot;fried food&quot;, &quot;corn&quot;.
+          </p>
+
+          {/* Add custom ban input */}
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={newBanInput}
+              onChange={(e) => setNewBanInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addCustomBan();
+                }
+              }}
+              placeholder="e.g. meat, pork, fried food..."
+              className="flex-1 px-3 py-2 rounded-lg bg-brand-charcoal/80 border border-brand-cream/20 text-brand-cream text-sm placeholder-brand-cream/40 focus:outline-none focus:border-brand-orange"
+            />
+            <button
+              type="button"
+              onClick={addCustomBan}
+              className="px-4 py-2 rounded-lg bg-brand-orange text-white text-sm font-semibold hover:bg-brand-orange-dark transition-colors whitespace-nowrap"
+            >
+              Add
+            </button>
+          </div>
+
+          {/* Custom ban chips */}
+          {bans.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {bans.map(ban => (
+                <span
+                  key={ban}
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/30 text-red-400 text-sm"
+                >
+                  {ban}
+                  <button
+                    type="button"
+                    onClick={() => removeCustomBan(ban)}
+                    className="ml-1 text-red-400 hover:text-red-300 font-bold leading-none"
+                    aria-label={`Remove ${ban}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          {bans.length === 0 && (
+            <p className="text-xs text-brand-cream/40 italic">No custom bans added yet.</p>
+          )}
+        </div>
+
         <div className="flex gap-3">
           <button
             onClick={onClose}
@@ -122,10 +204,12 @@ export default function AllergyEditModal({
             {saving ? 'Saving...' : 'Save Allergies'}
           </button>
         </div>
-        {selected.length > 0 && (
+
+        {/* Summary of selected */}
+        {(selected.length > 0 || bans.length > 0) && (
           <div className="mt-4 pt-4 border-t border-brand-cream/10">
-            <p className="text-xs text-brand-cream/50">Selected:</p>
-            <div className="flex flex-wrap gap-1 mt-1">
+            <p className="text-xs text-brand-cream/50 mb-2">Selected:</p>
+            <div className="flex flex-wrap gap-1">
               {selected.map(a => {
                 const opt = ALLERGY_OPTIONS.find(o => o.key === a);
                 return (
@@ -134,6 +218,11 @@ export default function AllergyEditModal({
                   </span>
                 );
               })}
+              {bans.map(ban => (
+                <span key={ban} className="inline-flex items-center px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs">
+                  {ban}
+                </span>
+              ))}
             </div>
           </div>
         )}

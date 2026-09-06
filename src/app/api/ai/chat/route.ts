@@ -364,7 +364,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Persist any accepted hard-allergy additions to the DB
-    await persistAcceptedAllergies(supabase, message, client.allergies || [], clientId);
+    await persistAcceptedAllergies(supabase, message, client.allergies || [], client.custom_allergy_bans || [], clientId);
 
     return NextResponse.json({
       response: result.text,
@@ -393,6 +393,7 @@ async function persistAcceptedAllergies(
   supabase: ReturnType<typeof getAdminClient>,
   message: string,
   currentAllergies: string[],
+  currentCustomBans: string[],
   clientId: string
 ): Promise<void> {
   const lower = message.toLowerCase();
@@ -425,27 +426,40 @@ async function persistAcceptedAllergies(
   if (foodNames.length === 0) return;
 
   const newAllergyKeys: string[] = [];
+  const newCustomBans: string[] = [];
+  const lowerCustomBans = currentCustomBans.map(b => b.toLowerCase());
+
   for (const foodName of foodNames) {
     const allergyKey = findAllergyKeyForFood(foodName);
     if (allergyKey && !currentAllergies.includes(allergyKey)) {
+      // Matches a preset allergy key → add to preset allergies
       newAllergyKeys.push(allergyKey);
+    } else if (!allergyKey && !lowerCustomBans.includes(foodName.toLowerCase())) {
+      // Doesn't match a preset key → add as a custom ban
+      newCustomBans.push(foodName);
     }
   }
 
-  if (newAllergyKeys.length === 0) return;
+  if (newAllergyKeys.length === 0 && newCustomBans.length === 0) return;
 
   const updatedAllergies = Array.from(new Set([...currentAllergies, ...newAllergyKeys]));
-  console.log(`[ALLERGY DISCOVERY] Adding allergies for client ${clientId}:`, newAllergyKeys);
+  const updatedCustomBans = Array.from(new Set([...currentCustomBans, ...newCustomBans]));
+
+  console.log(`[ALLERGY DISCOVERY] Adding preset allergies for client ${clientId}:`, newAllergyKeys);
+  console.log(`[ALLERGY DISCOVERY] Adding custom bans for client ${clientId}:`, newCustomBans);
 
   const { error } = await supabase
     .from('clients')
-    .update({ allergies: updatedAllergies })
+    .update({
+      allergies: updatedAllergies,
+      custom_allergy_bans: updatedCustomBans,
+    })
     .eq('id', clientId);
 
   if (error) {
     console.error('[ALLERGY DISCOVERY] Failed to persist allergies:', error);
   } else {
-    console.log('[ALLERGY DISCOVERY] Successfully persisted allergies:', updatedAllergies);
+    console.log('[ALLERGY DISCOVERY] Successfully persisted allergies:', updatedAllergies, 'custom bans:', updatedCustomBans);
   }
 }
 
@@ -514,6 +528,7 @@ async function getFallbackResponse(message: string, context: CoachContext, clien
       type Phase5DayRule = { day: number; type: 'phase1' | 'phase2' | 'phase4'; label: string };
 
       const allergies: string[] = client.allergies || [];
+      const customBans: string[] = client.custom_allergy_bans || [];
       const phase = client.current_phase || 1;
       const gender = client.gender === 'female' ? 'female' : 'male';
       const portions = getPortions(gender, phase);
@@ -540,11 +555,11 @@ async function getFallbackResponse(message: string, context: CoachContext, clien
         }
       }
 
-      const proteins = filterFoodsForAllergies(LEAN_PROTEINS, allergies);
-      const veggies = filterFoodsForAllergies(FIBROUS_VEGETABLES, allergies);
-      const fats = filterFoodsForAllergies(HEALTHY_FATS, allergies);
+      const proteins = filterFoodsForAllergies(LEAN_PROTEINS, allergies, customBans);
+      const veggies = filterFoodsForAllergies(FIBROUS_VEGETABLES, allergies, customBans);
+      const fats = filterFoodsForAllergies(HEALTHY_FATS, allergies, customBans);
       const starches = starchAllowed
-        ? filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies)
+        ? filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies, customBans)
         : [];
 
       // Build items
