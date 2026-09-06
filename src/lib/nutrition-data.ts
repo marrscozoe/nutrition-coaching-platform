@@ -455,7 +455,7 @@ export function generateMealSuggestion(
 
   // Filter food lists by allergies AND custom bans
   const allHardBans = [...allergies, ...custom_allergy_bans];
-  const filtered = getFilteredFoodLists(allHardBans);
+  const filtered = getFilteredFoodLists(allergies, custom_allergy_bans);
   const mainProteins = filtered.leanProteins.filter(
     p => !p.includes('Whey') && !p.includes('Bacon') && !p.includes('Protein powder')
   );
@@ -638,7 +638,8 @@ export function getPhaseGuidance(
   gender: 'male' | 'female',
   phase5Plan?: Phase5Day[],
   phase5StartDate?: string,
-  allergies: string[] = []
+  allergies: string[] = [],
+  custom_allergy_bans: string[] = []
 ): PhaseGuidance {
   const p = getPortions(gender, phase);
   const isMale = gender === 'male';
@@ -648,7 +649,7 @@ export function getPhaseGuidance(
   const starchPortion = p.starch;
 
   // Build food lists from actual food lists (filtered by allergies)
-  const filtered = getFilteredFoodLists(allergies);
+  const filtered = getFilteredFoodLists(allergies, custom_allergy_bans);
   const proteinList = filtered.leanProteins.join(', ');
   const veggieList = filtered.fibrousVegetables.join(', ');
   const starchList = filtered.starchyCarbohydrates.join(', ');
