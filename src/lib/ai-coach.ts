@@ -433,11 +433,13 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
   const lowerMessage = message.toLowerCase();
   const asksAboutPlan = lowerMessage.includes('what can i eat') || lowerMessage.includes('my plan') || lowerMessage.includes('show me') || lowerMessage.includes('what am i') || lowerMessage.includes('meal example') || lowerMessage.includes('example meal') || lowerMessage.includes('phase') || lowerMessage.includes('portion') || lowerMessage.includes('categories') || lowerMessage.includes('what to eat') || lowerMessage.includes('swap') || lowerMessage.includes('exchange') || lowerMessage.includes('restaurant') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonald') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('eating-out') || lowerMessage.includes('at a restaurant') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru') || lowerMessage.includes(' wendys') || lowerMessage.includes(' panera') || lowerMessage.includes(' chik-fil') || lowerMessage.includes(' qdoba') || lowerMessage.includes(' moe');
 
-  // Build dynamic food examples from the actual food lists
-  const proteinList = LEAN_PROTEINS.join(', ');
-  const veggieList = FIBROUS_VEGETABLES.join(', ');
-  const starchList = STARCHY_CARBOHYDRATES.join(', ');
-  const fatList = HEALTHY_FATS.join(', ');
+  // Build dynamic food examples — filter out hard bans (preset allergies + custom bans)
+  const allHardBans = [...(context.allergies || []), ...(context.custom_allergy_bans || [])];
+  const filteredFoodLists = allHardBans.length > 0 ? getFilteredFoodLists(allHardBans) : null;
+  const proteinList = (filteredFoodLists?.leanProteins || LEAN_PROTEINS).join(', ');
+  const veggieList = (filteredFoodLists?.fibrousVegetables || FIBROUS_VEGETABLES).join(', ');
+  const starchList = (filteredFoodLists?.starchyCarbohydrates || STARCHY_CARBOHYDRATES).join(', ');
+  const fatList = (filteredFoodLists?.healthyFats || HEALTHY_FATS).join(', ');
 
   if (asksAboutPlan) {
     // Build Phase 5 plan description if applicable
