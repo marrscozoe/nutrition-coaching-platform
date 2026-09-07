@@ -276,3 +276,6 @@
 - Processed foods, sugar, dairy blocked in Phase 1
 - Program choices updated ("Get Shredded" etc)
 - Corrections feature removed from trainer UI
+
+## Queued (see also ~/.openclaw/workspace/nutrition-feature-ideas.md)
+- Home Daily Category Countdown — protein 0.7g/lb goal (1.2g muscle_gain) as oz; veg/starch/fat = 3× phase portions; deduct on meal log.

@@ -58,11 +58,14 @@ export async function POST(request: NextRequest) {
 
     const existingNames = new Set((existingItems || []).map((i: any) => i.item_name));
 
+    // Shuffle arrays to return different suggestions on each regenerate
+    const shuffle = <T>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
+
     // Only add top 3 per category as suggestions (not the full catalog)
-    const suggestedProteins = proteins.slice(0, 3).filter(p => !existingNames.has(p));
-    const suggestedVeggies = veggies.slice(0, 3).filter(v => !existingNames.has(v));
-    const suggestedFats = fats.slice(0, 3).filter(f => !existingNames.has(f));
-    const suggestedStarches = (starchAllowed ? starches.slice(0, 3) : []).filter(s => !existingNames.has(s));
+    const suggestedProteins = shuffle(proteins).slice(0, 3).filter(p => !existingNames.has(p));
+    const suggestedVeggies = shuffle(veggies).slice(0, 3).filter(v => !existingNames.has(v));
+    const suggestedFats = shuffle(fats).slice(0, 3).filter(f => !existingNames.has(f));
+    const suggestedStarches = (starchAllowed ? shuffle(starches).slice(0, 3) : []).filter(s => !existingNames.has(s));
 
     const allSuggestions = [
       ...suggestedProteins.map(p => ({ client_id: clientId, item_name: p, category: 'protein' as const })),
