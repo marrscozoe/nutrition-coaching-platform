@@ -160,6 +160,7 @@ export default function GroceryPage() {
   const [mealCountEditing, setMealCountEditing] = useState(false);
   const [mealCountVal, setMealCountVal] = useState(12);
   const [regenerating, setRegenerating] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
     const userData = sessionStorage.getItem('client_user');
@@ -242,7 +243,12 @@ export default function GroceryPage() {
         const newSuggestions = (data.items || []).filter(
           (item: GroceryItem) => !existingNames.has(item.item_name)
         );
-        setItems(prev => [...prev, ...newSuggestions]);
+        if (newSuggestions.length === 0) {
+          setToastMessage('No new suggestions — you already have these items');
+        } else {
+          setItems(prev => [...prev, ...newSuggestions]);
+          setToastMessage(`Added ${newSuggestions.length} suggestion${newSuggestions.length !== 1 ? 's' : ''}`);
+        }
       }
     } catch (err) {
       console.error('Regenerate error:', err);
@@ -356,6 +362,12 @@ export default function GroceryPage() {
           </header>
 
           <AddToHomeScreenBanner />
+
+          {toastMessage && (
+            <div className="mx-4 mt-2 px-4 py-2 rounded-lg bg-green-100 border border-green-300 text-green-800 text-sm font-medium">
+              {toastMessage}
+            </div>
+          )}
 
           {/* TOP: Editable Totals with Countdown */}
           <div className="mx-4 mt-4 p-4 rounded-xl bg-blue-50 border-2 border-blue-200 overflow-hidden">
@@ -543,7 +555,7 @@ export default function GroceryPage() {
             ) : (
               <div className="space-y-3">
                 {(Object.keys(CATEGORY_LABELS) as TabKey[]).map(cat => {
-                  const catItems = items.filter(i => i.category === cat && (i.shop_amount ?? 0) > 0);
+                  const catItems = items.filter(i => i.category === cat);
                   if (catItems.length === 0) return null;
                   return (
                     <div key={cat} className="rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 p-3">
