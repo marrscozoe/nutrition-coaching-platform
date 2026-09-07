@@ -58,9 +58,9 @@ export async function POST(request: NextRequest) {
 
     const existingNames = new Set((existingItems || []).map((i: any) => i.item_name));
 
-    // Only add a reasonable subset as suggestions (not the full catalog)
-    const suggestedProteins = proteins.slice(0, 4).filter(p => !existingNames.has(p));
-    const suggestedVeggies = veggies.slice(0, 4).filter(v => !existingNames.has(v));
+    // Only add top 3 per category as suggestions (not the full catalog)
+    const suggestedProteins = proteins.slice(0, 3).filter(p => !existingNames.has(p));
+    const suggestedVeggies = veggies.slice(0, 3).filter(v => !existingNames.has(v));
     const suggestedFats = fats.slice(0, 3).filter(f => !existingNames.has(f));
     const suggestedStarches = (starchAllowed ? starches.slice(0, 3) : []).filter(s => !existingNames.has(s));
 
@@ -77,13 +77,13 @@ export async function POST(request: NextRequest) {
       if (insertErr) console.error('Insert suggestions error:', insertErr);
     }
 
-    // After insert, fetch the NEW suggestions (not existing items)
+    // Return only the newly inserted suggestions (by item_name match)
+    const newNames = new Set(allSuggestions.map(s => s.item_name));
     const { data: newSuggestions } = await supabase
       .from('client_grocery_items')
       .select('*')
       .eq('client_id', clientId)
-      .order('created_at', { ascending: false })
-      .limit(20); // only recent ones = the new suggestions
+      .in('item_name', Array.from(newNames));
 
     // Build summary
     const summary = {

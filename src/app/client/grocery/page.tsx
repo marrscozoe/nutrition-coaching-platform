@@ -378,21 +378,25 @@ export default function GroceryPage() {
                       setMealCountVal(raw === '' ? 0 : parseInt(raw) || 0);
                     }}
                     onBlur={() => {
-                      if (mealCountVal === 0 || mealCountVal === mealCount) {
-                        setMealCountVal(mealCount);
+                      if (mealCountVal === 0) {
+                        setMealCountVal(mealCount); // reset to original
+                        setMealCountEditing(false);
+                      } else if (mealCountVal !== mealCount) {
+                        handleMealCountChange(mealCountVal);
                         setMealCountEditing(false);
                       } else {
-                        handleMealCountChange(mealCountVal);
                         setMealCountEditing(false);
                       }
                     }}
                     onKeyDown={e => {
                       if (e.key === 'Enter') {
-                        if (mealCountVal === 0 || mealCountVal === mealCount) {
+                        if (mealCountVal === 0) {
                           setMealCountVal(mealCount);
                           setMealCountEditing(false);
-                        } else {
+                        } else if (mealCountVal !== mealCount) {
                           handleMealCountChange(mealCountVal);
+                          setMealCountEditing(false);
+                        } else {
                           setMealCountEditing(false);
                         }
                       }
