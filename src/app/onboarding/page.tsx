@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { saveUserSession } from '@/lib/auth';
 
 function LoadingFallback() {
   return (
@@ -87,23 +88,14 @@ function OnboardingContent() {
         return;
       }
 
-      // Set sessionStorage to log the client in (per-tab, prevents cross-tab contamination)
+      // Store session with 30-day persistence (handles trainer session preservation automatically)
       const clientData = {
         id: data.clientId,
         email: email,
         name: nameParam,
         trainer_id: trainerId || null,
       };
-      // Clear only client session data (preserve trainer session if one exists in same browser tab)
-      // This prevents the bug where a trainer would be logged out when a client signs up in the same browser
-      sessionStorage.removeItem('client_user');
-      sessionStorage.removeItem('client_user_type');
-      sessionStorage.removeItem('user'); // Legacy cleanup
-      sessionStorage.removeItem('userType'); // Legacy cleanup
-      // Do NOT clear trainer_user/trainer_user_type - preserve trainer session
-      // Set client session using dedicated keys (separate from trainer keys)
-      sessionStorage.setItem('client_user', JSON.stringify(clientData));
-      sessionStorage.setItem('client_user_type', 'client');
+      saveUserSession(clientData, 'client');
 
       setSuccessMessage('Account created! Redirecting to your dashboard...');
       setTimeout(() => router.push('/client'), 2000);

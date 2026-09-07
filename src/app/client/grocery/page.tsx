@@ -530,9 +530,9 @@ export default function GroceryPage() {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-brand-cream">
                   🛒 Your Shopping List
-                  {items.length > 0 && (
+                  {items.filter(i => (i.shop_amount ?? 0) > 0).length > 0 && (
                     <span className="ml-2 text-sm font-normal text-brand-orange">
-                      ({items.filter(i => i.checked).length}/{items.length} checked)
+                      ({items.filter(i => i.checked && (i.shop_amount ?? 0) > 0).length}/{items.filter(i => (i.shop_amount ?? 0) > 0).length} checked)
                     </span>
                   )}
                 </h3>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { saveUserSession, getCurrentUser } from '@/lib/auth';
 
 export default function HomePage() {
   const router = useRouter();
@@ -86,14 +87,8 @@ export default function HomePage() {
           return;
         }
 
-        // Store user data in localStorage (use separate keys for each user type to prevent overwriting)
-        if (data.userType === 'trainer') {
-          sessionStorage.setItem('trainer_user', JSON.stringify(data.user));
-          sessionStorage.setItem('trainer_user_type', 'trainer');
-        } else {
-          sessionStorage.setItem('client_user', JSON.stringify(data.user));
-          sessionStorage.setItem('client_user_type', 'client');
-        }
+        // Store user data with 30-day session persistence
+        saveUserSession(data.user, data.userType);
 
         // Redirect based on user type
         console.log('[Login] Success, redirecting...');
