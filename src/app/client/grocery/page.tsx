@@ -161,6 +161,7 @@ export default function GroceryPage() {
   const [mealCountVal, setMealCountVal] = useState(12);
   const [regenerating, setRegenerating] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'warning'>('success');
 
   useEffect(() => {
     const userData = sessionStorage.getItem('client_user');
@@ -243,11 +244,14 @@ export default function GroceryPage() {
         const newSuggestions = (data.items || []).filter(
           (item: GroceryItem) => !existingNames.has(item.item_name)
         );
-        if (newSuggestions.length === 0) {
-          setToastMessage('No new suggestions — you already have these items');
+        const totalNew = data.summary?.totalItems ?? newSuggestions.length;
+        if (totalNew === 0) {
+          setToastType('warning');
+          setToastMessage('No new suggestions');
         } else {
+          setToastType('success');
           setItems(prev => [...prev, ...newSuggestions]);
-          setToastMessage(`Added ${newSuggestions.length} suggestion${newSuggestions.length !== 1 ? 's' : ''}`);
+          setToastMessage(`Added ${totalNew} suggestion${totalNew !== 1 ? 's' : ''}`);
         }
       }
     } catch (err) {
@@ -364,7 +368,11 @@ export default function GroceryPage() {
           <AddToHomeScreenBanner />
 
           {toastMessage && (
-            <div className="mx-4 mt-2 px-4 py-2 rounded-lg bg-green-100 border border-green-300 text-green-800 text-sm font-medium">
+            <div className={`mx-4 mt-2 px-4 py-2 rounded-lg text-sm font-medium ${
+              toastType === 'success'
+                ? 'bg-green-100 border border-green-300 text-green-800'
+                : 'bg-yellow-100 border border-yellow-300 text-yellow-800'
+            }`}>
               {toastMessage}
             </div>
           )}
@@ -555,7 +563,7 @@ export default function GroceryPage() {
             ) : (
               <div className="space-y-3">
                 {(Object.keys(CATEGORY_LABELS) as TabKey[]).map(cat => {
-                  const catItems = items.filter(i => i.category === cat);
+                  const catItems = items.filter(i => i.category === cat && (i.shop_amount ?? 0) > 0);
                   if (catItems.length === 0) return null;
                   return (
                     <div key={cat} className="rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 p-3">

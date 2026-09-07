@@ -9,6 +9,8 @@ import {
   Phase5Day,
 } from '@/lib/nutrition-data';
 
+const EGG_OPTIONS = ['Eggs (12)', 'Eggs (18)', 'Eggs (24)'];
+
 /**
  * Generate a smart grocery list for the client based on their phase, program, and allergies.
  * Clears existing list and generates a fresh one.
@@ -66,15 +68,23 @@ export async function POST(request: NextRequest) {
     const suggestedVeggies = shuffle(veggies).slice(0, 4).filter(v => !existingNames.has(v));
     const suggestedFats = shuffle(fats).slice(0, 3).filter(f => !existingNames.has(f));
     const suggestedStarches = (starchAllowed ? shuffle(starches).slice(0, 3) : []).filter(s => !existingNames.has(s));
+    const suggestedEggs = shuffle(EGG_OPTIONS).slice(0, 2).filter(e => !existingNames.has(e));
 
     const allSuggestions = [
-      ...suggestedProteins.map(p => ({ client_id: clientId, item_name: p, category: 'protein' as const })),
-      ...suggestedVeggies.map(v => ({ client_id: clientId, item_name: v, category: 'veggies' as const })),
-      ...suggestedFats.map(f => ({ client_id: clientId, item_name: f, category: 'fats' as const })),
-      ...suggestedStarches.map(s => ({ client_id: clientId, item_name: s, category: 'starch' as const })),
+      ...suggestedProteins.map(p => ({ client_id: clientId, item_name: p, category: 'protein' as const, shop_amount: 2, unit: 'lb' })),
+      ...suggestedVeggies.map(v => ({ client_id: clientId, item_name: v, category: 'veggies' as const, shop_amount: 4, unit: 'cups' })),
+      ...suggestedFats.map(f => ({ client_id: clientId, item_name: f, category: 'fats' as const, shop_amount: 1, unit: 'lb' })),
+      ...suggestedStarches.map(s => ({ client_id: clientId, item_name: s, category: 'starch' as const, shop_amount: 2, unit: 'cups' })),
+      ...suggestedEggs.map(e => ({ client_id: clientId, item_name: e, category: 'eggs' as const, shop_amount: 1, unit: 'carton' })),
     ];
 
-    // REMOVE the DELETE call — just INSERT new suggestions
+    // Clean up existing zero/null amount items for this client so ghosts don't accumulate
+    await supabase
+      .from('client_grocery_items')
+      .delete()
+      .eq('client_id', clientId)
+      .or('shop_amount.is.null,shop_amount.eq.0');
+
     if (allSuggestions.length > 0) {
       const { error: insertErr } = await supabase.from('client_grocery_items').insert(allSuggestions);
       if (insertErr) console.error('Insert suggestions error:', insertErr);
@@ -95,6 +105,7 @@ export async function POST(request: NextRequest) {
       veggieCount: suggestedVeggies.length,
       fatCount: suggestedFats.length,
       starchCount: suggestedStarches.length,
+      eggCount: suggestedEggs.length,
       starchIncluded: starchAllowed,
     };
 
