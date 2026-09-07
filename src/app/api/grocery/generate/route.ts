@@ -61,9 +61,9 @@ export async function POST(request: NextRequest) {
     // Shuffle arrays to return different suggestions on each regenerate
     const shuffle = <T>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
 
-    // Only add top 3 per category as suggestions (not the full catalog)
-    const suggestedProteins = shuffle(proteins).slice(0, 3).filter(p => !existingNames.has(p));
-    const suggestedVeggies = shuffle(veggies).slice(0, 3).filter(v => !existingNames.has(v));
+    // Only add top suggestions per category (not the full catalog)
+    const suggestedProteins = shuffle(proteins).slice(0, 4).filter(p => !existingNames.has(p));
+    const suggestedVeggies = shuffle(veggies).slice(0, 4).filter(v => !existingNames.has(v));
     const suggestedFats = shuffle(fats).slice(0, 3).filter(f => !existingNames.has(f));
     const suggestedStarches = (starchAllowed ? shuffle(starches).slice(0, 3) : []).filter(s => !existingNames.has(s));
 
