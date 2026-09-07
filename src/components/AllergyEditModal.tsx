@@ -74,7 +74,7 @@ export default function AllergyEditModal({
       });
       if (res.ok) {
         const data = await res.json();
-        onSave(data.allergies || selected, data.custom_allergy_bans || bans);
+        onSave(data.client?.allergies || selected, data.client?.custom_allergy_bans || bans);
       } else {
         const err = await res.json().catch(() => ({ error: 'Failed to save' }));
         setError(err.error || 'Failed to save allergies');
