@@ -159,9 +159,7 @@ export default function GroceryPage() {
   const [mealCount, setMealCount] = useState(12);
   const [mealCountEditing, setMealCountEditing] = useState(false);
   const [mealCountVal, setMealCountVal] = useState(12);
-  const [regenerating, setRegenerating] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'warning'>('success');
+
 
   useEffect(() => {
     const userData = sessionStorage.getItem('client_user');
@@ -227,38 +225,6 @@ export default function GroceryPage() {
       headers: { 'Content-Type': 'application/json', 'x-client-id': client.id },
       body: JSON.stringify({ adjustedTotals: scaled }),
     });
-  }
-
-  async function handleRegenerateList() {
-    if (!client) return;
-    setRegenerating(true);
-    try {
-      const res = await fetch('/api/grocery/generate', {
-        method: 'POST',
-        headers: { 'x-client-id': client.id },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        // MERGE: keep existing items, add new suggestions only
-        const existingNames = new Set(items.map(i => i.item_name));
-        const newSuggestions = (data.items || []).filter(
-          (item: GroceryItem) => !existingNames.has(item.item_name)
-        );
-        const totalNew = data.summary?.totalItems ?? newSuggestions.length;
-        if (totalNew === 0) {
-          setToastType('warning');
-          setToastMessage('No new suggestions');
-        } else {
-          setToastType('success');
-          setItems(prev => [...prev, ...newSuggestions]);
-          setToastMessage(`Added ${totalNew} suggestion${totalNew !== 1 ? 's' : ''}`);
-        }
-      }
-    } catch (err) {
-      console.error('Regenerate error:', err);
-    } finally {
-      setRegenerating(false);
-    }
   }
 
   async function handleAddItem() {
@@ -367,15 +333,7 @@ export default function GroceryPage() {
 
           <AddToHomeScreenBanner />
 
-          {toastMessage && (
-            <div className={`mx-4 mt-2 px-4 py-2 rounded-lg text-sm font-medium ${
-              toastType === 'success'
-                ? 'bg-green-100 border border-green-300 text-green-800'
-                : 'bg-yellow-100 border border-yellow-300 text-yellow-800'
-            }`}>
-              {toastMessage}
-            </div>
-          )}
+
 
           {/* TOP: Editable Totals with Countdown */}
           <div className="mx-4 mt-4 p-4 rounded-xl bg-blue-50 border-2 border-blue-200 overflow-hidden">
@@ -478,16 +436,7 @@ export default function GroceryPage() {
               onChange={v => handleTotalChange('eggs_carton', v)}
             />
 
-            {/* Regenerate button */}
-            <div className="mt-4 pt-3 border-t border-blue-200">
-              <button
-                onClick={handleRegenerateList}
-                disabled={regenerating}
-                className="w-full py-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 disabled:bg-blue-400 text-white font-semibold text-sm transition-colors shadow-sm"
-              >
-                {regenerating ? 'Regenerating...' : '🔄 Regenerate Suggested Items'}
-              </button>
-            </div>
+
           </div>
 
           {/* MIDDLE: Add Foods */}
