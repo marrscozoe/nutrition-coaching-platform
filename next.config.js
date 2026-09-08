@@ -1,8 +1,14 @@
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
-  skipWaiting: true,
-  clientsClaim: true,
+  // REMOVED skipWaiting/clientsClaim:
+  // Old code had skipWaiting:true which caused the SW to silently
+  // take over and reload the page as soon as it installed — stealing
+  // the UpdateBanner away from the user before they could tap it.
+  // With skipWaiting:false (default) the new SW waits until ALL tabs
+  // are closed or until the user explicitly calls registration.update().
+  // skipWaiting: false,
+  // clientsClaim: false,
   disable: process.env.NODE_ENV === 'development',
   runtimeCaching: [
     {

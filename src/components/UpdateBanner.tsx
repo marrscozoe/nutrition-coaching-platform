@@ -148,21 +148,14 @@ export default function UpdateBanner() {
     }
   }
 
-  function handleDismiss() {
-    try {
-      localStorage.setItem(`${DISMISS_KEY}_${serverVersionRef.current}`, 'true');
-    } catch {
-      // ignore
-    }
-    setShowBanner(false);
-  }
+  // NO dismiss — the banner must stay on screen until the user explicitly
+  // taps \"Refresh to Update\". Removing the X button prevents accidental dismissal
+  // and ensures Allen always has a path to the new version.
 
   if (!showBanner) return null;
 
   return (
     <div
-      // bottom-24 = 6rem = 96px from viewport bottom
-      // keeps the banner above the fixed client tab bar (~56px) with 40px gap
       className={`fixed bottom-24 left-4 right-4 z-50 animate-slide-up ${
         isUpdating ? 'pointer-events-none' : ''
       }`}
@@ -183,7 +176,7 @@ export default function UpdateBanner() {
             <p className="text-brand-cream/60 text-xs mt-1">
               {isUpdating
                 ? 'Clearing caches and loading the new version…'
-                : 'A new version of AMarsBody Nutrition is ready. Tap to refresh.'}
+                : 'A new version of AMarsBody Nutrition is ready. You must update to continue.'}
             </p>
             {!isUpdating && (
               <button
@@ -194,15 +187,6 @@ export default function UpdateBanner() {
               </button>
             )}
           </div>
-          {!isUpdating && (
-            <button
-              onClick={handleDismiss}
-              className="text-brand-cream/40 hover:text-brand-cream/80 flex-shrink-0 p-1"
-              aria-label="Dismiss"
-            >
-              ✕
-            </button>
-          )}
         </div>
       </div>
     </div>
