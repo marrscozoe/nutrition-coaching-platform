@@ -66,7 +66,16 @@ export default function ClientDashboard() {
         if (currentUser && currentUser.userType === 'client') {
           // getCurrentUser() already extended the session; fetch fresh data
           fetchClientData(currentUser.user.id);
-          fetchRecentMeals(currentUser.user.id);
+          fetchRecentMeals(
+            currentUser.user.id,
+            proteinTarget,
+            vegTarget,
+            fatTarget,
+            starchTarget,
+            waterTarget,
+            client?.gender as 'male' | 'female',
+            client?.current_phase
+          );
         }
       }
     }
@@ -134,45 +143,65 @@ export default function ClientDashboard() {
     const waterTargetVal = waterOzMatch ? parseInt(waterOzMatch[1]) : (clientData.gender === 'male' ? 128 : 80);
     setWaterTarget(waterTargetVal);
 
-    setProteinRemaining(proteinOz);
-    setVegRemaining(vegTargetVal);
-    setFatRemaining(fatTargetVal);
-    setStarchRemaining(starchTargetVal);
-    setWaterRemaining(waterTargetVal);
   }
 
   // Recalculate remaining from today's meals
-  function recalculateRemainingFromMeals(meals: MealLog[]) {
+  function recalculateRemainingFromMeals(
+    meals: MealLog[],
+    proteinTargetVal: number,
+    vegTargetVal: number,
+    fatTargetVal: number,
+    starchTargetVal: number,
+    waterTargetVal: number,
+    gender: 'male' | 'female',
+    currentPhase: number
+  ) {
     if (!client) return;
 
-    // Get today's local date string
-    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+    const today = new Date().toLocaleDateString('en-CA');
 
-    // Filter to today's meals only
     const todaysMeals = meals.filter(meal => {
-      const mealDate = meal.meal_date || (meal.logged_at ? new Date(meal.logged_at).toLocaleDateString('en-CA') : null);
-      return mealDate === today;
+      let mealDateStr = meal.meal_date;
+      if (!mealDateStr && meal.logged_at) {
+        mealDateStr = new Date(meal.logged_at + 'T12:00:00').toLocaleDateString('en-CA');
+      }
+      return mealDateStr === today;
     });
 
-    // Each meal deducts 1 portion from each category
     const mealsCount = todaysMeals.length;
 
-    setProteinRemaining(Math.max(0, proteinTarget - mealsCount));
-    setVegRemaining(Math.max(0, vegTarget - mealsCount));
-    setFatRemaining(Math.max(0, fatTarget - mealsCount));
-    if (starchTarget > 0) {
-      setStarchRemaining(Math.max(0, starchTarget - mealsCount));
+    // Get per-meal portions
+    const portions = getPortions(gender, currentPhase);
+    const proteinPerMeal = parsePortionToNumber(portions.protein);
+    const vegPerMeal = parsePortionToNumber(portions.fibrousVegetables);
+    const fatPerMeal = parsePortionToNumber(portions.fat);
+    const starchPerMeal = parsePortionToNumber(portions.starch);
+
+    setProteinRemaining(Math.max(0, proteinTargetVal - mealsCount * proteinPerMeal));
+    setVegRemaining(Math.max(0, vegTargetVal - mealsCount * vegPerMeal));
+    setFatRemaining(Math.max(0, fatTargetVal - mealsCount * fatPerMeal));
+    if (starchTargetVal > 0) {
+      setStarchRemaining(Math.max(0, starchTargetVal - mealsCount * starchPerMeal));
     }
-    // Water: only deduct for meals that contain plain water
-    // (coffee/tea/soda/sparkling flavored drinks/broth do NOT count)
+
+    // Water: deduct waterPerMeal for each meal containing plain water
     const plainWaterMealCount = todaysMeals.filter(meal =>
       mealContainsPlainWater(meal.food_description)
     ).length;
-    const waterPerMeal = client.gender === 'male' ? 32 : 20;
-    setWaterRemaining(Math.max(0, waterTarget - plainWaterMealCount * waterPerMeal));
+    const waterPerMeal = gender === 'male' ? 32 : 20;
+    setWaterRemaining(Math.max(0, waterTargetVal - plainWaterMealCount * waterPerMeal));
   }
 
-  async function fetchRecentMeals(clientId: string) {
+  async function fetchRecentMeals(
+    clientId: string,
+    proteinTargetVal?: number,
+    vegTargetVal?: number,
+    fatTargetVal?: number,
+    starchTargetVal?: number,
+    waterTargetVal?: number,
+    gender?: 'male' | 'female',
+    currentPhase?: number
+  ) {
     try {
       const res = await fetch('/api/meals?limit=100', {
         headers: { 'x-client-id': clientId },
@@ -180,8 +209,27 @@ export default function ClientDashboard() {
       const data = await res.json();
       const meals = data.meals || [];
       setRecentMeals(meals);
-      // Recalculate remaining from all fetched meals
-      recalculateRemainingFromMeals(meals);
+      // Recalculate remaining from all fetched meals using current target values
+      if (
+        proteinTargetVal !== undefined &&
+        vegTargetVal !== undefined &&
+        fatTargetVal !== undefined &&
+        starchTargetVal !== undefined &&
+        waterTargetVal !== undefined &&
+        gender &&
+        currentPhase !== undefined
+      ) {
+        recalculateRemainingFromMeals(
+          meals,
+          proteinTargetVal,
+          vegTargetVal,
+          fatTargetVal,
+          starchTargetVal,
+          waterTargetVal,
+          gender,
+          currentPhase
+        );
+      }
     } catch (err) {
       console.error('Failed to fetch meals:', err);
     } finally {
@@ -211,7 +259,16 @@ export default function ClientDashboard() {
       const user = JSON.parse(userData);
       await Promise.all([
         fetchClientData(user.id),
-        fetchRecentMeals(user.id)
+        fetchRecentMeals(
+          user.id,
+          proteinTarget,
+          vegTarget,
+          fatTarget,
+          starchTarget,
+          waterTarget,
+          client?.gender as 'male' | 'female',
+          client?.current_phase
+        )
       ]);
     }
   }
@@ -247,12 +304,21 @@ export default function ClientDashboard() {
     }
   }, [client?.id, client?.current_phase, client?.goal_weight, client?.program_type, client?.gender]);
 
-  // Recalculate remaining whenever recentMeals changes
+  // Recalculate remaining whenever recentMeals or targets change
   useEffect(() => {
     if (recentMeals.length > 0 && client) {
-      recalculateRemainingFromMeals(recentMeals);
+      recalculateRemainingFromMeals(
+        recentMeals,
+        proteinTarget,
+        vegTarget,
+        fatTarget,
+        starchTarget,
+        waterTarget,
+        client.gender as 'male' | 'female',
+        client.current_phase
+      );
     }
-  }, [recentMeals]);
+  }, [recentMeals, proteinTarget, vegTarget, fatTarget, starchTarget, waterTarget, client]);
 
   if (loading || !client) {
     return (
