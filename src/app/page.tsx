@@ -26,18 +26,15 @@ export default function HomePage() {
         return;
       }
       
-      // Check trainer session first, then client session
-      const trainerUser = sessionStorage.getItem('trainer_user');
-      const trainerType = sessionStorage.getItem('trainer_user_type');
-      if (trainerUser && trainerType === 'trainer') {
-        router.push('/trainer');
+      // Use getCurrentUser() which checks localStorage 30-day sessions
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        if (currentUser.userType === 'trainer') {
+          router.push('/trainer');
+        } else if (currentUser.userType === 'client') {
+          router.push('/client');
+        }
         return;
-      }
-      
-      const clientUser = sessionStorage.getItem('client_user');
-      const clientType = sessionStorage.getItem('client_user_type');
-      if (clientUser && clientType === 'client') {
-        router.push('/client');
       }
     } catch (e) {
       // If sessionStorage fails, just show login page

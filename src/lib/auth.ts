@@ -32,11 +32,6 @@ function storeSession(user: any, userType: 'trainer' | 'client'): void {
     sessionStorage.setItem('client_user_type', 'client');
   }
   
-  // Also update legacy keys for backwards compatibility during transition
-  localStorage.setItem('trainer_user', JSON.stringify(user));
-  localStorage.setItem('trainer_user_type', 'trainer');
-  localStorage.setItem('client_user', JSON.stringify(user));
-  localStorage.setItem('client_user_type', 'client');
 }
 
 /**
