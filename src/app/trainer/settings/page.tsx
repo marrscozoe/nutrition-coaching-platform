@@ -170,7 +170,6 @@ export default function TrainerSettingsPage() {
                 disabled
                 className="w-full px-4 py-3 rounded-lg bg-brand-charcoal/40 border border-brand-cream/20 text-brand-cream/50 cursor-not-allowed"
               />
-              <p className="text-xs text-brand-cream/40 mt-1">Email cannot be changed</p>
             </div>
 
             <div>
