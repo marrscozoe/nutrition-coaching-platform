@@ -45,6 +45,16 @@ export default function ClientDashboard() {
   const [modalTitle, setModalTitle] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
 
+  // Daily targets state
+  const [proteinTarget, setProteinTarget] = useState(0);
+  const [vegTarget, setVegTarget] = useState(0);
+  const [fatTarget, setFatTarget] = useState(0);
+  const [starchTarget, setStarchTarget] = useState(0);
+  const [proteinRemaining, setProteinRemaining] = useState(0);
+  const [vegRemaining, setVegRemaining] = useState(0);
+  const [fatRemaining, setFatRemaining] = useState(0);
+  const [starchRemaining, setStarchRemaining] = useState(0);
+
   // Handle returning to the dashboard (e.g., after logging a meal or switching programs)
   // This catches cases where client-side navigation brings user back without pathname changing
   useEffect(() => {
@@ -79,13 +89,83 @@ export default function ClientDashboard() {
     fetchRecentMeals(currentUser.user.id);
   }, [router]);
 
+  // Helper: parse portion string to number (uses max for ranges like "1-2 cups")
+  function parsePortionToNumber(portion: string): number {
+    if (!portion) return 0;
+    // Match "X-Y" range pattern or single number
+    const rangeMatch = portion.match(/(\d+)-(\d+)/);
+    if (rangeMatch) {
+      return parseInt(rangeMatch[2]); // use max of range
+    }
+    const singleMatch = portion.match(/(\d+)/);
+    if (singleMatch) {
+      return parseInt(singleMatch[1]);
+    }
+    return 0;
+  }
+
+  // Calculate daily targets from client data
+  function calculateDailyTargets(clientData: ClientData) {
+    if (!clientData) return;
+
+    const portions = getPortions(clientData.gender as 'male' | 'female', clientData.current_phase);
+    const vegPerMeal = parsePortionToNumber(portions.fibrousVegetables);
+    const fatPerMeal = parsePortionToNumber(portions.fat);
+    const starchPerMeal = parsePortionToNumber(portions.starch);
+
+    // Protein: convert g/lb to oz (1 oz = 28g)
+    const proteinGPerLb = clientData.program_type === 'muscle_gain' ? 1.2 : 0.7;
+    const proteinOz = Math.round((clientData.goal_weight * proteinGPerLb / 28) * 10) / 10;
+
+    const vegTargetVal = vegPerMeal * 3;
+    const fatTargetVal = fatPerMeal * 3;
+    const starchTargetVal = clientData.current_phase === 1 ? 0 : starchPerMeal * 3;
+
+    setProteinTarget(proteinOz);
+    setVegTarget(vegTargetVal);
+    setFatTarget(fatTargetVal);
+    setStarchTarget(starchTargetVal);
+
+    setProteinRemaining(proteinOz);
+    setVegRemaining(vegTargetVal);
+    setFatRemaining(fatTargetVal);
+    setStarchRemaining(starchTargetVal);
+  }
+
+  // Recalculate remaining from today's meals
+  function recalculateRemainingFromMeals(meals: MealLog[]) {
+    if (!client) return;
+
+    // Get today's local date string
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+
+    // Filter to today's meals only
+    const todaysMeals = meals.filter(meal => {
+      const mealDate = meal.meal_date || (meal.logged_at ? new Date(meal.logged_at).toLocaleDateString('en-CA') : null);
+      return mealDate === today;
+    });
+
+    // Each meal deducts 1 portion from each category
+    const mealsCount = todaysMeals.length;
+
+    setProteinRemaining(Math.max(0, proteinTarget - mealsCount));
+    setVegRemaining(Math.max(0, vegTarget - mealsCount));
+    setFatRemaining(Math.max(0, fatTarget - mealsCount));
+    if (starchTarget > 0) {
+      setStarchRemaining(Math.max(0, starchTarget - mealsCount));
+    }
+  }
+
   async function fetchRecentMeals(clientId: string) {
     try {
-      const res = await fetch('/api/meals?limit=5', {
+      const res = await fetch('/api/meals?limit=100', {
         headers: { 'x-client-id': clientId },
       });
       const data = await res.json();
-      setRecentMeals(data.meals || []);
+      const meals = data.meals || [];
+      setRecentMeals(meals);
+      // Recalculate remaining from all fetched meals
+      recalculateRemainingFromMeals(meals);
     } catch (err) {
       console.error('Failed to fetch meals:', err);
     } finally {
@@ -152,15 +232,29 @@ export default function ClientDashboard() {
     );
   }
 
+  // Calculate daily targets when client data is available
+  useEffect(() => {
+    if (client) {
+      calculateDailyTargets(client);
+    }
+  }, [client?.id, client?.current_phase, client?.goal_weight, client?.program_type, client?.gender]);
+
+  // Recalculate remaining whenever recentMeals changes
+  useEffect(() => {
+    if (recentMeals.length > 0 && client) {
+      recalculateRemainingFromMeals(recentMeals);
+    }
+  }, [recentMeals]);
+
   // weightLost = Starting - Current: positive = lost weight, negative = gained weight
   const weightLost = client.starting_weight && client.current_weight
     ? Math.round((client.starting_weight - client.current_weight) * 10) / 10
     : 0;
 
   const weeksUntilEvent = getWeeksUntilEvent(client.event_date);
-  const today = new Date().getDay();
-  const isMonday = today === 1;
-  const isFriday = today === 5;
+  const todayDate = new Date().getDay();
+  const isMonday = todayDate === 1;
+  const isFriday = todayDate === 5;
 
   return (
     <>
@@ -186,6 +280,83 @@ export default function ClientDashboard() {
         <div className="mx-4 mt-4 p-4 rounded-xl bg-gradient-to-r from-brand-orange to-brand-orange-dark">
           <p className="text-white/80 text-sm font-medium">🎯 {weeksUntilEvent} days until your event!</p>
           <p className="text-white text-xs mt-1">Keep pushing — you've got this!</p>
+        </div>
+      )}
+
+      {/* Daily Targets Countdown */}
+      {client && (
+        <div className="mx-4 mt-4 p-4 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10">
+          <h2 className="text-sm font-semibold text-brand-cream/80 uppercase tracking-wider mb-3">
+            Today's Targets
+          </h2>
+          <div className="space-y-2">
+            {/* Protein row */}
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🍗</span>
+              <div className="flex-1">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-brand-cream/70">Protein</span>
+                  <span className="text-brand-cream/50">{proteinRemaining}/{proteinTarget} oz</span>
+                </div>
+                <div className="h-2 bg-brand-charcoal/60 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-red-500 rounded-full transition-all duration-300"
+                    style={{ width: `${proteinTarget > 0 ? Math.max(0, (proteinRemaining / proteinTarget) * 100) : 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+            {/* Veg row */}
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🥬</span>
+              <div className="flex-1">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-brand-cream/70">Vegetables</span>
+                  <span className="text-brand-cream/50">{vegRemaining}/{vegTarget} cups</span>
+                </div>
+                <div className="h-2 bg-brand-charcoal/60 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 rounded-full transition-all duration-300"
+                    style={{ width: `${vegTarget > 0 ? Math.max(0, (vegRemaining / vegTarget) * 100) : 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+            {/* Fat row */}
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🥑</span>
+              <div className="flex-1">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-brand-cream/70">Healthy Fats</span>
+                  <span className="text-brand-cream/50">{fatRemaining}/{fatTarget} tbsp</span>
+                </div>
+                <div className="h-2 bg-brand-charcoal/60 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-yellow-500 rounded-full transition-all duration-300"
+                    style={{ width: `${fatTarget > 0 ? Math.max(0, (fatRemaining / fatTarget) * 100) : 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+            {/* Starch row — only shown when starch_target > 0 */}
+            {starchTarget > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="text-lg">🍠</span>
+                <div className="flex-1">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-brand-cream/70">Starchy Carbs</span>
+                    <span className="text-brand-cream/50">{starchRemaining}/{starchTarget} cups</span>
+                  </div>
+                  <div className="h-2 bg-brand-charcoal/60 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-orange-500 rounded-full transition-all duration-300"
+                      style={{ width: `${starchTarget > 0 ? Math.max(0, (starchRemaining / starchTarget) * 100) : 0}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
