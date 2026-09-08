@@ -878,6 +878,42 @@ export function getWaterReminder(gender: 'male' | 'female'): string {
     : "Don't forget your water — 80 oz daily (20 oz per meal)";
 }
 
+/**
+ * Returns true if a meal's food_description contains plain water.
+ * Plain water = water with no additives, no flavor, no caffeine, no calories.
+ * Excludes: coffee, tea, soda, sparkling flavored drinks, broth, juice,
+ * coconut water, vitamin water, flavored water, fruit-infused water, etc.
+ */
+export function mealContainsPlainWater(foodDescription: string): boolean {
+  if (!foodDescription) return false;
+  // Split by common delimiters to isolate individual food/beverage items
+  const items = foodDescription.toLowerCase().split(/[,\n]+/).map(s => s.trim());
+  for (const item of items) {
+    // Must contain the word "water"
+    if (!item.includes('water')) continue;
+    // Exclude non-plain-water beverages that contain "water"
+    if (
+      item.includes('sparkling') ||
+      item.includes('flavored') ||
+      item.includes('flavoured') ||
+      item.includes('vitamin') ||
+      item.includes('coconut') ||
+      item.includes('juice') ||
+      item.includes('soda') ||
+      item.includes('broth') ||
+      item.includes('coffee') ||
+      item.includes('tea ') ||
+      item.includes('tea,') ||
+      item.includes('tea.')
+    ) {
+      continue;
+    }
+    // This item contains "water" with no disqualifying modifier → plain water found
+    return true;
+  }
+  return false;
+}
+
 // ============================================
 // PROGRAM FLOWS
 // ============================================

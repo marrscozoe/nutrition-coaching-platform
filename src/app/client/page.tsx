@@ -6,7 +6,7 @@ import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
 import { logout, getCurrentUser } from '@/lib/auth';
-import { getPhaseGuidance, getPortions, getWaterReminder, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies } from '@/lib/nutrition-data';
+import { getPhaseGuidance, getPortions, getWaterReminder, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies, mealContainsPlainWater } from '@/lib/nutrition-data';
 
 interface ClientData {
   id: string;
@@ -163,9 +163,13 @@ export default function ClientDashboard() {
     if (starchTarget > 0) {
       setStarchRemaining(Math.max(0, starchTarget - mealsCount));
     }
-    // Water: deduct per-meal amount (male=32oz/meal, female=20oz/meal)
+    // Water: only deduct for meals that contain plain water
+    // (coffee/tea/soda/sparkling flavored drinks/broth do NOT count)
+    const plainWaterMealCount = todaysMeals.filter(meal =>
+      mealContainsPlainWater(meal.food_description)
+    ).length;
     const waterPerMeal = client.gender === 'male' ? 32 : 20;
-    setWaterRemaining(Math.max(0, waterTarget - mealsCount * waterPerMeal));
+    setWaterRemaining(Math.max(0, waterTarget - plainWaterMealCount * waterPerMeal));
   }
 
   async function fetchRecentMeals(clientId: string) {
