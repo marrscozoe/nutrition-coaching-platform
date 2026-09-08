@@ -17,16 +17,16 @@ export default function GlobalError({
   }, [error]);
 
   function handleHardReload() {
-    // Capture window ref to prevent TypeScript narrowing it to `never` inside closures
+    // Capture window ref to prevent TypeScript narrowing to `never` inside closures
     const win = window;
-    // Clear SW and hard-reload, same strategy as UpdateBanner
+    // Unregister all SWs so no stale SW intercepts the reload
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
         Promise.all(registrations.map((r) => r.unregister()));
       }).then(() => {
-        if ('caches' in win) {
+        // Clear caches if Cache API is available
+        if (typeof caches !== 'undefined') {
           caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).then(() => {
-            // Navigate to fresh URL — forces network fetch, no SW intercept
             win.location.href = win.location.pathname + '?__err_reload=' + Date.now();
           });
         } else {
