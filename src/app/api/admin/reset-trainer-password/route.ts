@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       status: 'ok', 
       email: 'amarsbody@gmail.com',
-      password: *** 
+      password: 'TrainerPassword123!'
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

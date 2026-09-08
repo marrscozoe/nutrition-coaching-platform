@@ -113,9 +113,9 @@ export default function ClientDashboard() {
     const fatPerMeal = parsePortionToNumber(portions.fat);
     const starchPerMeal = parsePortionToNumber(portions.starch);
 
-    // Protein: convert g/lb to oz (1 oz = 28g)
-    const proteinGPerLb = clientData.program_type === 'muscle_gain' ? 1.2 : 0.7;
-    const proteinOz = Math.round((clientData.goal_weight * proteinGPerLb / 28) * 10) / 10;
+    // Protein: goal_weight / 6 for muscle_gain, / 9 for all others
+    const divisor = clientData.program_type === 'muscle_gain' ? 6 : 9;
+    const proteinOz = Math.round((clientData.goal_weight / divisor) * 10) / 10;
 
     const vegTargetVal = vegPerMeal * 3;
     const fatTargetVal = fatPerMeal * 3;

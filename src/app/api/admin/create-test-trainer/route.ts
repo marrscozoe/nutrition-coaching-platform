@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         .from('trainers')
         .update({ password_hash: hash })
         .eq('id', existing.id);
-      return NextResponse.json({ status: 'ok', email, password: ***, note: 'password updated' });
+      return NextResponse.json({ status: 'ok', email, password: password, note: 'password updated' });
     }
 
     // Create trainer
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ status: 'ok', email, password: *** });
+    return NextResponse.json({ status: 'ok', email, password: 'TrainerTest123!' });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
