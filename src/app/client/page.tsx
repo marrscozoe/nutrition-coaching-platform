@@ -224,14 +224,6 @@ export default function ClientDashboard() {
     setModalTitle('');
   }
 
-  if (loading || !client) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-brand-orange text-xl">Loading...</div>
-      </div>
-    );
-  }
-
   // Calculate daily targets when client data is available
   useEffect(() => {
     if (client) {
@@ -245,6 +237,14 @@ export default function ClientDashboard() {
       recalculateRemainingFromMeals(recentMeals);
     }
   }, [recentMeals]);
+
+  if (loading || !client) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-brand-orange text-xl">Loading...</div>
+      </div>
+    );
+  }
 
   // weightLost = Starting - Current: positive = lost weight, negative = gained weight
   const weightLost = client.starting_weight && client.current_weight
