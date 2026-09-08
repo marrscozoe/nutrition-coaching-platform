@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { getAdminClient } from '@/lib/db';
 import { generatePhase5Plan } from '@/lib/ai-coach';
 import { getPhase5DayNumber } from '@/lib/nutrition-data';

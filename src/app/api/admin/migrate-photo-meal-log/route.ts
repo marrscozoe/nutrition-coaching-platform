@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { getAdminClient } from '@/lib/db';
 
 // Migration: add photo_meal_log_enabled column to clients table

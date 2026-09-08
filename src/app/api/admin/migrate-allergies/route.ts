@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { getAdminClient } from '@/lib/db';
 
 // POST /api/admin/migrate-allergies — one-time migration to add allergies column

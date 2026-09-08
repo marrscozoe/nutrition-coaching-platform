@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { getAdminClient } from '@/lib/db';
 
 // One-shot migration: add allergy_discovery_enabled column
