@@ -367,7 +367,7 @@ export default function ClientDashboard() {
           {/* Lean Protein */}
           <button
             onClick={() => openFoodModal('Lean Protein 🍗', filterFoodsForAllergies(LEAN_PROTEINS, client.allergies || [], client.custom_allergy_bans || []))}
-            className="p-4 rounded-xl bg-gradient-to-br from-className="p-4 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/10 border border-red-500/30 flex flex-col items-start justify-start text-left w-full hover:border-red-500/60 transition-colors cursor-pointer"
+            className="p-4 rounded-xl bg-gradient-to-br from-red-500/20 to-red-600/10 border border-red-500/30 flex flex-col items-start justify-start text-left w-full hover:border-red-500/60 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">🍗</span>
@@ -382,7 +382,7 @@ export default function ClientDashboard() {
           {/* Fibrous Vegetables */}
           <button
             onClick={() => openFoodModal('Fibrous Veggies 🥬', filterFoodsForAllergies(FIBROUS_VEGETABLES, client.allergies || [], client.custom_allergy_bans || []))}
-            className="p-4 rounded-xl bg-gradient-to-br from-className="p-4 rounded-xl bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/30 flex flex-col items-start justify-start text-left w-full hover:border-green-500/60 transition-colors cursor-pointer"
+            className="p-4 rounded-xl bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/30 flex flex-col items-start justify-start text-left w-full hover:border-green-500/60 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">🥬</span>
@@ -397,7 +397,7 @@ export default function ClientDashboard() {
           {/* Healthy Fats */}
           <button
             onClick={() => openFoodModal('Healthy Fats 🥑', filterFoodsForAllergies(HEALTHY_FATS, client.allergies || [], client.custom_allergy_bans || []))}
-            className="p-4 rounded-xl bg-gradient-to-br from-className="p-4 rounded-xl bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30 flex flex-col items-start justify-start text-left w-full hover:border-yellow-500/60 transition-colors cursor-pointer"
+            className="p-4 rounded-xl bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30 flex flex-col items-start justify-start text-left w-full hover:border-yellow-500/60 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">🥑</span>
@@ -415,7 +415,7 @@ export default function ClientDashboard() {
               const safeStarch = filterFoodsForAllergies(STARCHY_CARBOHYDRATES, client.allergies || [], client.custom_allergy_bans || []);
               openFoodModal('Starchy Carbs 🍠', safeStarch);
             }}
-            className="p-4 rounded-xl bg-gradient-to-br from-className="p-4 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/30 flex flex-col items-start justify-start text-left w-full hover:border-orange-500/60 transition-colors cursor-pointer"
+            className="p-4 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/30 flex flex-col items-start justify-start text-left w-full hover:border-orange-500/60 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">🍠</span>
