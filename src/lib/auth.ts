@@ -24,10 +24,14 @@ function storeSession(user: any, userType: 'trainer' | 'client'): void {
   
   if (userType === 'trainer') {
     localStorage.setItem(TRAINER_SESSION_KEY, JSON.stringify(session));
+    localStorage.setItem('trainer_user', JSON.stringify(user));
+    localStorage.setItem('trainer_user_type', 'trainer');
     sessionStorage.setItem('trainer_user', JSON.stringify(user));
     sessionStorage.setItem('trainer_user_type', 'trainer');
   } else {
     localStorage.setItem(CLIENT_SESSION_KEY, JSON.stringify(session));
+    localStorage.setItem('client_user', JSON.stringify(user));
+    localStorage.setItem('client_user_type', 'client');
     sessionStorage.setItem('client_user', JSON.stringify(user));
     sessionStorage.setItem('client_user_type', 'client');
   }
@@ -190,34 +194,52 @@ export function getCurrentUser(): { user: any; userType: string | null } | null 
     const trainerData = localStorage.getItem('trainer_user');
     const trainerType = localStorage.getItem('trainer_user_type');
     if (trainerData && trainerType === 'trainer') {
-      // Migrate legacy session to new format
-      storeSession(JSON.parse(trainerData), 'trainer');
-      return {
-        user: JSON.parse(trainerData),
-        userType: 'trainer'
-      };
+      try {
+        // Migrate legacy session to new format
+        storeSession(JSON.parse(trainerData), 'trainer');
+        return {
+          user: JSON.parse(trainerData),
+          userType: 'trainer'
+        };
+      } catch {
+        // Legacy data is malformed, clear and continue
+        localStorage.removeItem('trainer_user');
+        localStorage.removeItem('trainer_user_type');
+      }
     }
     
     // Check client session
     const clientData = localStorage.getItem('client_user');
     const clientType = localStorage.getItem('client_user_type');
     if (clientData && clientType === 'client') {
-      // Migrate legacy session to new format
-      storeSession(JSON.parse(clientData), 'client');
-      return {
-        user: JSON.parse(clientData),
-        userType: 'client'
-      };
+      try {
+        // Migrate legacy session to new format
+        storeSession(JSON.parse(clientData), 'client');
+        return {
+          user: JSON.parse(clientData),
+          userType: 'client'
+        };
+      } catch {
+        // Legacy data is malformed, clear and continue
+        localStorage.removeItem('client_user');
+        localStorage.removeItem('client_user_type');
+      }
     }
     
     // Legacy support: check old keys
     const userData = localStorage.getItem('user');
     const userType = localStorage.getItem('userType');
     if (userData && userType) {
-      return {
-        user: JSON.parse(userData),
-        userType
-      };
+      try {
+        return {
+          user: JSON.parse(userData),
+          userType
+        };
+      } catch {
+        // Legacy data is malformed, clear and continue
+        localStorage.removeItem('user');
+        localStorage.removeItem('userType');
+      }
     }
     
     return null;

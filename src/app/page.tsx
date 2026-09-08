@@ -28,7 +28,7 @@ export default function HomePage() {
       
       // Use getCurrentUser() which checks localStorage 30-day sessions
       const currentUser = getCurrentUser();
-      if (currentUser) {
+      if (currentUser?.user) {
         if (currentUser.userType === 'trainer') {
           router.push('/trainer');
         } else if (currentUser.userType === 'client') {
@@ -85,14 +85,19 @@ export default function HomePage() {
         }
 
         // Store user data with 30-day session persistence
-        saveUserSession(data.user, data.userType);
+        if (data.user && data.userType) {
+          saveUserSession(data.user, data.userType);
 
-        // Redirect based on user type
-        console.log('[Login] Success, redirecting...');
-        if (data.userType === 'trainer') {
-          router.push('/trainer');
+          // Redirect based on user type
+          console.log('[Login] Success, redirecting...');
+          if (data.userType === 'trainer') {
+            router.push('/trainer');
+          } else {
+            router.push('/client');
+          }
         } else {
-          router.push('/client');
+          console.error('[Login] Invalid session data:', data);
+          setError('Login failed: invalid session data');
         }
       } else {
         // Signup - call pre-signup API to get a secure token, then redirect to onboarding
