@@ -1014,3 +1014,238 @@ export function toStandardUnit(amount: number, unit: string): number {
     default: return amount;
   }
 }
+
+// ============================================
+// FOOD DESCRIPTION PARSING — for portion deduction
+// ============================================
+
+/**
+ * Clean number display: removes trailing zeros after decimal.
+ * e.g. 5.0 → "5", 5.5 → "5.5", 5.50 → "5.5", 0 → "0"
+ */
+export function cleanDisplayNumber(n: number): string {
+  if (n === 0) return '0';
+  const str = n.toString();
+  // Remove trailing zeros after decimal point
+  return str.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+}
+
+/**
+ * Parse a fraction string like "1/2", "1/4", "1/3", "2/3", "3/4" to decimal.
+ */
+function parseFraction(s: string): number {
+  const parts = s.split('/');
+  if (parts.length === 2) {
+    const [num, den] = parts.map(p => parseFloat(p.trim()));
+    if (!isNaN(num) && !isNaN(den) && den !== 0) {
+      return num / den;
+    }
+  }
+  return parseFloat(s) || 0;
+}
+
+/**
+ * Extract a numeric amount from an item string, returns the parsed number or 1 if no amount found.
+ * Handles fractions, ranges (uses max), decimals.
+ * Also returns the unit string if found.
+ */
+function extractAmountUnit(item: string): { amount: number; unit: string } {
+  // Pattern: number (possibly fraction or range) followed by unit word
+  const amountUnitPattern = /([\d]+(?:[\/\.][\d]+)?(?:\s*[-–]\s*[\d]+(?:[\/\.][\d]+)?)?)\s*(oz|ounces?|cups?|cup|tbsp|tablespoons?|handfuls?|handful|small handfuls?|small handful|egg|eggs|small|medium|large)\b/gi;
+  const match = amountUnitPattern.exec(item);
+  if (match) {
+    let amountStr = match[1].trim();
+    const unit = match[2].toLowerCase();
+    // Handle range: "1-2" → use max → 2
+    if (amountStr.includes('-') || amountStr.includes('–')) {
+      const rangeParts = amountStr.split(/[-–]/);
+      amountStr = rangeParts[rangeParts.length - 1].trim();
+    }
+    let amount = parseFraction(amountStr);
+    return { amount, unit };
+  }
+  // No amount found
+  return { amount: 1, unit: '' };
+}
+
+/**
+ * Classify a food item string into a category, returning the category key or null.
+ * Uses keyword matching on food lists.
+ */
+function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'starch' | null {
+  const lower = item.toLowerCase();
+  // Extract just the food name (before any portion/amount description)
+  const foodName = lower.split(/[,\d\s\(\-\/]/)[0].trim();
+  if (!foodName) return null;
+
+  // Check lean proteins (skip whey/bacon for deduction)
+  for (const p of LEAN_PROTEINS) {
+    if (p.toLowerCase().includes(foodName) && !p.toLowerCase().includes('whey') && !p.toLowerCase().includes('bacon')) {
+      return 'protein';
+    }
+  }
+  // Check fibrous vegetables
+  for (const v of FIBROUS_VEGETABLES) {
+    if (v.toLowerCase().includes(foodName)) {
+      return 'veg';
+    }
+  }
+  // Check starchy carbohydrates
+  for (const s of STARCHY_CARBOHYDRATES) {
+    if (s.toLowerCase().includes(foodName)) {
+      return 'starch';
+    }
+  }
+  // Check healthy fats
+  for (const f of HEALTHY_FATS) {
+    if (f.toLowerCase().includes(foodName)) {
+      return 'fat';
+    }
+  }
+  return null;
+}
+
+/**
+ * Convert various portion units to a consistent category unit.
+ * Returns the amount in: oz for protein, cups for veg/starch, tbsp for fat.
+ */
+function convertToCategoryUnit(amount: number, unit: string, category: 'protein' | 'veg' | 'fat' | 'starch'): number {
+  const normalizedUnit = unit.toLowerCase().replace(/\b(ounces?|ounce)\b/, 'oz').replace(/\b(tablespoons?|tbsp)\b/, 'tbsp').replace(/\b(cups?|cup)\b/, 'cup');
+
+  if (category === 'protein') {
+    // "egg" or "eggs" → 1 oz each
+    if (normalizedUnit === 'egg' || normalizedUnit === 'eggs') {
+      return amount;
+    }
+    // Default: assume oz
+    return amount;
+  }
+
+  if (category === 'veg' || category === 'starch') {
+    if (normalizedUnit === 'oz' || normalizedUnit === 'tbsp') {
+      // Rough conversion: 1 oz ≈ 0.125 cups (2 tbsp ≈ 1 oz liquid)
+      return amount * 0.125;
+    }
+    // "small", "medium", "large" after no amount → assume 1 cup for veg/starch
+    return amount;
+  }
+
+  if (category === 'fat') {
+    if (normalizedUnit === 'cup' || normalizedUnit === 'oz') {
+      // 1 cup of most fats ≈ 16 tbsp
+      return amount * 16;
+    }
+    if (normalizedUnit === 'handful' || normalizedUnit === 'handfuls' || normalizedUnit === 'small handful' || normalizedUnit === 'small handfuls') {
+      // 1 handful ≈ 1 tbsp
+      return amount;
+    }
+    return amount;
+  }
+
+  return amount;
+}
+
+/**
+ * Given a food_description string, parses and returns the sum of actual amounts
+ * deducted per category.
+ *
+ * Returns: { proteinOz, vegCups, fatTbsp, starchCups, waterOz }
+ *
+ * Parsing rules:
+ * - Each comma/semicolon/newline-delimited item is classified against food lists.
+ * - Amounts are extracted via regex; no amount = 1 unit of that category's default.
+ * - Protein: counted in oz. Egg whites tracked separately.
+ * - Water: plain water oz only via mealContainsPlainWater(); falls back to per-meal
+ *   amount (32 oz male / 20 oz female) only when plain water was explicitly logged.
+ */
+export function parseFoodDescriptionToPortions(foodDescription: string): {
+  proteinOz: number;
+  vegCups: number;
+  fatTbsp: number;
+  starchCups: number;
+  waterOz: number;
+} {
+  const result = { proteinOz: 0, vegCups: 0, fatTbsp: 0, starchCups: 0, waterOz: 0 };
+  if (!foodDescription || foodDescription.trim() === '') return result;
+
+  // Split on common delimiters
+  const items = foodDescription.split(/[,;\n]+/);
+
+  // Track whether we've counted eggs (to avoid double-counting egg whites)
+  let eggsCounted = false;
+  let eggWhitesCounted = false;
+
+  for (const rawItem of items) {
+    const item = rawItem.trim();
+    if (!item || item.toLowerCase() === 'photo logged') continue;
+
+    const lower = item.toLowerCase();
+    const { amount, unit } = extractAmountUnit(item);
+    const category = classifyFoodItem(item);
+
+    switch (category) {
+      case 'protein': {
+        // Special handling for eggs
+        if (lower.includes('egg') && !lower.includes('white')) {
+          // "egg whites" skip if eggs already counted
+          if (lower.includes('whites')) {
+            if (!eggsCounted) {
+              // Count egg whites as 0 oz protein (or minimal)
+              eggWhitesCounted = true;
+            }
+            break;
+          }
+          // Regular eggs
+          result.proteinOz += convertToCategoryUnit(amount, unit, 'protein');
+          eggsCounted = true;
+        } else if (lower.includes('whey') || lower.includes('protein powder')) {
+          // Whey/protein powder — skip for oz-based deduction (not a whole food)
+          break;
+        } else {
+          result.proteinOz += convertToCategoryUnit(amount, unit, 'protein');
+        }
+        break;
+      }
+      case 'veg': {
+        result.vegCups += convertToCategoryUnit(amount, unit, 'veg');
+        break;
+      }
+      case 'fat': {
+        result.fatTbsp += convertToCategoryUnit(amount, unit, 'fat');
+        break;
+      }
+      case 'starch': {
+        result.starchCups += convertToCategoryUnit(amount, unit, 'starch');
+        break;
+      }
+    }
+  }
+
+  // Water: only plain water oz counts
+  if (mealContainsPlainWater(foodDescription)) {
+    // Try to parse explicit oz from the food description for water
+    const waterOzPattern = /(\d+(?:\.\d+)?)\s*(?:oz)?\s*water/gi;
+    let foundOz = false;
+    let waterMatch;
+    while ((waterMatch = waterOzPattern.exec(foodDescription)) !== null) {
+      result.waterOz += parseFloat(waterMatch[1]);
+      foundOz = true;
+    }
+    // If no explicit oz found, use per-meal default (32 male, 20 female)
+    // This will be overridden by the caller if needed
+    if (!foundOz) {
+      // Return 0 here; caller uses the per-meal default when mealContainsPlainWater is true
+      // But we can't know gender here, so just return 0 and let caller handle it
+      result.waterOz = 0;
+    }
+  }
+
+  // Round to 1 decimal to avoid floating point noise
+  result.proteinOz = Math.round(result.proteinOz * 10) / 10;
+  result.vegCups = Math.round(result.vegCups * 10) / 10;
+  result.fatTbsp = Math.round(result.fatTbsp * 10) / 10;
+  result.starchCups = Math.round(result.starchCups * 10) / 10;
+  result.waterOz = Math.round(result.waterOz * 10) / 10;
+
+  return result;
+}

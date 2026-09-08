@@ -6,7 +6,7 @@ import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
 import { logout, getCurrentUser } from '@/lib/auth';
-import { getPhaseGuidance, getPortions, getWaterReminder, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies, mealContainsPlainWater } from '@/lib/nutrition-data';
+import { getPhaseGuidance, getPortions, getWaterReminder, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies, mealContainsPlainWater, parseFoodDescriptionToPortions, cleanDisplayNumber } from '@/lib/nutrition-data';
 
 interface ClientData {
   id: string;
@@ -168,28 +168,44 @@ export default function ClientDashboard() {
       return mealDateStr === today;
     });
 
-    const mealsCount = todaysMeals.length;
+    // Accumulate actual deducted amounts by parsing each meal's food_description
+    let totalProteinOz = 0;
+    let totalVegCups = 0;
+    let totalFatTbsp = 0;
+    let totalStarchCups = 0;
+    let totalWaterOz = 0;
 
-    // Get per-meal portions
-    const portions = getPortions(gender, currentPhase);
-    const proteinPerMeal = parsePortionToNumber(portions.protein);
-    const vegPerMeal = parsePortionToNumber(portions.fibrousVegetables);
-    const fatPerMeal = parsePortionToNumber(portions.fat);
-    const starchPerMeal = parsePortionToNumber(portions.starch);
-
-    setProteinRemaining(Math.max(0, proteinTargetVal - mealsCount * proteinPerMeal));
-    setVegRemaining(Math.max(0, vegTargetVal - mealsCount * vegPerMeal));
-    setFatRemaining(Math.max(0, fatTargetVal - mealsCount * fatPerMeal));
-    if (starchTargetVal > 0) {
-      setStarchRemaining(Math.max(0, starchTargetVal - mealsCount * starchPerMeal));
+    for (const meal of todaysMeals) {
+      const portions = parseFoodDescriptionToPortions(meal.food_description || '');
+      totalProteinOz += portions.proteinOz;
+      totalVegCups += portions.vegCups;
+      totalFatTbsp += portions.fatTbsp;
+      totalStarchCups += portions.starchCups;
+      // Water: plain water only; per-meal amount only when plain water was logged
+      if (mealContainsPlainWater(meal.food_description)) {
+        const waterPerMeal = gender === 'male' ? 32 : 20;
+        // Try to parse explicit oz from the food description
+        const waterOzMatch = meal.food_description.match(/(\d+(?:\.\d+)?)\s*oz\s*water/gi);
+        if (waterOzMatch) {
+          let explicitOz = 0;
+          for (const m of waterOzMatch) {
+            const oz = parseFloat(m.match(/(\d+(?:\.\d+)?)/)?.[1] || '0');
+            explicitOz += oz;
+          }
+          totalWaterOz += explicitOz;
+        } else {
+          totalWaterOz += waterPerMeal;
+        }
+      }
     }
 
-    // Water: deduct waterPerMeal for each meal containing plain water
-    const plainWaterMealCount = todaysMeals.filter(meal =>
-      mealContainsPlainWater(meal.food_description)
-    ).length;
-    const waterPerMeal = gender === 'male' ? 32 : 20;
-    setWaterRemaining(Math.max(0, waterTargetVal - plainWaterMealCount * waterPerMeal));
+    setProteinRemaining(Math.max(0, proteinTargetVal - totalProteinOz));
+    setVegRemaining(Math.max(0, vegTargetVal - totalVegCups));
+    setFatRemaining(Math.max(0, fatTargetVal - totalFatTbsp));
+    if (starchTargetVal > 0) {
+      setStarchRemaining(Math.max(0, starchTargetVal - totalStarchCups));
+    }
+    setWaterRemaining(Math.max(0, waterTargetVal - totalWaterOz));
   }
 
   async function fetchRecentMeals(
@@ -378,7 +394,7 @@ export default function ClientDashboard() {
               <div className="flex-1">
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-brand-cream/70">Water</span>
-                  <span className="text-brand-cream/50">{waterRemaining}/{waterTarget} oz</span>
+                  <span className="text-brand-cream/50">{cleanDisplayNumber(waterRemaining)}/{cleanDisplayNumber(waterTarget)} oz</span>
                 </div>
                 <div className="h-2 bg-brand-charcoal/60 rounded-full overflow-hidden">
                   <div
@@ -394,7 +410,7 @@ export default function ClientDashboard() {
               <div className="flex-1">
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-brand-cream/70">Protein</span>
-                  <span className="text-brand-cream/50">{proteinRemaining}/{proteinTarget} oz</span>
+                  <span className="text-brand-cream/50">{cleanDisplayNumber(proteinRemaining)}/{cleanDisplayNumber(proteinTarget)} oz</span>
                 </div>
                 <div className="h-2 bg-brand-charcoal/60 rounded-full overflow-hidden">
                   <div
@@ -410,7 +426,7 @@ export default function ClientDashboard() {
               <div className="flex-1">
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-brand-cream/70">Vegetables</span>
-                  <span className="text-brand-cream/50">{vegRemaining}/{vegTarget} cups</span>
+                  <span className="text-brand-cream/50">{cleanDisplayNumber(vegRemaining)}/{cleanDisplayNumber(vegTarget)} cups</span>
                 </div>
                 <div className="h-2 bg-brand-charcoal/60 rounded-full overflow-hidden">
                   <div
@@ -426,7 +442,7 @@ export default function ClientDashboard() {
               <div className="flex-1">
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-brand-cream/70">Healthy Fats</span>
-                  <span className="text-brand-cream/50">{fatRemaining}/{fatTarget} tbsp</span>
+                  <span className="text-brand-cream/50">{cleanDisplayNumber(fatRemaining)}/{cleanDisplayNumber(fatTarget)} tbsp</span>
                 </div>
                 <div className="h-2 bg-brand-charcoal/60 rounded-full overflow-hidden">
                   <div
@@ -443,7 +459,7 @@ export default function ClientDashboard() {
                 <div className="flex-1">
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-brand-cream/70">Starchy Carbs</span>
-                    <span className="text-brand-cream/50">{starchRemaining}/{starchTarget} cups</span>
+                    <span className="text-brand-cream/50">{cleanDisplayNumber(starchRemaining)}/{cleanDisplayNumber(starchTarget)} cups</span>
                   </div>
                   <div className="h-2 bg-brand-charcoal/60 rounded-full overflow-hidden">
                     <div
