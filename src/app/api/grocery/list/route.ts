@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   // Get list metadata
   const { data: list, error: listError } = await supabase
     .from('client_grocery_lists')
-    .select('notes, adjusted_totals')
+    .select('notes, adjusted_totals, meal_count')
     .eq('client_id', clientId)
     .single();
 
@@ -37,7 +37,8 @@ export async function GET(request: NextRequest) {
     items: items || [],
     list: {
       notes: list?.notes || '',
-      adjustedTotals: list?.adjusted_totals || {}
+      adjustedTotals: list?.adjusted_totals || {},
+      mealCount: list?.meal_count ?? 12
     }
   });
 }
@@ -49,10 +50,11 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json();
   const supabase = getAdminClient();
 
-  const { notes, adjustedTotals } = body;
+  const { notes, adjustedTotals, mealCount } = body;
   const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
   if (notes !== undefined) updateData.notes = notes;
   if (adjustedTotals !== undefined) updateData.adjusted_totals = adjustedTotals;
+  if (mealCount !== undefined) updateData.meal_count = mealCount;
 
   const { data, error } = await supabase
     .from('client_grocery_lists')

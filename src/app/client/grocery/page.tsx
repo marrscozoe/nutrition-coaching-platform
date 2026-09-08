@@ -186,6 +186,9 @@ export default function GroceryPage() {
       if (data.list?.adjustedTotals && Object.keys(data.list.adjustedTotals).length > 0) {
         setAdjustedTotals(data.list.adjustedTotals);
       }
+      if (data.list?.mealCount !== undefined) {
+        setMealCount(data.list.mealCount);
+      }
     } catch (err) {
       console.error('fetchGroceryList error:', err);
     } finally {
@@ -223,7 +226,7 @@ export default function GroceryPage() {
     await fetch('/api/grocery/list', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-client-id': client.id },
-      body: JSON.stringify({ adjustedTotals: scaled }),
+      body: JSON.stringify({ adjustedTotals: scaled, mealCount: newCount }),
     });
   }
 
