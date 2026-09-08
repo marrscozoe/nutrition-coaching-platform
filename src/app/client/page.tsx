@@ -642,11 +642,6 @@ export default function ClientDashboard() {
                     <p className="text-xs text-red-400 font-semibold">⚠️ Not allowed in Phase 1</p>
                   </div>
                 )}
-                {client.current_phase === 6 && (
-                  <div className="mx-5 mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
-                    <p className="text-xs text-red-400 font-semibold">⚠️ Not allowed in Phase 6</p>
-                  </div>
-                )}
                 {client.current_phase === 5 && !client.phase5_plan && (
                   <div className="mx-5 mt-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
                     <p className="text-xs text-yellow-400 font-semibold">⚠️ Only with Phase 5 plan</p>
