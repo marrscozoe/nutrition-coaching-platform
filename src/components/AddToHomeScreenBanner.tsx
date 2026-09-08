@@ -72,7 +72,7 @@ export default function AddToHomeScreenBanner() {
   if (!showBanner) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-40 animate-slide-up">
+    <div className="fixed bottom-24 left-4 right-4 z-40 animate-slide-up">
       <div className="bg-brand-charcoal/95 backdrop-blur-sm border border-brand-orange/30 rounded-2xl p-4 shadow-2xl">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-brand-orange/20 flex items-center justify-center flex-shrink-0">

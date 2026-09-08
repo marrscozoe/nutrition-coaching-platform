@@ -3,167 +3,156 @@
 import { useState, useEffect, useRef } from 'react';
 import { CURRENT_VERSION } from '@/lib/version';
 
-const STORAGE_KEY = '***';
+const VERSION_KEY = '***';
 const DISMISS_KEY = '***';
 
 export default function UpdateBanner() {
   const [showBanner, setShowBanner] = useState(false);
-  const [dismissing, setDismissing] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const updateTriggered = useRef(false);
   const serverVersionRef = useRef<string>(CURRENT_VERSION);
 
   useEffect(() => {
-    // Check for updates on every page load — this effect runs client-side only
-    // so it's never server-rendered and always fresh
     checkForUpdate();
   }, []);
 
   async function checkForUpdate() {
+    let serverVersion: string = CURRENT_VERSION;
+
     try {
-      // Get the server's current version
-      let serverVersion: string;
+      const res = await fetch('/api/version?t=' + Date.now(), {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        serverVersion = data.version;
+      }
+    } catch {
+      // network error — stick with CURRENT_VERSION
+    }
+
+    serverVersionRef.current = serverVersion;
+
+    let storedVersion: string | null = null;
+    try {
+      storedVersion = localStorage.getItem(VERSION_KEY);
+    } catch {
+      return; // localStorage unavailable
+    }
+
+    // First visit — stamp version, no banner
+    if (!storedVersion) {
       try {
-        const res = await fetch('/api/version?t=' + Date.now(), {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          serverVersion = data.version;
-        } else {
-          // Fallback to local version if API fails
-          serverVersion = CURRENT_VERSION;
-        }
+        localStorage.setItem(VERSION_KEY, serverVersion);
       } catch {
-        // Fallback to local version if fetch fails
-        serverVersion = CURRENT_VERSION;
+        // ignore
       }
-      
-      // Store server version for use in dismiss
-      serverVersionRef.current = serverVersion;
+      return;
+    }
 
-      // Get stored version
-      let storedVersion: string | null = null;
-      try {
-        storedVersion = localStorage.getItem(STORAGE_KEY);
-      } catch (e) {
-        // localStorage not available, skip banner
-        console.warn('[UpdateBanner] localStorage not available:', e);
-        return;
-      }
+    // Same version — nothing to do
+    if (storedVersion === serverVersion) {
+      return;
+    }
 
-      // First visit — store version and don't show banner
-      if (!storedVersion) {
-        try {
-          localStorage.setItem(STORAGE_KEY, serverVersion);
-        } catch (e) {
-          console.warn('[UpdateBanner] Failed to save version:', e);
-        }
-        return;
-      }
+    // Different version — check dismiss state
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem(`${DISMISS_KEY}_${serverVersion}`) === 'true';
+    } catch {
+      // ignore
+    }
 
-      // Version mismatch — show update banner (user clicks to update)
-      if (storedVersion !== serverVersion) {
-        // Check if user already dismissed this version
-        let dismissed = false;
-        try {
-          dismissed = localStorage.getItem(`${DISMISS_KEY}_${serverVersion}`) === 'true';
-        } catch (e) {
-          // Ignore storage errors
-        }
-        if (!dismissed) {
-          setShowBanner(true);
-        }
-      }
-    } catch (e) {
-      console.error('[UpdateBanner] Version check failed:', e);
+    if (!dismissed) {
+      setShowBanner(true);
     }
   }
 
+  /**
+   * Unregister every service worker registration.
+   * After this the browser will not route requests through any SW,
+   * ensuring the subsequent reload hits the network directly.
+   */
   async function unregisterServiceWorkers(): Promise<void> {
-    if ('serviceWorker' in navigator) {
-      try {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(
-          registrations.map((registration) => registration.unregister())
-        );
-      } catch (e) {
-        console.warn('[UpdateBanner] Failed to unregister service workers:', e);
-      }
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((reg) => reg.unregister()));
+    } catch (e) {
+      console.warn('[UpdateBanner] SW unregister failed:', e);
     }
   }
 
+  /**
+   * Delete every named cache in the Cache Storage API.
+   * Covers Workbox-managed precache and runtime caches.
+   */
   async function clearAllCaches(): Promise<void> {
-    // Clear Workbox caches (used by next-pwa)
-    if ('caches' in window) {
-      try {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map((name) => caches.delete(name)));
-      } catch (e) {
-        console.warn('[UpdateBanner] Failed to clear caches:', e);
-      }
+    if (!('caches' in window)) return;
+    try {
+      const names = await caches.keys();
+      await Promise.all(names.map((name) => caches.delete(name)));
+    } catch (e) {
+      console.warn('[UpdateBanner] Cache clear failed:', e);
     }
   }
 
+  /**
+   * Hard reload strategy:
+   * 1. Unregister all SWs  → no SW intercepts the reload request
+   * 2. Clear all caches     → no stale responses in any cache layer
+   * 3. Stamp new version    → version check passes on next mount
+   * 4. Clear sessionStorage → reset ephemeral UI state
+   * 5. Navigate to fresh URL (window.location.href = …) → forces network
+   *
+   * Using window.location.href assignment (not reload()) ensures the
+   * browser treats the navigation as a brand-new top-level load with no
+   * back-button history pollution, and it bypasses the HTTP disk cache.
+   */
   async function handleUpdate() {
-    // Prevent double-triggering
     if (updateTriggered.current) return;
     updateTriggered.current = true;
-
-    setDismissing(true);
-    setUpdateProgress(true);
+    setIsUpdating(true);
 
     try {
-      // Step 1: Unregister all service workers (clears SW cache control)
       await unregisterServiceWorkers();
-
-      // Step 2: Clear ALL browser caches (HTTP cache, Workbox caches, etc.)
       await clearAllCaches();
 
-      // Step 3: Store the new version in localStorage so after reload, version check finds a match
       try {
-        localStorage.setItem(STORAGE_KEY, serverVersionRef.current);
-      } catch (e) {
-        console.warn('[UpdateBanner] Failed to save version:', e);
+        localStorage.setItem(VERSION_KEY, serverVersionRef.current);
+      } catch {
+        // ignore — version check will fall back on next mount
       }
 
-      // Step 4: Clear sessionStorage (but NOT localStorage - we want to preserve user session)
       try {
         sessionStorage.clear();
-      } catch (e) {
-        console.warn('[UpdateBanner] Failed to clear sessionStorage:', e);
+      } catch {
+        // ignore
       }
 
-      // Step 5: Force hard reload bypassing all caches
-      // Use a cache-busting approach: reload with replacement
-      // First replace current entry so back-button doesn't re-trigger
-      window.location.replace(
-        window.location.href.split('?')[0] +
-          '?__update=' +
-          Date.now() +
-          '#__updating'
-      );
+      // Cache-bust the URL: same path, fresh query + fragment so the
+      // HTTP cache cannot serve a stale response for this exact URL.
+      const url =
+        window.location.pathname +
+        '?__app_update=' +
+        Date.now() +
+        '#__updating';
 
-      // Small delay to let replace take effect, then hard reload
-      setTimeout(() => {
-        // Hard reload: forces re-fetch of all resources
-        window.location.reload();
-      }, 100);
+      // Assign forces a top-level navigation with a brand-new URL
+      window.location.href = url;
     } catch (err) {
       console.error('[UpdateBanner] Update failed:', err);
       updateTriggered.current = false;
-      setDismissing(false);
-      setUpdateProgress(false);
+      setIsUpdating(false);
     }
   }
 
   function handleDismiss() {
-    // Remember that user dismissed this specific version (use server version)
     try {
       localStorage.setItem(`${DISMISS_KEY}_${serverVersionRef.current}`, 'true');
-    } catch (e) {
-      console.warn('[UpdateBanner] Failed to save dismiss:', e);
+    } catch {
+      // ignore
     }
     setShowBanner(false);
   }
@@ -172,14 +161,16 @@ export default function UpdateBanner() {
 
   return (
     <div
-      className={`fixed bottom-20 left-4 right-4 z-50 animate-slide-up ${
-        dismissing ? 'pointer-events-none' : ''
+      // bottom-24 = 6rem = 96px from viewport bottom
+      // keeps the banner above the fixed client tab bar (~56px) with 40px gap
+      className={`fixed bottom-24 left-4 right-4 z-50 animate-slide-up ${
+        isUpdating ? 'pointer-events-none' : ''
       }`}
     >
       <div className="bg-brand-charcoal/95 backdrop-blur-sm border border-brand-orange/40 rounded-2xl p-4 shadow-2xl">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-brand-orange/20 flex items-center justify-center flex-shrink-0">
-            {updateProgress ? (
+            {isUpdating ? (
               <span className="text-xl animate-spin">⚡</span>
             ) : (
               <span className="text-xl">🔄</span>
@@ -187,14 +178,14 @@ export default function UpdateBanner() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-brand-cream font-bold text-sm">
-              {updateProgress ? 'Updating...' : 'Update Available!'}
+              {isUpdating ? 'Updating…' : 'Update Available!'}
             </p>
             <p className="text-brand-cream/60 text-xs mt-1">
-              {updateProgress
-                ? 'Clearing caches and loading new version...'
-                : 'A new version of AMarsBody Nutrition is ready. Tap to refresh and get the latest features.'}
+              {isUpdating
+                ? 'Clearing caches and loading the new version…'
+                : 'A new version of AMarsBody Nutrition is ready. Tap to refresh.'}
             </p>
-            {!updateProgress && (
+            {!isUpdating && (
               <button
                 onClick={handleUpdate}
                 className="mt-2 bg-brand-orange hover:bg-brand-orange-dark text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
@@ -203,7 +194,7 @@ export default function UpdateBanner() {
               </button>
             )}
           </div>
-          {!updateProgress && (
+          {!isUpdating && (
             <button
               onClick={handleDismiss}
               className="text-brand-cream/40 hover:text-brand-cream/80 flex-shrink-0 p-1"
