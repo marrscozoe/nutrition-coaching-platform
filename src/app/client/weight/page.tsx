@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getCurrentUser } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -111,19 +112,17 @@ export default function WeightPage() {
   // Response (no longer used - redirects to chat now)
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('client_user');
-    const userType = sessionStorage.getItem('client_user_type');
+    const currentUser = getCurrentUser();
 
-    if (!userData || userType !== 'client') {
+    if (!currentUser || currentUser.userType !== 'client') {
       router.push('/');
       return;
     }
 
-    const user = JSON.parse(userData);
-    setClient(user);
+    setClient(currentUser.user);
     // Fetch fresh client data from server to ensure current_weight is accurate
-    fetchClientData(user.id);
-    fetchWeightHistory(user.id);
+    fetchClientData(currentUser.user.id);
+    fetchWeightHistory(currentUser.user.id);
     setLoading(false);
   }, [router]);
 

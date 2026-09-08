@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
-import { logout } from '@/lib/auth';
+import { logout, getCurrentUser } from '@/lib/auth';
 import { getPhaseGuidance, getPortions, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies } from '@/lib/nutrition-data';
 
 interface ClientData {
@@ -50,12 +50,11 @@ export default function ClientDashboard() {
   useEffect(() => {
     function handleVisibilityChange() {
       if (document.visibilityState === 'visible') {
-        const userData = sessionStorage.getItem('client_user');
-        if (userData) {
-          const user = JSON.parse(userData);
-          // Fetch BOTH fresh client data and meals to ensure we have latest program/event info
-          fetchClientData(user.id);
-          fetchRecentMeals(user.id);
+        const currentUser = getCurrentUser();
+        if (currentUser && currentUser.userType === 'client') {
+          // getCurrentUser() already extended the session; fetch fresh data
+          fetchClientData(currentUser.user.id);
+          fetchRecentMeals(currentUser.user.id);
         }
       }
     }
@@ -64,22 +63,20 @@ export default function ClientDashboard() {
   }, []);
 
   useEffect(() => {
-    // Check if user is logged in (use separate client keys to avoid overwriting trainer session)
-    const userData = sessionStorage.getItem('client_user');
-    const userType = sessionStorage.getItem('client_user_type');
+    // Check if user is logged in using getCurrentUser() which validates 30-day expiration
+    const currentUser = getCurrentUser();
 
-    if (!userData || userType !== 'client') {
+    if (!currentUser || currentUser.userType !== 'client') {
       router.push('/');
       return;
     }
 
-    const user = JSON.parse(userData);
-    setClient(user);
+    setClient(currentUser.user);
 
     // Fetch fresh client data from server on mount
-    fetchClientData(user.id);
+    fetchClientData(currentUser.user.id);
     // Fetch recent meals
-    fetchRecentMeals(user.id);
+    fetchRecentMeals(currentUser.user.id);
   }, [router]);
 
   async function fetchRecentMeals(clientId: string) {

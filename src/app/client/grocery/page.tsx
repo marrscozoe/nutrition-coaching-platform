@@ -14,6 +14,7 @@ import {
   get12MealTotals,
   toStandardUnit,
 } from '@/lib/nutrition-data';
+import { getCurrentUser } from '@/lib/auth';
 import type { AdjustedTotals, GroceryItem } from '@/lib/grocery-types';
 
 interface ClientData {
@@ -162,10 +163,9 @@ export default function GroceryPage() {
 
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('client_user');
-    const userType = sessionStorage.getItem('client_user_type');
-    if (!userData || userType !== 'client') { router.push('/'); return; }
-    const user: ClientData = JSON.parse(userData);
+    const currentUser = getCurrentUser();
+    if (!currentUser || currentUser.userType !== 'client') { router.push('/'); return; }
+    const user: ClientData = currentUser.user;
     setClient(user);
     const defaults = get12MealTotals(
       user.gender === 'female' ? 'female' : 'male',

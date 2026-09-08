@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Toast from '@/components/Toast';
-import { logout } from '@/lib/auth';
+import { logout, getCurrentUser } from '@/lib/auth';
 import AllergyEditModal from '@/components/AllergyEditModal';
 
 interface ClientData {
@@ -147,19 +147,17 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('client_user');
-    const userType = sessionStorage.getItem('client_user_type');
+    const currentUser = getCurrentUser();
 
-    if (!userData || userType !== 'client') {
+    if (!currentUser || currentUser.userType !== 'client') {
       router.push('/');
       return;
     }
 
-    const user = JSON.parse(userData);
-    setClient(user);
+    setClient(currentUser.user);
 
     // Fetch fresh data from server to ensure phase and weights are current
-    fetchClientData(user.id);
+    fetchClientData(currentUser.user.id);
     setLoading(false);
   }, [router]);
 

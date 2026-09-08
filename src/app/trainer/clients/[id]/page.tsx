@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { getCurrentUser } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -74,17 +75,15 @@ export default function ClientDetailPage() {
   const [currentWeek, setCurrentWeek] = useState(1);
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('trainer_user');
-    const userType = sessionStorage.getItem('trainer_user_type');
+    const currentUser = getCurrentUser();
 
-    if (!userData || userType !== 'trainer') {
+    if (!currentUser || currentUser.userType !== 'trainer') {
       router.push('/?login=trainer');
       return;
     }
 
-    const user = JSON.parse(userData);
-    setTrainer(user);
-    fetchClientData(clientId, user.id);
+    setTrainer(currentUser.user);
+    fetchClientData(clientId, currentUser.user.id);
   }, [router, clientId]);
 
   async function fetchClientData(clientId: string, trainerId: string) {

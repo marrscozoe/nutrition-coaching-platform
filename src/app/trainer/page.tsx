@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { logout } from '@/lib/auth';
+import { logout, getCurrentUser } from '@/lib/auth';
 
 interface TrainerData {
   id: string;
@@ -35,18 +35,16 @@ export default function TrainerDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('trainer_user');
-    const userType = sessionStorage.getItem('trainer_user_type');
+    const currentUser = getCurrentUser();
 
-    if (!userData || userType !== 'trainer') {
+    if (!currentUser || currentUser.userType !== 'trainer') {
       router.push('/?login=trainer');
       return;
     }
 
-    const user = JSON.parse(userData);
-    setTrainer(user);
+    setTrainer(currentUser.user);
     // Fetch clients using user.id directly (not trainer state) to avoid race condition
-    fetchClients(user.id);
+    fetchClients(currentUser.user.id);
   }, [router]);
 
   async function fetchClients(trainerId: string) {

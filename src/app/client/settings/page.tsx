@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Toast from '@/components/Toast';
-import { logout } from '@/lib/auth';
+import { logout, getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 interface ClientData {
@@ -44,16 +44,14 @@ export default function ClientSettingsPage() {
   const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('client_user');
-    const userType = sessionStorage.getItem('client_user_type');
+    const currentUser = getCurrentUser();
 
-    if (!userData || userType !== 'client') {
+    if (!currentUser || currentUser.userType !== 'client') {
       router.push('/');
       return;
     }
 
-    const user = JSON.parse(userData);
-    setClient(user);
+    setClient(currentUser.user);
     setLoading(false);
   }, [router]);
 

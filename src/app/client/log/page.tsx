@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Toast from '@/components/Toast';
+import { getCurrentUser } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -68,23 +69,21 @@ export default function LogMealPage() {
   const [recentMeals, setRecentMeals] = useState<RecentMeal[]>([]);
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('client_user');
-    const userType = sessionStorage.getItem('client_user_type');
+    const currentUser = getCurrentUser();
 
-    if (!userData || userType !== 'client') {
+    if (!currentUser || currentUser.userType !== 'client') {
       router.push('/');
       return;
     }
 
-    const user = JSON.parse(userData);
-    setClient(user);
+    setClient(currentUser.user);
     setLoading(false);
     
     // Check if user can see correction button
-    checkCorrectionStatus(user.id);
+    checkCorrectionStatus(currentUser.user.id);
 
     // Fetch recent meals
-    fetchRecentMeals(user.id);
+    fetchRecentMeals(currentUser.user.id);
   }, [router]);
 
   async function fetchRecentMeals(clientId: string) {

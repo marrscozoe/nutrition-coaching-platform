@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { SUPPLEMENTS } from '@/lib/nutrition-data';
+import { getCurrentUser } from '@/lib/auth';
 
 interface ClientData {
   id: string;
@@ -76,15 +77,14 @@ export default function ChatPage() {
   const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('client_user');
-    const userType = sessionStorage.getItem('client_user_type');
+    const currentUser = getCurrentUser();
 
-    if (!userData || userType !== 'client') {
+    if (!currentUser || currentUser.userType !== 'client') {
       router.push('/');
       return;
     }
 
-    const user = JSON.parse(userData);
+    const user = currentUser.user;
     setClient(user);
 
     // Load chat history from sessionStorage (use client-specific key to prevent cross-contamination)

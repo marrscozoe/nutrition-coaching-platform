@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { logout } from '@/lib/auth';
+import { logout, getCurrentUser } from '@/lib/auth';
 import Toast from '@/components/Toast';
 
 interface TrainerData {
@@ -39,17 +39,15 @@ export default function TrainerProfilePage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('trainer_user');
-    const userType = sessionStorage.getItem('trainer_user_type');
+    const currentUser = getCurrentUser();
 
-    if (!userData || userType !== 'trainer') {
+    if (!currentUser || currentUser.userType !== 'trainer') {
       router.push('/?login=trainer');
       return;
     }
 
     try {
-      const user = JSON.parse(userData);
-      setTrainer(user);
+      setTrainer(currentUser.user);
     } catch (e) {
       router.push('/?login=trainer');
       return;

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Toast from '@/components/Toast';
+import { getCurrentUser } from '@/lib/auth';
 
 interface TrainerData {
   id: string;
@@ -49,15 +50,14 @@ export default function TrainerSettingsPage() {
   const [copiedMessage, setCopiedMessage] = useState('');
 
   useEffect(() => {
-    const userData = sessionStorage.getItem('trainer_user');
-    const userType = sessionStorage.getItem('trainer_user_type');
+    const currentUser = getCurrentUser();
 
-    if (!userData || userType !== 'trainer') {
+    if (!currentUser || currentUser.userType !== 'trainer') {
       router.push('/?login=trainer');
       return;
     }
 
-    const user = JSON.parse(userData);
+    const user = currentUser.user;
     setTrainer(user);
     setName(user.name || '');
     setBusinessName(user.business_name || '');
