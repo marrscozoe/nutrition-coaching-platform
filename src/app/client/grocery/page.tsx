@@ -295,7 +295,13 @@ export default function GroceryPage() {
   function openAddModal(food: string) {
     setSelectedFood(food);
     setAddAmount(0);
-    setAddUnit(activeTab === 'eggs' ? 'carton' : 'lb');
+    // Set unit based on category
+    let defaultUnit: 'lb' | 'cups' | 'oz' | 'carton' = 'lb';
+    if (activeTab === 'eggs') defaultUnit = 'carton';
+    else if (activeTab === 'veggies') defaultUnit = 'cups';
+    else if (activeTab === 'starch') defaultUnit = 'cups';
+    else if (activeTab === 'fats') defaultUnit = 'oz';
+    setAddUnit(defaultUnit);
     setAddModalOpen(true);
   }
 
@@ -600,19 +606,19 @@ export default function GroceryPage() {
             <h3 className="text-lg font-bold text-brand-cream mb-4">Add: {selectedFood}</h3>
             <div className="mb-4">
               <label className="text-sm text-brand-cream/60 block mb-1">Amount</label>
-              <div className="flex gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1">
                 <input
                   type="number"
                   value={addAmount || ''}
                   onChange={e => setAddAmount(parseFloat(e.target.value) || 0)}
-                  className="flex-1 px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-base focus:border-brand-orange/60 focus:outline-none"
+                  className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-base focus:border-brand-orange/60 focus:outline-none"
                   min="0" step="0.5" placeholder="0"
                   autoFocus
                 />
                 <select
                   value={addUnit}
                   onChange={e => setAddUnit(e.target.value as any)}
-                  className="px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm"
+                  className="px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm flex-shrink-0"
                 >
                   {activeTab === 'eggs' ? (
                     <option value="carton">carton</option>
