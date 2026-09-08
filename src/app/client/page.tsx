@@ -6,7 +6,7 @@ import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
 import { logout, getCurrentUser } from '@/lib/auth';
-import { getPhaseGuidance, getPortions, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies } from '@/lib/nutrition-data';
+import { getPhaseGuidance, getPortions, getWaterReminder, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies } from '@/lib/nutrition-data';
 
 interface ClientData {
   id: string;
@@ -50,10 +50,12 @@ export default function ClientDashboard() {
   const [vegTarget, setVegTarget] = useState(0);
   const [fatTarget, setFatTarget] = useState(0);
   const [starchTarget, setStarchTarget] = useState(0);
+  const [waterTarget, setWaterTarget] = useState(0);
   const [proteinRemaining, setProteinRemaining] = useState(0);
   const [vegRemaining, setVegRemaining] = useState(0);
   const [fatRemaining, setFatRemaining] = useState(0);
   const [starchRemaining, setStarchRemaining] = useState(0);
+  const [waterRemaining, setWaterRemaining] = useState(0);
 
   // Handle returning to the dashboard (e.g., after logging a meal or switching programs)
   // This catches cases where client-side navigation brings user back without pathname changing
@@ -126,10 +128,17 @@ export default function ClientDashboard() {
     setFatTarget(fatTargetVal);
     setStarchTarget(starchTargetVal);
 
+    // Water: extract oz from getWaterReminder (male=128, female=80)
+    const waterReminder = getWaterReminder(clientData.gender as 'male' | 'female');
+    const waterOzMatch = waterReminder.match(/(\d+) oz daily/);
+    const waterTargetVal = waterOzMatch ? parseInt(waterOzMatch[1]) : (clientData.gender === 'male' ? 128 : 80);
+    setWaterTarget(waterTargetVal);
+
     setProteinRemaining(proteinOz);
     setVegRemaining(vegTargetVal);
     setFatRemaining(fatTargetVal);
     setStarchRemaining(starchTargetVal);
+    setWaterRemaining(waterTargetVal);
   }
 
   // Recalculate remaining from today's meals
@@ -154,6 +163,9 @@ export default function ClientDashboard() {
     if (starchTarget > 0) {
       setStarchRemaining(Math.max(0, starchTarget - mealsCount));
     }
+    // Water: deduct per-meal amount (male=32oz/meal, female=20oz/meal)
+    const waterPerMeal = client.gender === 'male' ? 32 : 20;
+    setWaterRemaining(Math.max(0, waterTarget - mealsCount * waterPerMeal));
   }
 
   async function fetchRecentMeals(clientId: string) {
@@ -290,6 +302,22 @@ export default function ClientDashboard() {
             Today's Targets
           </h2>
           <div className="space-y-2">
+            {/* Water row */}
+            <div className="flex items-center gap-3">
+              <span className="text-lg">💧</span>
+              <div className="flex-1">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-brand-cream/70">Water</span>
+                  <span className="text-brand-cream/50">{waterRemaining}/{waterTarget} oz</span>
+                </div>
+                <div className="h-2 bg-brand-charcoal/60 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                    style={{ width: `${waterTarget > 0 ? Math.max(0, (waterRemaining / waterTarget) * 100) : 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
             {/* Protein row */}
             <div className="flex items-center gap-3">
               <span className="text-lg">🍗</span>
