@@ -1045,118 +1045,162 @@ function parseFraction(s: string): number {
 }
 
 /**
- * Extract a numeric amount from an item string, returns the parsed number or 1 if no amount found.
- * Handles fractions, ranges (uses max), decimals.
- * Also returns the unit string if found.
+ * Extract a numeric amount from an item string.
+ * Returns the amount (defaulting to 1) and the unit string.
+ * Handles fractions ("1/2", "3/4"), decimals ("1.5"), ranges ("1-2" uses max).
+ * Returns { amount, unit }.
  */
-function extractAmountUnit(item: string): { amount: number; unit: string } {
-  // Pattern: number (possibly fraction or range) followed by unit word
-  const amountUnitPattern = /([\d]+(?:[\/\.][\d]+)?(?:\s*[-–]\s*[\d]+(?:[\/\.][\d]+)?)?)\s*(oz|ounces?|cups?|cup|tbsp|tablespoons?|handfuls?|handful|small handfuls?|small handful|egg|eggs|small|medium|large)\b/gi;
-  const match = amountUnitPattern.exec(item);
-  if (match) {
-    let amountStr = match[1].trim();
-    const unit = match[2].toLowerCase();
-    // Handle range: "1-2" → use max → 2
-    if (amountStr.includes('-') || amountStr.includes('–')) {
-      const rangeParts = amountStr.split(/[-–]/);
-      amountStr = rangeParts[rangeParts.length - 1].trim();
+function extractAmount(item: string): { amount: number; unit: string } {
+  // Match: number (int/float/fraction/range) then whitespace then unit word
+  // Units: oz, cups, cup, tbsp, tablespoons, handful, handfuls, egg, eggs, etc.
+  const pattern = /([\d]+(?:\.[\d]+)?(?:\s*\/\s*[\d]+)?|(?:[\d]+\s*\/\s*[\d]+))\s*(oz|ounce|ounces|cups?|tbsp|tablespoons?|handfuls?|handful|egg|eggs)\b/i;
+  const match = pattern.exec(item);
+  if (!match) return { amount: 1, unit: '' };
+
+  let amountStr = match[1].trim();
+  const unit = match[2].toLowerCase();
+
+  // Handle fractions like "1/2", "3/4"
+  if (amountStr.includes('/')) {
+    const parts = amountStr.split('/');
+    if (parts.length === 2) {
+      const num = parseFloat(parts[0].trim());
+      const den = parseFloat(parts[1].trim());
+      if (!isNaN(num) && !isNaN(den) && den !== 0) {
+        return { amount: num / den, unit };
+      }
     }
-    let amount = parseFraction(amountStr);
-    return { amount, unit };
   }
-  // No amount found
-  return { amount: 1, unit: '' };
+
+  // Handle range "1-2" → use max
+  if (/^\d+\s*-\s*\d+$/.test(amountStr)) {
+    const parts = amountStr.split('-').map(s => parseFloat(s.trim()));
+    return { amount: Math.max(parts[0], parts[1]), unit };
+  }
+
+  const amount = parseFloat(amountStr);
+  return { amount: isNaN(amount) ? 1 : amount, unit };
 }
 
 /**
- * Classify a food item string into a category, returning the category key or null.
- * Uses keyword matching on food lists.
+ * Classify a food item string into a category by checking against the food lists.
+ * Returns 'protein', 'veg', 'fat', 'starch', or null if unrecognized.
+ *
+ * Matching: the item string is checked for whether it contains the base food name
+ * as a distinct word (case-insensitive). Handles:
+ * - Parenthetical notes: "Avocado (1/2 male)" extracts base "avocado" for matching
+ * - Plurals: "sweet potato" matches "sweet potatoes"
+ * - Partial words: avoids "chicken" matching inside "chicken breast" as protein
  */
 function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'starch' | null {
   const lower = item.toLowerCase();
-  // Extract just the food name (before any portion/amount description)
-  const foodName = lower.split(/[,\d\s\(\-\/]/)[0].trim();
-  if (!foodName) return null;
+  if (!lower || lower === 'photo logged') return null;
 
-  // Check lean proteins (skip whey/bacon for deduction)
-  for (const p of LEAN_PROTEINS) {
-    if (p.toLowerCase().includes(foodName) && !p.toLowerCase().includes('whey') && !p.toLowerCase().includes('bacon')) {
-      return 'protein';
-    }
+  // Extract the base food name: take text before any parenthetical note
+  function baseName(foodName: string): string {
+    const idx = foodName.indexOf('(');
+    return idx >= 0 ? foodName.substring(0, idx).trim() : foodName.trim();
   }
+
+  // Check if the item string contains the base food name as a distinct word
+  function itemContainsFood(foodName: string): boolean {
+    const fnBase = baseName(foodName).toLowerCase();
+    if (!fnBase) return false;
+
+    // Word boundary check: food name must not be embedded inside another word
+    // "avocado" in "2 tablespoons avocado" is a word at the end of the string
+    const escaped = fnBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, 'i');
+    if (pattern.test(lower)) return true;
+
+    // Plural/singular bridge: "sweet potatoes" ↔ "sweet potato"
+    // Remove trailing 'es' (potatoes→potato) or 's' (apples→apple) from the LAST WORD only
+    const words = fnBase.split(' ');
+    const lastWord = words[words.length - 1];
+    let singularBase: string | null = null;
+    if (lastWord.endsWith('es') && lastWord.length > 3) {
+      singularBase = words.slice(0, -1).concat([lastWord.slice(0, -2)]).join(' '); // potatoes→potato
+    } else if (lastWord.endsWith('s') && lastWord.length > 2) {
+      singularBase = words.slice(0, -1).concat([lastWord.slice(0, -1)]).join(' '); // apples→apple
+    }
+    if (singularBase && singularBase.length > 2 && singularBase !== fnBase) {
+      const singEscaped = singularBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const singPattern = new RegExp(`(?:^|[^a-z0-9])${singEscaped}(?:$|[^a-z0-9])`, 'i');
+      if (singPattern.test(lower)) return true;
+    }
+
+    return false;
+  }
+
+  // Check lean proteins (whey/bacon excluded from deduction)
+  for (const food of LEAN_PROTEINS) {
+    const foodLower = food.toLowerCase();
+    if (foodLower.includes('whey') || foodLower.includes('bacon')) continue;
+    if (itemContainsFood(food)) return 'protein';
+  }
+
   // Check fibrous vegetables
-  for (const v of FIBROUS_VEGETABLES) {
-    if (v.toLowerCase().includes(foodName)) {
-      return 'veg';
-    }
+  for (const food of FIBROUS_VEGETABLES) {
+    if (itemContainsFood(food)) return 'veg';
   }
+
   // Check starchy carbohydrates
-  for (const s of STARCHY_CARBOHYDRATES) {
-    if (s.toLowerCase().includes(foodName)) {
-      return 'starch';
-    }
+  for (const food of STARCHY_CARBOHYDRATES) {
+    if (itemContainsFood(food)) return 'starch';
   }
+
   // Check healthy fats
-  for (const f of HEALTHY_FATS) {
-    if (f.toLowerCase().includes(foodName)) {
-      return 'fat';
-    }
+  for (const food of HEALTHY_FATS) {
+    if (itemContainsFood(food)) return 'fat';
   }
+
   return null;
 }
 
 /**
- * Convert various portion units to a consistent category unit.
- * Returns the amount in: oz for protein, cups for veg/starch, tbsp for fat.
+ * Convert an extracted amount+unit into a category-consistent value:
+ * protein → oz, veg/starch → cups, fat → tbsp.
  */
-function convertToCategoryUnit(amount: number, unit: string, category: 'protein' | 'veg' | 'fat' | 'starch'): number {
-  const normalizedUnit = unit.toLowerCase().replace(/\b(ounces?|ounce)\b/, 'oz').replace(/\b(tablespoons?|tbsp)\b/, 'tbsp').replace(/\b(cups?|cup)\b/, 'cup');
+function normalizeToCategoryUnit(amount: number, unit: string, category: 'protein' | 'veg' | 'fat' | 'starch'): number {
+  const u = unit.toLowerCase();
 
   if (category === 'protein') {
-    // "egg" or "eggs" → 1 oz each
-    if (normalizedUnit === 'egg' || normalizedUnit === 'eggs') {
-      return amount;
-    }
-    // Default: assume oz
+    // "egg" / "eggs" → 1 oz each
+    if (u === 'egg' || u === 'eggs') return amount;
+    // oz assumed otherwise
     return amount;
   }
 
   if (category === 'veg' || category === 'starch') {
-    if (normalizedUnit === 'oz' || normalizedUnit === 'tbsp') {
-      // Rough conversion: 1 oz ≈ 0.125 cups (2 tbsp ≈ 1 oz liquid)
-      return amount * 0.125;
+    if (u === 'oz' || u === 'ounce' || u === 'ounces' || u === 'tbsp' || u === 'tablespoons') {
+      return amount * 0.125; // rough: 2 tbsp ≈ 1 oz ≈ 0.125 cup
     }
-    // "small", "medium", "large" after no amount → assume 1 cup for veg/starch
-    return amount;
+    return amount; // cups assumed
   }
 
   if (category === 'fat') {
-    if (normalizedUnit === 'cup' || normalizedUnit === 'oz') {
-      // 1 cup of most fats ≈ 16 tbsp
-      return amount * 16;
-    }
-    if (normalizedUnit === 'handful' || normalizedUnit === 'handfuls' || normalizedUnit === 'small handful' || normalizedUnit === 'small handfuls') {
-      // 1 handful ≈ 1 tbsp
-      return amount;
-    }
-    return amount;
+    if (u === 'cup' || u === 'cups') return amount * 16;
+    if (u === 'oz' || u === 'ounce' || u === 'ounces') return amount * 2;
+    if (u.includes('handful')) return amount;
+    return amount; // tbsp assumed
   }
 
   return amount;
 }
 
 /**
- * Given a food_description string, parses and returns the sum of actual amounts
- * deducted per category.
+ * Given a food_description string (free-text, e.g. "6 oz chicken breast, 1 cup broccoli, 1 tbsp olive oil"),
+ * parses and returns the sum of actual amounts deducted per category.
  *
  * Returns: { proteinOz, vegCups, fatTbsp, starchCups, waterOz }
  *
  * Parsing rules:
  * - Each comma/semicolon/newline-delimited item is classified against food lists.
- * - Amounts are extracted via regex; no amount = 1 unit of that category's default.
- * - Protein: counted in oz. Egg whites tracked separately.
- * - Water: plain water oz only via mealContainsPlainWater(); falls back to per-meal
- *   amount (32 oz male / 20 oz female) only when plain water was explicitly logged.
+ * - Amounts are extracted via regex (fractions, ranges, decimals supported).
+ * - No amount → 1 unit of that category's default.
+ * - Protein: counted in oz. Egg whites tracked to avoid double-count.
+ * - Water: plain water oz only via mealContainsPlainWater();
+ *   explicit "N oz water" parsed from description, or per-meal default (caller handles gender).
  */
 export function parseFoodDescriptionToPortions(foodDescription: string): {
   proteinOz: number;
@@ -1168,84 +1212,38 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
   const result = { proteinOz: 0, vegCups: 0, fatTbsp: 0, starchCups: 0, waterOz: 0 };
   if (!foodDescription || foodDescription.trim() === '') return result;
 
-  // Split on common delimiters
   const items = foodDescription.split(/[,;\n]+/);
-
-  // Track whether we've counted eggs (to avoid double-counting egg whites)
-  let eggsCounted = false;
-  let eggWhitesCounted = false;
 
   for (const rawItem of items) {
     const item = rawItem.trim();
-    if (!item || item.toLowerCase() === 'photo logged') continue;
+    if (!item) continue;
 
-    const lower = item.toLowerCase();
-    const { amount, unit } = extractAmountUnit(item);
     const category = classifyFoodItem(item);
+    if (!category) continue;
+
+    // Special case: egg whites skip if eggs counted; eggs count as protein
+    const lower = item.toLowerCase();
+    if (lower.includes('egg white') || lower.includes('egg whites')) continue;
+
+    const { amount, unit } = extractAmount(item);
+    const normalized = normalizeToCategoryUnit(amount, unit, category);
 
     switch (category) {
-      case 'protein': {
-        // Special handling for eggs
-        if (lower.includes('egg') && !lower.includes('white')) {
-          // "egg whites" skip if eggs already counted
-          if (lower.includes('whites')) {
-            if (!eggsCounted) {
-              // Count egg whites as 0 oz protein (or minimal)
-              eggWhitesCounted = true;
-            }
-            break;
-          }
-          // Regular eggs
-          result.proteinOz += convertToCategoryUnit(amount, unit, 'protein');
-          eggsCounted = true;
-        } else if (lower.includes('whey') || lower.includes('protein powder')) {
-          // Whey/protein powder — skip for oz-based deduction (not a whole food)
-          break;
-        } else {
-          result.proteinOz += convertToCategoryUnit(amount, unit, 'protein');
-        }
-        break;
-      }
-      case 'veg': {
-        result.vegCups += convertToCategoryUnit(amount, unit, 'veg');
-        break;
-      }
-      case 'fat': {
-        result.fatTbsp += convertToCategoryUnit(amount, unit, 'fat');
-        break;
-      }
-      case 'starch': {
-        result.starchCups += convertToCategoryUnit(amount, unit, 'starch');
-        break;
-      }
+      case 'protein': result.proteinOz += normalized; break;
+      case 'veg':     result.vegCups     += normalized; break;
+      case 'fat':     result.fatTbsp     += normalized; break;
+      case 'starch':   result.starchCups  += normalized; break;
     }
   }
 
-  // Water: only plain water oz counts
-  if (mealContainsPlainWater(foodDescription)) {
-    // Try to parse explicit oz from the food description for water
-    const waterOzPattern = /(\d+(?:\.\d+)?)\s*(?:oz)?\s*water/gi;
-    let foundOz = false;
-    let waterMatch;
-    while ((waterMatch = waterOzPattern.exec(foodDescription)) !== null) {
-      result.waterOz += parseFloat(waterMatch[1]);
-      foundOz = true;
-    }
-    // If no explicit oz found, use per-meal default (32 male, 20 female)
-    // This will be overridden by the caller if needed
-    if (!foundOz) {
-      // Return 0 here; caller uses the per-meal default when mealContainsPlainWater is true
-      // But we can't know gender here, so just return 0 and let caller handle it
-      result.waterOz = 0;
-    }
-  }
+  // Water: only plain water oz counts (detected separately by caller)
+  // parseFoodDescriptionToPortions returns 0 for waterOz — caller applies
+  // mealContainsPlainWater + explicit oz parsing or per-meal default.
 
-  // Round to 1 decimal to avoid floating point noise
+  // Round to 1 decimal
   result.proteinOz = Math.round(result.proteinOz * 10) / 10;
-  result.vegCups = Math.round(result.vegCups * 10) / 10;
-  result.fatTbsp = Math.round(result.fatTbsp * 10) / 10;
+  result.vegCups    = Math.round(result.vegCups * 10) / 10;
+  result.fatTbsp    = Math.round(result.fatTbsp * 10) / 10;
   result.starchCups = Math.round(result.starchCups * 10) / 10;
-  result.waterOz = Math.round(result.waterOz * 10) / 10;
-
   return result;
 }
