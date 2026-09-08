@@ -292,16 +292,20 @@ export default function GroceryPage() {
     });
   }
 
+  function defaultUnitForCategory(tab: TabKey): 'lb' | 'cups' | 'oz' | 'carton' {
+    switch (tab) {
+      case 'protein': return 'lb';
+      case 'veggies': return 'cups';
+      case 'starch': return 'cups';
+      case 'fats': return 'oz';
+      case 'eggs': return 'carton';
+    }
+  }
+
   function openAddModal(food: string) {
     setSelectedFood(food);
     setAddAmount(0);
-    // Set unit based on category
-    let defaultUnit: 'lb' | 'cups' | 'oz' | 'carton' = 'lb';
-    if (activeTab === 'eggs') defaultUnit = 'carton';
-    else if (activeTab === 'veggies') defaultUnit = 'cups';
-    else if (activeTab === 'starch') defaultUnit = 'cups';
-    else if (activeTab === 'fats') defaultUnit = 'oz';
-    setAddUnit(defaultUnit);
+    setAddUnit(defaultUnitForCategory(activeTab));
     setAddModalOpen(true);
   }
 
@@ -618,7 +622,7 @@ export default function GroceryPage() {
                 <select
                   value={addUnit}
                   onChange={e => setAddUnit(e.target.value as any)}
-                  className="px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm flex-shrink-0"
+                  className="px-2 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm whitespace-nowrap flex-shrink-0"
                 >
                   {activeTab === 'eggs' ? (
                     <option value="carton">carton</option>
