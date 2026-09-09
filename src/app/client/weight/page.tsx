@@ -114,7 +114,7 @@ export default function WeightPage() {
   useEffect(() => {
     const currentUser = getCurrentUser();
 
-    if (!currentUser || currentUser.userType !== 'client') {
+    if (!currentUser || currentUser.userType !== 'client' || !currentUser.user) {
       router.push('/');
       return;
     }

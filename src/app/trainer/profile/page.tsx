@@ -41,7 +41,7 @@ export default function TrainerProfilePage() {
   useEffect(() => {
     const currentUser = getCurrentUser();
 
-    if (!currentUser || currentUser.userType !== 'trainer') {
+    if (!currentUser || currentUser.userType !== 'trainer' || !currentUser.user) {
       router.push('/?login=trainer');
       return;
     }

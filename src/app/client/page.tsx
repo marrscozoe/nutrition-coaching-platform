@@ -63,7 +63,7 @@ export default function ClientDashboard() {
     function handleVisibilityChange() {
       if (document.visibilityState === 'visible') {
         const currentUser = getCurrentUser();
-        if (currentUser && currentUser.userType === 'client') {
+        if (currentUser && currentUser.userType === 'client' && currentUser.user) {
           // getCurrentUser() already extended the session; fetch fresh data
           fetchClientData(currentUser.user.id);
           // Pass explicit primitives so the call is not affected by stale client-object closures
@@ -88,7 +88,7 @@ export default function ClientDashboard() {
     // Check if user is logged in using getCurrentUser() which validates 30-day expiration
     const currentUser = getCurrentUser();
 
-    if (!currentUser || currentUser.userType !== 'client') {
+    if (!currentUser || currentUser.userType !== 'client' || !currentUser.user) {
       router.push('/');
       return;
     }
