@@ -35,16 +35,30 @@ export default function TrainerDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
-
-    if (!currentUser || currentUser.userType !== 'trainer' || !currentUser.user) {
-      router.push('/?login=trainer');
-      return;
+    function checkAuth() {
+      const currentUser = getCurrentUser();
+      if (!currentUser || currentUser.userType !== 'trainer' || !currentUser.user) {
+        router.push('/?login=trainer');
+        return false;
+      }
+      setTrainer(currentUser.user);
+      fetchClients(currentUser.user.id);
+      return true;
     }
 
-    setTrainer(currentUser.user);
-    // Fetch clients using user.id directly (not trainer state) to avoid race condition
-    fetchClients(currentUser.user.id);
+    if (!checkAuth()) return;
+
+    // Re-check auth whenever the page becomes visible again.
+    // This catches bfcache restores (Safari/other browsers) where the page
+    // is reactivated without re-running useEffect, preventing a stale-auth
+    // trainer dashboard from showing after logout+back-button navigation.
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        checkAuth();
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [router]);
 
   async function fetchClients(trainerId: string) {

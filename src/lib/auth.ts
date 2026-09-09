@@ -132,81 +132,18 @@ function extendSession(userType: 'trainer' | 'client'): void {
   }
 }
 
+/**
+ * Navigate to the /logout route which clears all session data and redirects.
+ * This is a hard navigation (window.location.href) that ensures:
+ * 1. The current page is fully abandoned (no bfcache restore)
+ * 2. The /logout route runs on a fresh network request
+ * 3. No cached JavaScript context can re-execute after logout
+ */
 export async function logout(): Promise<void> {
-  try {
-    // Unregister ALL service workers first — this prevents the SW from
-    // intercepting the logout redirect and re-serving cached authenticated pages
-    // (e.g., /trainer dashboard) on back-button press after logout.
-    await unregisterServiceWorkers();
-
-    // Clear all browser caches — removes Workbox precached pages and runtime
-    // caches so no stale authenticated content can be served after sign-out.
-    await clearAllCaches();
-
-    // Clear persistent sessions (30-day)
-    clearAllSessions();
-
-    // Clear all user session data from localStorage (persists across tabs)
-    localStorage.removeItem('trainer_user');
-    localStorage.removeItem('trainer_user_type');
-    localStorage.removeItem('client_user');
-    localStorage.removeItem('client_user_type');
-    localStorage.removeItem('user'); // Legacy key cleanup
-    localStorage.removeItem('userType'); // Legacy key cleanup
-
-    // Clear sessionStorage (per-tab session)
-    sessionStorage.removeItem('trainer_user');
-    sessionStorage.removeItem('trainer_user_type');
-    sessionStorage.removeItem('client_user');
-    sessionStorage.removeItem('client_user_type');
-    sessionStorage.removeItem('user'); // Legacy key cleanup
-    sessionStorage.removeItem('userType'); // Legacy key cleanup
-    // Clear chat history keys
-    sessionStorage.removeItem('pending_meal_data');
-    sessionStorage.removeItem('pending_weight_data');
-    // Clear chat cleared flags
-    const keysToRemove = Object.keys(sessionStorage).filter(k => k.startsWith('chat_cleared_'));
-    keysToRemove.forEach(k => sessionStorage.removeItem(k));
-
-    // Clear chat history for the current user type
-    const trainerData = localStorage.getItem('trainer_user');
-    const trainerType = localStorage.getItem('trainer_user_type');
-    const clientData = localStorage.getItem('client_user');
-    const clientType = localStorage.getItem('client_user_type');
-
-    if (trainerData && trainerType === 'trainer') {
-      try {
-        const trainer = JSON.parse(trainerData);
-        localStorage.removeItem(`chat_history_trainer_${trainer.id}`);
-      } catch (e) {
-        // ignore parse errors
-      }
-    }
-    if (clientData && clientType === 'client') {
-      try {
-        const client = JSON.parse(clientData);
-        localStorage.removeItem(`chat_history_${client.id}`);
-      } catch (e) {
-        // ignore parse errors
-      }
-    }
-
-    // Sign out from Supabase (clears any auth session)
-    await supabase.auth.signOut();
-
-    // Small delay to ensure cleanup completes
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    // Clear sessionStorage right before redirect (belt-and-suspenders)
-    sessionStorage.clear();
-
-    // Redirect to home using replace() so back button doesn't return to dashboard
-    window.location.replace('/');
-  } catch (error) {
-    console.error('Logout error:', error);
-    // Even if signOut fails, still redirect
-    window.location.href = '/';
-  }
+  // Cancel any pending navigation and go to logout route directly.
+  // Using window.location.href = '/' ensures a full browser navigation,
+  // not a client-side route change that could be served from bfcache.
+  window.location.href = '/logout?redirect=/';
 }
 
 export function getCurrentUser(): { user: any; userType: string | null } | null {

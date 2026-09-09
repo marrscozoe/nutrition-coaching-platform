@@ -75,15 +75,26 @@ export default function ClientDetailPage() {
   const [currentWeek, setCurrentWeek] = useState(1);
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
-
-    if (!currentUser || currentUser.userType !== 'trainer' || !currentUser.user) {
-      router.push('/?login=trainer');
-      return;
+    function checkAuth() {
+      const currentUser = getCurrentUser();
+      if (!currentUser || currentUser.userType !== 'trainer' || !currentUser.user) {
+        router.push('/?login=trainer');
+        return false;
+      }
+      setTrainer(currentUser.user);
+      fetchClientData(clientId, currentUser.user.id);
+      return true;
     }
 
-    setTrainer(currentUser.user);
-    fetchClientData(clientId, currentUser.user.id);
+    if (!checkAuth()) return;
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        checkAuth();
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [router, clientId]);
 
   async function fetchClientData(clientId: string, trainerId: string) {

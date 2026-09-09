@@ -39,21 +39,34 @@ export default function TrainerProfilePage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
-
-    if (!currentUser || currentUser.userType !== 'trainer' || !currentUser.user) {
-      router.push('/?login=trainer');
-      return;
+    function checkAuth() {
+      const currentUser = getCurrentUser();
+      if (!currentUser || currentUser.userType !== 'trainer' || !currentUser.user) {
+        router.push('/?login=trainer');
+        return false;
+      }
+      try {
+        setTrainer(currentUser.user);
+      } catch (e) {
+        router.push('/?login=trainer');
+        return false;
+      } finally {
+        setLoading(false);
+      }
+      return true;
     }
 
-    try {
-      setTrainer(currentUser.user);
-    } catch (e) {
-      router.push('/?login=trainer');
-      return;
-    } finally {
-      setLoading(false);
+    if (!checkAuth()) return;
+
+    // Re-check auth whenever the page becomes visible again.
+    // Catches bfcache restores that skip useEffect re-run.
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        checkAuth();
+      }
     }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [router]);
 
   async function handleLogout() {

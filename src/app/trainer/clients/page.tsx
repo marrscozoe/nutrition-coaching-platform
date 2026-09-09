@@ -27,14 +27,25 @@ export default function TrainerClientsPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'trial'>('all');
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
-
-    if (!currentUser || currentUser.userType !== 'trainer' || !currentUser.user) {
-      router.push('/?login=trainer');
-      return;
+    function checkAuth() {
+      const currentUser = getCurrentUser();
+      if (!currentUser || currentUser.userType !== 'trainer' || !currentUser.user) {
+        router.push('/?login=trainer');
+        return false;
+      }
+      fetchClients(currentUser.user.id);
+      return true;
     }
 
-    fetchClients(currentUser.user.id);
+    if (!checkAuth()) return;
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        checkAuth();
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [router]);
 
   async function fetchClients(trainerId: string) {

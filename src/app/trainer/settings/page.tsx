@@ -50,20 +50,31 @@ export default function TrainerSettingsPage() {
   const [copiedMessage, setCopiedMessage] = useState('');
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
-
-    if (!currentUser || currentUser.userType !== 'trainer') {
-      router.push('/?login=trainer');
-      return;
+    function checkAuth() {
+      const currentUser = getCurrentUser();
+      if (!currentUser || currentUser.userType !== 'trainer') {
+        router.push('/?login=trainer');
+        return false;
+      }
+      const user = currentUser.user;
+      setTrainer(user);
+      setName(user.name || '');
+      setBusinessName(user.business_name || '');
+      setBrandColor(user.brand_color || '#f97316');
+      setEmail(user.email || '');
+      setLoading(false);
+      return true;
     }
 
-    const user = currentUser.user;
-    setTrainer(user);
-    setName(user.name || '');
-    setBusinessName(user.business_name || '');
-    setBrandColor(user.brand_color || '#f97316');
-    setEmail(user.email || '');
-    setLoading(false);
+    if (!checkAuth()) return;
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        checkAuth();
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [router]);
 
   async function handleSave(e: React.FormEvent) {

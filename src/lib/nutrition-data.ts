@@ -286,9 +286,8 @@ export const STARCHY_CARBOHYDRATES = [
   'Brown rice', 'Wild rice', 'Jasmine rice', 'Basmati rice',
   'Oatmeal', 'Steel cut oats',
   'Barley', 'Bulgur', 'Buckwheat', 'Millet', 'Spelt',
-  'Peas', 'Corn', 'Beans', 'Legumes',
-  'Lentils', 'Cannellini beans', 'Navy beans', 'Lima beans', 'Butter beans',
-  'Black Eyed Peas',
+  'Peas', 'Corn', 'Lentils', 'Kidney beans', 'Pinto beans', 'Black beans', 'Garbanzo beans', 'Chickpeas', 'Cannellini beans', 'Navy beans', 'Lima beans', 'Butter beans', 'Black Eyed Peas',
+  
   'Plantain', 'Parsnips', 'Acorn squash', 'Delicata squash',
 ];
 // Fresh or frozen, NO CANS
