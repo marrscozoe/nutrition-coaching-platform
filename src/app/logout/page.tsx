@@ -1,14 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 export default function LogoutPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const redirectTo = searchParams.get('redirect') || '/';
-
   useEffect(() => {
     // Clear ALL session data
     const TRAINER_SESSION_KEY = 'ncp_session_trainer';
@@ -33,11 +28,11 @@ export default function LogoutPage() {
       // 1. Clears the back-forward cache entry for this page
       // 2. Forces a network request (not served from bfcache)
       // 3. Adds a timestamp to bust any HTTP caches
-      window.location.href = `${redirectTo}?logged_out=1&t=${Date.now()}`;
+      window.location.href = `/?logged_out=1&t=${Date.now()}`;
     }, 50);
 
     return () => clearTimeout(timer);
-  }, [redirectTo]);
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center">
