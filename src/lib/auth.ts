@@ -77,6 +77,36 @@ function getStoredSession(userType: 'trainer' | 'client'): SessionData | null {
 }
 
 /**
+ * Unregister every service worker registration.
+ * This ensures no SW intercepts requests after logout,
+ * preventing cached trainer/client pages from being restored.
+ */
+async function unregisterServiceWorkers(): Promise<void> {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((reg) => reg.unregister()));
+  } catch (e) {
+    console.warn('[Auth] SW unregister failed:', e);
+  }
+}
+
+/**
+ * Delete every named cache in the Cache Storage API.
+ * Covers Workbox-managed precache and runtime caches,
+ * ensuring no stale authenticated pages are served after logout.
+ */
+async function clearAllCaches(): Promise<void> {
+  if (!('caches' in window)) return;
+  try {
+    const names = await caches.keys();
+    await Promise.all(names.map((name) => caches.delete(name)));
+  } catch (e) {
+    console.warn('[Auth] Cache clear failed:', e);
+  }
+}
+
+/**
  * Clear a specific session from localStorage
  */
 function clearSession(userType: 'trainer' | 'client'): void {
@@ -104,9 +134,18 @@ function extendSession(userType: 'trainer' | 'client'): void {
 
 export async function logout(): Promise<void> {
   try {
+    // Unregister ALL service workers first — this prevents the SW from
+    // intercepting the logout redirect and re-serving cached authenticated pages
+    // (e.g., /trainer dashboard) on back-button press after logout.
+    await unregisterServiceWorkers();
+
+    // Clear all browser caches — removes Workbox precached pages and runtime
+    // caches so no stale authenticated content can be served after sign-out.
+    await clearAllCaches();
+
     // Clear persistent sessions (30-day)
     clearAllSessions();
-    
+
     // Clear all user session data from localStorage (persists across tabs)
     localStorage.removeItem('trainer_user');
     localStorage.removeItem('trainer_user_type');
@@ -114,7 +153,7 @@ export async function logout(): Promise<void> {
     localStorage.removeItem('client_user_type');
     localStorage.removeItem('user'); // Legacy key cleanup
     localStorage.removeItem('userType'); // Legacy key cleanup
-    
+
     // Clear sessionStorage (per-tab session)
     sessionStorage.removeItem('trainer_user');
     sessionStorage.removeItem('trainer_user_type');
@@ -128,7 +167,7 @@ export async function logout(): Promise<void> {
     // Clear chat cleared flags
     const keysToRemove = Object.keys(sessionStorage).filter(k => k.startsWith('chat_cleared_'));
     keysToRemove.forEach(k => sessionStorage.removeItem(k));
-    
+
     // Clear chat history for the current user type
     const trainerData = localStorage.getItem('trainer_user');
     const trainerType = localStorage.getItem('trainer_user_type');
@@ -151,16 +190,16 @@ export async function logout(): Promise<void> {
         // ignore parse errors
       }
     }
-    
+
     // Sign out from Supabase (clears any auth session)
     await supabase.auth.signOut();
-    
+
     // Small delay to ensure cleanup completes
     await new Promise(resolve => setTimeout(resolve, 50));
-    
+
     // Clear sessionStorage right before redirect (belt-and-suspenders)
     sessionStorage.clear();
-    
+
     // Redirect to home using replace() so back button doesn't return to dashboard
     window.location.replace('/');
   } catch (error) {
