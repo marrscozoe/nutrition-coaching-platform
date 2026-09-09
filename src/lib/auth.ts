@@ -158,8 +158,11 @@ export async function logout(): Promise<void> {
     // Small delay to ensure cleanup completes
     await new Promise(resolve => setTimeout(resolve, 50));
     
-    // Redirect to home
-    window.location.href = '/';
+    // Clear sessionStorage right before redirect (belt-and-suspenders)
+    sessionStorage.clear();
+    
+    // Redirect to home using replace() so back button doesn't return to dashboard
+    window.location.replace('/');
   } catch (error) {
     console.error('Logout error:', error);
     // Even if signOut fails, still redirect

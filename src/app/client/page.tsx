@@ -326,7 +326,9 @@ export default function ClientDashboard() {
 
   // Recalculate remaining whenever recentMeals or targets change
   useEffect(() => {
-    if (recentMeals.length > 0 && client) {
+    // Guard: skip if targets are still at initial-0 state (before calculateDailyTargets runs).
+    // proteinTarget > 0 is a reliable sentinel for "targets have been initialized".
+    if (recentMeals.length > 0 && client && proteinTarget > 0) {
       recalculateRemainingFromMeals(
         recentMeals,
         proteinTarget,
