@@ -140,9 +140,13 @@ export default function ProfilePage() {
         const data = await res.json();
         setClient(data.user);
         sessionStorage.setItem('client_user', JSON.stringify(data.user));
+        setLoading(false); // Only show content after fresh DB phase is loaded
+      } else {
+        setLoading(false); // Still finish loading even on error
       }
     } catch (err) {
       console.error('Failed to fetch client data:', err);
+      setLoading(false); // Still finish loading even on error
     }
   }
 
@@ -154,11 +158,10 @@ export default function ProfilePage() {
       return;
     }
 
-    setClient(currentUser.user);
-
-    // Fetch fresh data from server to ensure phase and weights are current
+    // Do NOT set client from sessionStorage here — that may have stale phase (e.g. Phase 4
+    // while DB says Phase 1). Instead, wait for fetchClientData before rendering.
+    // fetchClientData will set client and then setLoading(false).
     fetchClientData(currentUser.user.id);
-    setLoading(false);
   }, [router]);
 
   async function handleLogout() {

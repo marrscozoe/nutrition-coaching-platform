@@ -226,8 +226,11 @@ export default function ClientDashboard() {
       const meals = data.meals || [];
       setRecentMeals(meals);
       // Recalculate remaining from all fetched meals using current target values
+      // Guard: skip if targets are still at initial-0 state (before calculateDailyTargets runs).
+      // proteinTarget is always > 0 for any real client, so it's a good sentinel for "initialized".
       if (
         proteinTargetVal !== undefined &&
+        proteinTargetVal > 0 && // Skip if still at initial-0 state
         vegTargetVal !== undefined &&
         fatTargetVal !== undefined &&
         starchTargetVal !== undefined &&

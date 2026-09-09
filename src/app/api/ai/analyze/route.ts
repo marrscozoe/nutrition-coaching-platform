@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db_get, db_hget, Client } from '@/lib/db';
+import { getAdminClient } from '@/lib/db';
 import { 
   CoachContext, 
   getCoachPrompt, 
@@ -158,16 +158,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Food description or photo required' }, { status: 400 });
     }
 
-    // Build client context - prefer passed parameters, fall back to Redis
+    // Build client context - ALWAYS read phase from DB to avoid stale/wrong phase
+    // from client state. Use passed parameters for other fields.
     let context: CoachContext;
-    
-    if (gender && currentPhase && goalWeight) {
-      // Use provided context
+
+    // Always fetch client data from DB (using getAdminClient to bypass RLS) to get authoritative phase
+    const supabase = getAdminClient();
+    const { data: clientData } = await supabase.from('clients').select('*').eq('id', clientId).single();
+
+    if (clientData) {
+      // Use DB for phase (authoritative source of truth), passed params for everything else
+      context = {
+        clientName: clientData.name || 'Client',
+        gender: gender || clientData.gender || 'male',
+        currentPhase: clientData.current_phase || 1, // Always from DB
+        goalWeight: goalWeight || clientData.goal_weight || 0,
+        currentWeight: currentWeight || clientData.current_weight || 0,
+        startingWeight: startingWeight || clientData.starting_weight || clientData.current_weight || 0,
+        programType: programType || clientData.program_type || 'general_health',
+        eventDate: eventDate || clientData.event_date,
+        weekNumber: weekNumber || (() => {
+          if (!clientData.goal_start_date) return 1;
+          const start = new Date(clientData.goal_start_date + 'T12:00:00');
+          const now = new Date();
+          const diffDays = Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000));
+          return Math.max(1, diffDays + 1);
+        })(),
+        trainerNotes: trainerNotes || clientData.notes,
+        mealType: validatedMealType,
+        // phase5Plan: passed param overrides DB; DB is parsed if present
+        phase5Plan: phase5Plan || (clientData.phase5_plan ? (typeof clientData.phase5_plan === 'string' ? JSON.parse(clientData.phase5_plan) : clientData.phase5_plan) : undefined) as Phase5Day[] | undefined,
+        phase5StartDate: phase5StartDate || clientData.phase5_start_date,
+        allergies: allergies || clientData.allergies || [],
+      };
+    } else {
+      // No DB record - use passed params with safe defaults
       context = {
         clientName: 'Client',
-        gender,
-        currentPhase,
-        goalWeight,
+        gender: gender || 'male',
+        currentPhase: 1, // Default phase when no DB record
+        goalWeight: goalWeight || 0,
         currentWeight: currentWeight || 0,
         startingWeight: startingWeight || currentWeight || 0,
         programType: programType || 'general_health',
@@ -179,50 +209,6 @@ export async function POST(request: NextRequest) {
         phase5StartDate,
         allergies: allergies || [],
       };
-    } else {
-      // Try to get from Redis
-      const clientData = await db_hget<Client>(`client:${clientId}`, 'data');
-      
-      if (clientData) {
-        context = {
-          clientName: clientData.name || 'Client',
-          gender: clientData.gender || 'male',
-          currentPhase: clientData.current_phase || 1,
-          goalWeight: clientData.goal_weight || 0,
-          currentWeight: clientData.current_weight || 0,
-          startingWeight: clientData.starting_weight || clientData.current_weight || 0,
-          programType: clientData.program_type || 'general_health',
-          eventDate: clientData.event_date,
-          weekNumber: (() => {
-            if (!clientData.goal_start_date) return 1;
-            const start = new Date(clientData.goal_start_date + 'T12:00:00');
-            const now = new Date();
-            const diffDays = Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000));
-            return Math.max(1, diffDays + 1);
-          })(),
-          trainerNotes: clientData.notes,
-          mealType: validatedMealType,
-          allergies: clientData.allergies || [],
-        };
-      } else {
-        // Default context
-        context = {
-          clientName: 'Client',
-          gender: 'male',
-          currentPhase: 1,
-          goalWeight: goalWeight || 0,
-          currentWeight: currentWeight || 0,
-          startingWeight: startingWeight || currentWeight || 0,
-          programType: programType || 'general_health',
-          eventDate,
-          weekNumber: weekNumber || 1,
-          trainerNotes,
-          mealType: validatedMealType,
-          phase5Plan: phase5Plan as Phase5Day[] | undefined,
-          phase5StartDate,
-          allergies: allergies || [],
-        };
-      }
     }
 
     // Helper to get tomorrow's starch message (only for dinner - the last meal of the day)
