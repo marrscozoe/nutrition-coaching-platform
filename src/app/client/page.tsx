@@ -66,6 +66,7 @@ export default function ClientDashboard() {
         if (currentUser && currentUser.userType === 'client') {
           // getCurrentUser() already extended the session; fetch fresh data
           fetchClientData(currentUser.user.id);
+          // Pass explicit primitives so the call is not affected by stale client-object closures
           fetchRecentMeals(
             currentUser.user.id,
             proteinTarget,
@@ -73,8 +74,8 @@ export default function ClientDashboard() {
             fatTarget,
             starchTarget,
             waterTarget,
-            client?.gender as 'male' | 'female',
-            client?.current_phase
+            client?.gender as 'male' | 'female' | undefined,
+            typeof client?.current_phase === 'number' ? client.current_phase : undefined
           );
         }
       }
@@ -337,7 +338,7 @@ export default function ClientDashboard() {
         client.current_phase
       );
     }
-  }, [recentMeals, proteinTarget, vegTarget, fatTarget, starchTarget, waterTarget, client]);
+  }, [recentMeals, proteinTarget, vegTarget, fatTarget, starchTarget, waterTarget, client?.id, client?.current_phase, client?.gender]);
 
   if (loading || !client) {
     return (

@@ -85,7 +85,9 @@ export default function ChatPage() {
     }
 
     const user = currentUser.user;
-    setClient(user);
+    // Do NOT set client from localStorage here — that may have a stale phase.
+    // Instead, fetch from DB (via /api/auth/me) inside the .then() chain
+    // and set client there, so the chat always operates with the authoritative phase.
 
     // Load chat history from sessionStorage (use client-specific key to prevent cross-contamination)
     const chatKey = `chat_history_${user.id}`;
@@ -315,6 +317,22 @@ export default function ChatPage() {
     }
 
     loadChatClearedFlag().then(async (clearedAt: string | null) => {
+      // Fetch authoritative client data from DB (phase source of truth) BEFORE
+      // loading messages and setting client state. This prevents the chat from
+      // ever using a stale phase from localStorage.
+      try {
+        const meRes = await fetch('/api/auth/me', {
+          headers: { 'x-client-id': user.id },
+        });
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          setClient(meData.user);
+          sessionStorage.setItem('client_user', JSON.stringify(meData.user));
+        }
+      } catch (err) {
+        console.error('Failed to fetch client data for chat:', err);
+      }
+
       setChatClearedAt(clearedAt);
       
       // Load past meals - returns { mode, messages } to avoid race conditions
