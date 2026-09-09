@@ -140,9 +140,25 @@ function extendSession(userType: 'trainer' | 'client'): void {
  * 3. No cached JavaScript context can re-execute after logout
  */
 export async function logout(): Promise<void> {
-  // Cancel any pending navigation and go to logout route directly.
-  // Using window.location.href = '/' ensures a full browser navigation,
-  // not a client-side route change that could be served from bfcache.
+  // SYNCHRONOUSLY clear all session data FIRST, before any navigation.
+  // This ensures that even if getCurrentUser() is called during the
+  // navigation race, the session is already gone from storage.
+  localStorage.removeItem(TRAINER_SESSION_KEY);
+  localStorage.removeItem(CLIENT_SESSION_KEY);
+  localStorage.removeItem('trainer_user');
+  localStorage.removeItem('trainer_user_type');
+  localStorage.removeItem('client_user');
+  localStorage.removeItem('client_user_type');
+  localStorage.removeItem('user');
+  localStorage.removeItem('userType');
+  sessionStorage.removeItem('trainer_user');
+  sessionStorage.removeItem('trainer_user_type');
+  sessionStorage.removeItem('client_user');
+  sessionStorage.removeItem('client_user_type');
+  sessionStorage.removeItem('user');
+  sessionStorage.removeItem('userType');
+
+  // Now navigate to /logout for full server-side cleanup and redirect.
   window.location.href = '/logout?redirect=/';
 }
 
