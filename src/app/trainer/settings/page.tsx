@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Toast from '@/components/Toast';
-import { getCurrentUser } from '@/lib/auth';
+import { logout, getCurrentUser } from '@/lib/auth';
 
 interface TrainerData {
   id: string;
@@ -469,12 +469,8 @@ export default function TrainerSettingsPage() {
             🐛 Report a Problem
           </button>
           <button
-            onClick={() => {
-              sessionStorage.removeItem('trainer_user');
-              sessionStorage.removeItem('trainer_user_type');
-              sessionStorage.removeItem('user'); // Legacy cleanup
-              sessionStorage.removeItem('userType'); // Legacy cleanup
-              router.push('/');
+            onClick={async () => {
+              await logout();
             }}
             className="w-full py-3 rounded-xl bg-red-500/20 text-red-400 font-medium hover:bg-red-500/30 transition-colors"
           >
