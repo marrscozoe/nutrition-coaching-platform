@@ -151,6 +151,7 @@ export default function ChatPage() {
                     mealType: pendingMealData.mealType,
                     foodDescription: pendingMealData.foodDescription,
                     messedUp: pendingMealData.messedUp,
+                    mealDate: pendingMealData.mealDate,
                   }
                 }),
               });

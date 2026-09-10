@@ -164,7 +164,9 @@ export default function ClientDashboard() {
     const todaysMeals = meals.filter(meal => {
       let mealDateStr = meal.meal_date;
       if (!mealDateStr && meal.logged_at) {
-        mealDateStr = new Date(meal.logged_at + 'T12:00:00').toLocaleDateString('en-CA');
+        // Parse logged_at (ISO UTC string) as a proper Date, then convert to local date.
+        // Do NOT concatenate 'T12:00:00' onto an ISO string — that creates Invalid Date.
+        mealDateStr = new Date(meal.logged_at).toLocaleDateString('en-CA');
       }
       return mealDateStr === today;
     });
