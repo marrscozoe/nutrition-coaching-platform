@@ -159,6 +159,20 @@ assertApprox(t5.proteinOz, 2, 'proteinOz');
 assertApprox(t5.fatTbsp, 1, 'fatTbsp (1/2 avocado = 1 tbsp)');
 console.log('NEW TEST 5: PASS\n');
 
+console.log('\n=== NEW TEST 6: ground beef in compound meal ===');
+// "20oz water 4oz ground beef 1 cup green beans 1 tablespoon olive oil"
+// Ground beef: 4oz protein; Water: 20oz plain; Green beans: 1 cup veg; Olive oil: 1 tbsp fat
+const t6 = parseFoodDescriptionToPortions('20oz water 4oz ground beef 1 cup green beans 1 tablespoon olive oil');
+console.log('  proteinOz:', t6.proteinOz, '(expected: 4)');
+console.log('  waterOz:', t6.waterOz, '(expected: 20)');
+console.log('  vegCups:', t6.vegCups, '(expected: 1)');
+console.log('  fatTbsp:', t6.fatTbsp, '(expected: 1)');
+assertApprox(t6.proteinOz, 4, 'proteinOz (ground beef)');
+assertApprox(t6.waterOz, 20, 'waterOz');
+assertApprox(t6.vegCups, 1, 'vegCups');
+assertApprox(t6.fatTbsp, 1, 'fatTbsp');
+console.log('NEW TEST 6: PASS\n');
+
 // =============================================================================
 // ORDER-INDEPENDENCE TEST
 // parse("A, B, C") === parse("A") + parse("B") + parse("C")

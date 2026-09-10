@@ -127,7 +127,7 @@ export default function ChatPage() {
           const mealContent = `📸 ${pendingMealData.mealType.toUpperCase()} — ${dateStr}\n${pendingMealData.foodDescription}`;
 
           const userMessage: ChatMessage = {
-            id: `meal_${pendingMealData.id}_${Date.now()}`,
+            id: `meal-${pendingMealData.id}-user`,
             role: 'user',
             content: mealContent,
             timestamp: new Date(),
