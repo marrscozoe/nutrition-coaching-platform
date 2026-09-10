@@ -168,12 +168,21 @@ export default function ClientDashboard() {
     setVegTarget(vegTargetVal);
     setFatTarget(fatTargetVal);
     setStarchTarget(starchTargetVal);
+    // Initialize remaining to targets (no meals deducted yet).
+    // When recalculateRemainingFromMeals runs with fetched meals it will deduct accordingly.
+    setProteinRemaining(proteinOz);
+    setVegRemaining(vegTargetVal);
+    setFatRemaining(fatTargetVal);
+    if (starchTargetVal > 0) {
+      setStarchRemaining(starchTargetVal);
+    }
 
     // Water: extract oz from getWaterReminder (male=128, female=80)
     const waterReminder = getWaterReminder(clientData.gender as 'male' | 'female');
     const waterOzMatch = waterReminder.match(/(\d+) oz daily/);
     const waterTargetVal = waterOzMatch ? parseInt(waterOzMatch[1]) : (clientData.gender === 'male' ? 128 : 80);
     setWaterTarget(waterTargetVal);
+    setWaterRemaining(waterTargetVal);
 
   }
 
