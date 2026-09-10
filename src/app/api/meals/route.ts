@@ -410,3 +410,60 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to log meal' }, { status: 500 });
   }
 }
+
+// DELETE - Delete a meal by ID
+export async function DELETE(request: NextRequest) {
+  let supabase;
+  try {
+    supabase = getAdminClient();
+  } catch (e) {
+    console.error('Admin client not available:', e);
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+  }
+
+  try {
+    const clientId = request.headers.get('x-client-id');
+    if (!clientId) {
+      return NextResponse.json({ error: 'Client ID required' }, { status: 401 });
+    }
+
+    // Extract meal ID from the URL path: /api/meals/:id
+    const url = new URL(request.url);
+    const pathParts = url.pathname.split('/');
+    const mealId = pathParts[pathParts.length - 1];
+
+    if (!mealId || mealId === 'meals') {
+      return NextResponse.json({ error: 'Meal ID required' }, { status: 400 });
+    }
+
+    // Verify the meal belongs to this client
+    const { data: existingMeal, error: fetchError } = await supabase
+      .from('meals')
+      .select('id, client_id')
+      .eq('id', mealId)
+      .single();
+
+    if (fetchError || !existingMeal) {
+      return NextResponse.json({ error: 'Meal not found' }, { status: 404 });
+    }
+
+    if (existingMeal.client_id !== clientId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('meals')
+      .delete()
+      .eq('id', mealId);
+
+    if (deleteError) {
+      console.error('Delete meal error:', deleteError);
+      return NextResponse.json({ error: 'Failed to delete meal' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, mealId });
+  } catch (error) {
+    console.error('Delete meal error:', error);
+    return NextResponse.json({ error: 'Failed to delete meal' }, { status: 500 });
+  }
+}
