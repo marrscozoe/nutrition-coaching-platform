@@ -430,14 +430,14 @@ export async function DELETE(request: NextRequest) {
     // Extract meal ID from URL path /api/meals/:id OR from query param
     const url = new URL(request.url);
     const pathParts = url.pathname.split('/');
-    let mealId = pathParts[pathParts.length - 1];
+    let mealId: string | null = pathParts[pathParts.length - 1];
     if (!mealId || mealId === 'meals') {
       // Fallback: try query param or body
-      mealId = url.searchParams.get('mealId') || url.searchParams.get('id');
+      mealId = url.searchParams.get('mealId') ?? url.searchParams.get('id') ?? null;
     }
     if (!mealId) {
       // Try body for DELETE (workaround for route.ts limitation)
-      try { const body = await request.json(); mealId = body.mealId || body.id; } catch {}
+      try { const body = await request.json(); mealId = (body.mealId || body.id) ?? null; } catch {}
     }
     if (!mealId) {
       return NextResponse.json({ error: 'Meal ID required' }, { status: 400 });
