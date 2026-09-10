@@ -368,7 +368,6 @@ export default function ClientDashboard() {
 
   // Recalculate remaining whenever recentMeals changes (after fetch resolves)
   // or when any target value changes (after calculateDailyTargets sets them).
-  // The guard (proteinTarget > 0) ensures we skip the initial-0 state.
   useEffect(() => {
     if (recentMeals.length > 0 && client && proteinTarget > 0) {
       recalculateRemainingFromMeals(
@@ -382,7 +381,7 @@ export default function ClientDashboard() {
         client.current_phase
       );
     }
-  }, [recentMeals, client?.id, client?.current_phase, client?.gender]);
+  }, [recentMeals, proteinTarget, client?.id, client?.current_phase, client?.gender]);
 
   // Separate effect: when proteinTarget transitions from 0 → positive (after
   // calculateDailyTargets runs), recentMeals may already be populated — recalculate.
