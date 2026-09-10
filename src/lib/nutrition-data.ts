@@ -894,7 +894,16 @@ export function extractWaterOzFromDescription(foodDescription: string, defaultPe
   if (!foodDescription) return 0;
 
   // Split on period/comma/semicolon/newline to isolate individual clauses.
-  const clauses = foodDescription.split(/[,;\n]+|\.\s*/).map(s => s.trim()).filter(Boolean);
+  // Also split on amount-unit boundaries so "20oz water 12oz coffee" → separate items.
+  const rawClauses = foodDescription.split(/[,;\n]+|\.\s*/);
+  const clauses: string[] = [];
+  for (const raw of rawClauses) {
+    const parts = raw.split(/\s+(?=\d{1,4}(?:\.[\d]+)?(?:\s*\/\s*\d+)?\s*(?:oz|ounce|tbsp|tablespoons?|cups?|handfuls?|egg|eggs)\b)/gi);
+    for (const p of parts) {
+      const t = p.trim();
+      if (t) clauses.push(t);
+    }
+  }
 
   let totalOz = 0;
   let hasPlainWater = false;
@@ -937,11 +946,11 @@ export function extractWaterOzFromDescription(foodDescription: string, defaultPe
       totalOz += n;
     }
 
-    // Try bare "N oz" when the clause is purely water (no other food words present).
+    // Try bare "N oz" only if numBeforeUnit/numAfterWater found nothing.
     // This handles structured log entries like "Water\n24 oz" where water and amount are
     // in separate parsed fields.
     const FOOD_WORDS = /\b(chicken|beef|fish|egg|steek|broccoli|spinach|rice|bread|potato|cream|oil|avocado|butter|nuts|salad|meat|protein|carbs|starch|fat|fiber)\b/;
-    if (!FOOD_WORDS.test(lower) && lower.trim() !== 'water') {
+    if (numBeforeUnit.length === 0 && numAfterWater.length === 0 && !FOOD_WORDS.test(lower) && lower.trim() !== 'water') {
       const bareOz = (lower.match(/\b(\d+(?:\.\d+)?)\s*oz\b/gi)) || [];
       for (const m of bareOz) {
         const n = parseFloat((m.match(/(\d+(?:\.\d+)?)/) || [])[1] || '0');
@@ -969,7 +978,16 @@ export function mealContainsPlainWater(foodDescription: string): boolean {
   // Split by common delimiters (comma, newline, AND period) to isolate individual
   // food/beverage items. This ensures "24oz water. 12 oz coffee..." splits into
   // separate clauses so coffee exclusion does not wipe out plain water detection.
-  const items = foodDescription.toLowerCase().split(/[,;\n]+|\.\s*/).map(s => s.trim()).filter(Boolean);
+  // Also split on amount-unit boundaries so "20oz water 12oz coffee" → ["20oz water", "12oz coffee"].
+  const rawItems = foodDescription.toLowerCase().split(/[,;\n]+|\.\s*/);
+  const items: string[] = [];
+  for (const raw of rawItems) {
+    const chunks = raw.split(/\s+(?=\d{1,4}(?:\.[\d]+)?(?:\s*\/\s*\d+)?\s*(?:oz|ounce|tbsp|tablespoons?|cups?|handfuls?|egg|eggs)\b)/gi);
+    for (const c of chunks) {
+      const t = c.trim();
+      if (t) items.push(t);
+    }
+  }
   for (const item of items) {
     // Must contain the word "water"
     if (!item.includes('water')) continue;
@@ -1128,21 +1146,53 @@ function parseFraction(s: string): number {
 
 /**
  * Extract a numeric amount from an item string.
- * Returns the amount (defaulting to 1) and the unit string.
+ * If foodPos >= 0, finds the number closest to (and before) the food token position
+ * within the item string — so the amount binds to the correct food, not an earlier
+ * number from a different food in the same undelimited run.
+ * If no nearby number is found, falls back to the first number in the string.
  * Handles fractions ("1/2", "3/4"), decimals ("1.5"), ranges ("1-2" uses max).
  * Returns { amount, unit }.
  */
-function extractAmount(item: string): { amount: number; unit: string } {
-  // Match: number (int/float/fraction/range) then whitespace then unit word
-  // Units: oz, cups, cup, tbsp, tablespoons, handful, handfuls, egg, eggs, etc.
-  const pattern = /([\d]+(?:\.[\d]+)?(?:\s*\/\s*[\d]+)?|(?:[\d]+\s*\/\s*[\d]+))\s*(oz|ounce|ounces|cups?|tbsp|tablespoons?|handfuls?|handful|egg|eggs)\b/i;
-  const match = pattern.exec(item);
-  if (!match) return { amount: 1, unit: '' };
+function extractAmount(item: string, foodPos: number = -1): { amount: number; unit: string } {
+  // Match all number+unit pairs in the item string with their start positions.
+  const pattern = /([\d]+(?:\.[\d]+)?(?:\s*\/\s*[\d]+)?|(?:[\d]+\s*\/\s*[\d]+))\s*(oz|ounce|ounces|cups?|tbsp|tablespoons?|handfuls?|handful|egg|eggs)\b/gi;
+  const matches: { amountStr: string; unit: string; start: number; end: number }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(item)) !== null) {
+    matches.push({ amountStr: m[1].trim(), unit: m[2].toLowerCase(), start: m.index, end: m.index + m[0].length });
+  }
+  if (matches.length === 0) return { amount: 1, unit: '' };
+  if (matches.length === 1) {
+    // Single match — use it
+    const match = matches[0];
+    const { amount, unit } = parseAmountStr(match.amountStr, match.unit);
+    return { amount, unit };
+  }
 
-  let amountStr = match[1].trim();
-  const unit = match[2].toLowerCase();
+  // Multiple matches — pick the one closest to and before the food token.
+  // If foodPos is before all matches, use the first match (amount precedes the food).
+  // If foodPos is after all matches, use the last match (food precedes amount — unusual but possible).
+  let best = matches[0];
+  let bestDist = Infinity;
+  for (const match of matches) {
+    // Distance: how far the amount starts before the food token (prefer negative = before)
+    const dist = foodPos >= 0 ? foodPos - match.start : 0;
+    // Only consider amounts that appear before or at the food token
+    if (dist >= 0 && dist < bestDist) {
+      bestDist = dist;
+      best = match;
+    }
+  }
+  // If nothing was before the food token (all amounts came after), use the last match
+  // (e.g., "water 20 oz" where oz comes after)
+  if (bestDist === Infinity) {
+    best = matches[matches.length - 1];
+  }
 
-  // Handle fractions like "1/2", "3/4"
+  return parseAmountStr(best.amountStr, best.unit);
+}
+
+function parseAmountStr(amountStr: string, unit: string): { amount: number; unit: string } {
   if (amountStr.includes('/')) {
     const parts = amountStr.split('/');
     if (parts.length === 2) {
@@ -1153,15 +1203,49 @@ function extractAmount(item: string): { amount: number; unit: string } {
       }
     }
   }
-
-  // Handle range "1-2" → use max
   if (/^\d+\s*-\s*\d+$/.test(amountStr)) {
     const parts = amountStr.split('-').map(s => parseFloat(s.trim()));
     return { amount: Math.max(parts[0], parts[1]), unit };
   }
-
   const amount = parseFloat(amountStr);
   return { amount: isNaN(amount) ? 1 : amount, unit };
+}
+
+/**
+ * Find the character position of the matched food token within the item string.
+ * Uses the same matching logic as classifyFoodItem but returns the start index.
+ * Returns -1 if not found.
+ */
+function findFoodTokenPosition(item: string, category: 'protein' | 'veg' | 'fat' | 'starch'): number {
+  const lower = item.toLowerCase();
+  const foodLists: Record<string, string[]> = {
+    protein: LEAN_PROTEINS,
+    veg: FIBROUS_VEGETABLES,
+    fat: HEALTHY_FATS,
+    starch: STARCHY_CARBOHYDRATES,
+  };
+  for (const foodName of foodLists[category]) {
+    const fnBase = (() => { const idx = foodName.indexOf('('); return idx >= 0 ? foodName.substring(0, idx).trim() : foodName.trim(); })();
+    const fnLower = fnBase.toLowerCase();
+    if (!fnLower) continue;
+    const escaped = fnLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, 'i');
+    const match = pattern.exec(lower);
+    if (match) return match.index;
+    // Try singular/plural bridge
+    const words = fnLower.split(' ');
+    const lastWord = words[words.length - 1];
+    let singularBase: string | null = null;
+    if (lastWord.endsWith('es') && lastWord.length > 3) singularBase = words.slice(0, -1).concat([lastWord.slice(0, -2)]).join(' ');
+    else if (lastWord.endsWith('s') && lastWord.length > 2) singularBase = words.slice(0, -1).concat([lastWord.slice(0, -1)]).join(' ');
+    if (singularBase && singularBase.length > 2 && singularBase !== fnLower) {
+      const singEscaped = singularBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const singPattern = new RegExp(`(?:^|[^a-z0-9])${singEscaped}(?:$|[^a-z0-9])`, 'i');
+      const singMatch = singPattern.exec(lower);
+      if (singMatch) return singMatch.index;
+    }
+  }
+  return -1;
 }
 
 /**
@@ -1295,18 +1379,25 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
   if (!foodDescription || foodDescription.trim() === '') return result;
 
   // Split food description into individual items.
-  // First split on major delimiters (comma, semicolon, newline), then
+  // Split on major delimiters (comma, semicolon, newline, PERIOD), then
   // further split each chunk on " with " and " and " to isolate each food item.
-  const rawItems = foodDescription.split(/[,;\n]+/);
+  // Also split on amount-unit boundaries so "20oz water 12oz coffee" splits
+  // into ["20oz water", "12oz coffee"] before classification.
+  const rawItems = foodDescription.split(/[,;\n]+|\.\s*/);
   const items: string[] = [];
   for (const raw of rawItems) {
     // Split on " with " or " and " to separate compound descriptions.
     // E.g. "12oz coffee with 1 tbsp heavy cream and 1 tbsp sugar"
     //   → ["12oz coffee", "1 tbsp heavy cream", "1 tbsp sugar"]
-    const parts = raw.split(/\s+(?:with|and)\s+/i);
-    for (const p of parts) {
-      const trimmed = p.trim();
-      if (trimmed) items.push(trimmed);
+    const andSplit = raw.split(/\s+(?:with|and)\s+/i);
+    for (const chunk of andSplit) {
+      // Also split on amount-unit boundaries when no other delimiter exists.
+      // This splits "20oz water 12oz coffee" → ["20oz water", "12oz coffee"]
+      const unitSplit = chunk.split(/\s+(?=\d{1,4}(?:\.\d+)?(?:\s*\/\s*\d+)?\s*(?:oz|ounce|tbsp|tablespoons?|cups?|handfuls?|egg|eggs)\b)/gi);
+      for (const p of unitSplit) {
+        const trimmed = p.trim();
+        if (trimmed) items.push(trimmed);
+      }
     }
   }
 
@@ -1318,7 +1409,11 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
     const lower = item.toLowerCase();
     if (lower.includes('egg white') || lower.includes('egg whites')) continue;
 
-    const { amount, unit } = extractAmount(item);
+    // Find the position of the food token within the item string so we can
+    // extract the amount that is closest to (and therefore bound to) that token —
+    // NOT the first number in the whole string.
+    const foodPos = findFoodTokenPosition(item, category);
+    const { amount, unit } = extractAmount(item, foodPos);
     const normalized = normalizeToCategoryUnit(amount, unit, category);
 
     switch (category) {

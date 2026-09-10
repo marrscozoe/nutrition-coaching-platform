@@ -1,0 +1,13 @@
+{
+  "traceSchema": "openclaw-trajectory",
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-09T21:28:16.851Z",
+  "traceId": "ac6a33be-4288-4ed9-8679-5a19ee638c06",
+  "sessionId": "ac6a33be-4288-4ed9-8679-5a19ee638c06",
+  "sessionKey": "agent:main:dashboard:12f24c20-c52d-4449-b6da-4c42215c5854",
+  "system": "[Oversized diagnostic JSON redacted]",
+  "submittedPrompts": [
+    "[Malformed diagnostic JSON redacted]"
+  ],
+  "latestSubmittedPrompt": "[Malformed diagnostic JSON redacted]"
+}

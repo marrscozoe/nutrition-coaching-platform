@@ -1,0 +1,306 @@
+{
+  "traceSchema": "openclaw-trajectory",
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-09T21:28:16.851Z",
+  "traceId": "ac6a33be-4288-4ed9-8679-5a19ee638c06",
+  "sessionId": "ac6a33be-4288-4ed9-8679-5a19ee638c06",
+  "sessionKey": "agent:main:dashboard:12f24c20-c52d-4449-b6da-4c42215c5854",
+  "harness": {
+    "type": "openclaw",
+    "name": "OpenClaw",
+    "version": "2026.8.2",
+    "os": {
+      "platform": "darwin",
+      "arch": "arm64",
+      "release": "25.6.0",
+      "label": "macos 26.6.2 (arm64)"
+    },
+    "runtime": {
+      "node": "v24.18.0"
+    },
+    "invocation": [
+      "/opt/homebrew/Cellar/node@24/24.18.0/bin/node",
+      "/opt/homebrew/lib/node_modules/openclaw/dist/index.js",
+      "gateway",
+      "--port",
+      "18789"
+    ],
+    "entrypoint": "/opt/homebrew/lib/node_modules/openclaw/dist/index.js",
+    "workspaceDir": "$OPENCLAW_STATE_DIR/workspace/main",
+    "sessionFile": "$OPENCLAW_STATE_DIR/agent:main:dashboard:12f24c20-c52d-4449-b6da-4c42215c5854"
+  },
+  "model": {
+    "provider": "minimax",
+    "name": "MiniMax-M2.7",
+    "api": "anthropic-messages",
+    "fastMode": false,
+    "thinkLevel": "medium",
+    "reasoningLevel": "off"
+  },
+  "config": {
+    "redacted": {
+      "meta": {
+        "lastTouchedVersion": "2026.8.2",
+        "migrations": {
+          "modelPolicyAllowlist": true
+        }
+      },
+      "wizard": {
+        "lastRunAt": "2026-09-02T18:14:10.847Z",
+        "lastRunVersion": "2026.8.2",
+        "lastRunCommand": "doctor",
+        "lastRunMode": "local"
+      },
+      "browser": {
+        "defaultProfile": "openclaw",
+        "profiles": {
+          "openclaw": {
+            "cdpUrl": "http://127.0.0.1:9222"
+          },
+          "imported": {
+            "cdpPort": 18800
+          }
+        }
+      },
+      "auth": {
+        "profiles": {
+          "minimax:default": {
+            "provider": "minimax",
+            "mode": "api_key"
+          },
+          "minimax:global": {
+            "provider": "minimax",
+            "mode": "api_key"
+          }
+        }
+      },
+      "models": {
+        "mode": "merge",
+        "providers": {
+          "ollama": {
+            "baseUrl": "http://127.0.0.1:11434",
+            "models": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            }
+          },
+          "minimax": {
+            "baseUrl": "https://api.minimax.io/anthropic",
+            "api": "anthropic-messages",
+            "authHeader": true,
+            "models": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            }
+          }
+        }
+      },
+      "agents": {
+        "ownership": "explicit",
+        "defaults": {
+          "model": {
+            "primary": "minimax/MiniMax-M2.7",
+            "fallbacks": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            }
+          },
+          "models": {
+            "minimax/MiniMax-M2.5": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "minimax/MiniMax-M2.7": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "minimax/MiniMax-M3": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            }
+          },
+          "modelPolicy": {
+            "allow": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            }
+          },
+          "workspace": "$OPENCLAW_STATE_DIR/workspace",
+          "compaction": {
+            "mode": "safeguard"
+          },
+          "thinkingDefault": "medium",
+          "systemAgent": {
+            "agentId": "main"
+          },
+          "maxConcurrent": 4,
+          "subagents": {
+            "allowAgents": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "maxConcurrent": 8,
+            "model": "minimax/MiniMax-M2.7",
+            "runTimeoutSeconds": 900,
+            "archiveAfterMinutes": 60
+          }
+        },
+        "entries": {
+          "main": {
+            "skills": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "identity": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "subagents": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "tools": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            }
+          },
+          "builder": {
+            "name": "builder",
+            "workspace": "$OPENCLAW_STATE_DIR/workspace",
+            "agentDir": "$OPENCLAW_STATE_DIR/agents/builder/agent",
+            "model": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "skills": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "identity": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "subagents": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "tools": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            }
+          },
+          "tester": {
+            "name": "tester",
+            "workspace": "$OPENCLAW_STATE_DIR/workspace",
+            "agentDir": "$OPENCLAW_STATE_DIR/agents/tester/agent",
+            "model": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "skills": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "identity": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "subagents": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "tools": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            }
+          },
+          "qa-loop": {
+            "name": "qa-loop",
+            "workspace": "$OPENCLAW_STATE_DIR/workspace",
+            "agentDir": "$OPENCLAW_STATE_DIR/agents/qa-loop",
+            "skills": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "identity": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "subagents": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "tools": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            }
+          },
+          "sage": {
+            "name": "sage",
+            "workspace": "$OPENCLAW_STATE_DIR/workspace",
+            "agentDir": "$OPENCLAW_STATE_DIR/agents/sage/agent",
+            "model": {
+              "truncated": true,
+              "reason": "trajectory-depth-limit",
+              "limitDepth": 6
+            },
+            "skills": "[Truncated]",
+            "identity": "[Truncated]",
+            "subagents": "[Truncated]",
+            "tools": "[Truncated]"
+          },
+          "grim": "[Truncated]",
+          "nova": "[Truncated]",
+          "rank": "[Truncated]",
+          "copy": "[Truncated]",
+          "visual": "[Truncated]",
+          "deploy": "[Truncated]",
+          "data": "[Truncated]",
+          "client": "[Truncated]"
+        }
+      },
+      "tools": "[Truncated]",
+      "bindings": "[Truncated]",
+      "messages": "[Truncated]",
+      "tts": "[Truncated]",
+      "commands": "[Truncated]",
+      "channels": "[Truncated]",
+      "gateway": "[Truncated]",
+      "memory": "[Truncated]",
+      "skills": "[Truncated]",
+      "plugins": "[Truncated]"
+    },
+    "runtime": "[Truncated]"
+  },
+  "plugins": "[Truncated]",
+  "skills": "[Truncated]",
+  "prompting": "[Truncated]",
+  "redaction": "[Truncated]",
+  "metadata": "[Truncated]"
+}
