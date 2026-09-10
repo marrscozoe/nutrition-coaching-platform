@@ -6,7 +6,7 @@ import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
 import { logout, getCurrentUser } from '@/lib/auth';
-import { getPhaseGuidance, getPortions, getWaterReminder, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies, mealContainsPlainWater, parseFoodDescriptionToPortions, cleanDisplayNumber } from '@/lib/nutrition-data';
+import { getPhaseGuidance, getPortions, getWaterReminder, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies, mealContainsPlainWater, parseFoodDescriptionToPortions, cleanDisplayNumber, extractWaterOzFromDescription } from '@/lib/nutrition-data';
 
 interface ClientData {
   id: string;
@@ -222,22 +222,10 @@ export default function ClientDashboard() {
       totalVegCups += portions.vegCups;
       totalFatTbsp += portions.fatTbsp;
       totalStarchCups += portions.starchCups;
-      // Water: plain water only; per-meal amount only when plain water was logged
-      if (mealContainsPlainWater(meal.food_description)) {
-        const waterPerMeal = gender === 'male' ? 32 : 20;
-        // Try to parse explicit oz from the food description
-        const waterOzMatch = meal.food_description.match(/(\d+(?:\.\d+)?)\s*oz\s*water/gi);
-        if (waterOzMatch) {
-          let explicitOz = 0;
-          for (const m of waterOzMatch) {
-            const oz = parseFloat(m.match(/(\d+(?:\.\d+)?)/)?.[1] || '0');
-            explicitOz += oz;
-          }
-          totalWaterOz += explicitOz;
-        } else {
-          totalWaterOz += waterPerMeal;
-        }
-      }
+      // Water: use extractWaterOzFromDescription which handles all orderings
+      // (N oz water, water N oz, 24oz water, plain-water-only lines).
+      const waterPerMeal = gender === 'male' ? 32 : 20;
+      totalWaterOz += extractWaterOzFromDescription(meal.food_description || '', waterPerMeal);
     }
 
     setProteinRemaining(Math.max(0, proteinTargetVal - totalProteinOz));

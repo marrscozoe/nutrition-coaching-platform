@@ -878,6 +878,87 @@ export function getWaterReminder(gender: 'male' | 'female'): string {
 }
 
 /**
+ * Extract total plain-water ounces from a food description string.
+ * Handles multiple formats:
+ *   - "24 oz water"      (number before unit)
+ *   - "water 24 oz"      (unit before number)
+ *   - "24oz water"       (no space before unit)
+ *   - "Water 24oz"       (capitalized, no space)
+ *   - "24 oz" on a line/field that is purely plain water (no other food)
+ * Only counts water from items confirmed plain by mealContainsPlainWater().
+ *
+ * Returns the sum of all matched oz values. If no explicit oz found but plain
+ * water is present, returns the per-meal default (caller passes gender-based default).
+ */
+export function extractWaterOzFromDescription(foodDescription: string, defaultPerMealOz: number): number {
+  if (!foodDescription) return 0;
+
+  // Split on period/comma/semicolon/newline to isolate individual clauses.
+  const clauses = foodDescription.split(/[,;\n]+|\.\s*/).map(s => s.trim()).filter(Boolean);
+
+  let totalOz = 0;
+  let hasPlainWater = false;
+
+  for (const clause of clauses) {
+    const lower = clause.toLowerCase();
+    if (!lower.includes('water')) continue;
+
+    // Check exclusions (same logic as mealContainsPlainWater).
+    if (
+      lower.includes('sparkling') ||
+      lower.includes('flavored') ||
+      lower.includes('flavoured') ||
+      lower.includes('vitamin') ||
+      lower.includes('coconut') ||
+      lower.includes('juice') ||
+      lower.includes('soda') ||
+      lower.includes('broth') ||
+      lower.includes('coffee') ||
+      lower.includes('tea ') ||
+      lower.includes('tea,') ||
+      lower.includes('tea.')
+    ) {
+      continue;
+    }
+
+    hasPlainWater = true;
+
+    // Try "N oz water" and "N ozwater" (no space before unit) — gather all numbers.
+    const numBeforeUnit = (lower.match(/(\d+(?:\.\d+)?)\s*oz\s*water/gi)) || [];
+    for (const m of numBeforeUnit) {
+      const n = parseFloat((m.match(/(\d+(?:\.\d+)?)/) || [])[1] || '0');
+      totalOz += n;
+    }
+
+    // Try "water N oz" — the number comes after "water".
+    const numAfterWater = (lower.match(/water\s+(\d+(?:\.\d+)?)\s*oz/gi)) || [];
+    for (const m of numAfterWater) {
+      const n = parseFloat((m.match(/(\d+(?:\.\d+)?)/) || [])[1] || '0');
+      totalOz += n;
+    }
+
+    // Try bare "N oz" when the clause is purely water (no other food words present).
+    // This handles structured log entries like "Water\n24 oz" where water and amount are
+    // in separate parsed fields.
+    const FOOD_WORDS = /\b(chicken|beef|fish|egg|steek|broccoli|spinach|rice|bread|potato|cream|oil|avocado|butter|nuts|salad|meat|protein|carbs|starch|fat|fiber)\b/;
+    if (!FOOD_WORDS.test(lower) && lower.trim() !== 'water') {
+      const bareOz = (lower.match(/\b(\d+(?:\.\d+)?)\s*oz\b/gi)) || [];
+      for (const m of bareOz) {
+        const n = parseFloat((m.match(/(\d+(?:\.\d+)?)/) || [])[1] || '0');
+        totalOz += n;
+      }
+    }
+  }
+
+  // If we found plain water but no explicit oz, use the per-meal default.
+  if (hasPlainWater && totalOz === 0) {
+    return defaultPerMealOz;
+  }
+
+  return totalOz;
+}
+
+/**
  * Returns true if a meal's food_description contains plain water.
  * Plain water = water with no additives, no flavor, no caffeine, no calories.
  * Excludes: coffee, tea, soda, sparkling flavored drinks, broth, juice,
@@ -885,8 +966,10 @@ export function getWaterReminder(gender: 'male' | 'female'): string {
  */
 export function mealContainsPlainWater(foodDescription: string): boolean {
   if (!foodDescription) return false;
-  // Split by common delimiters to isolate individual food/beverage items
-  const items = foodDescription.toLowerCase().split(/[,\n]+/).map(s => s.trim());
+  // Split by common delimiters (comma, newline, AND period) to isolate individual
+  // food/beverage items. This ensures "24oz water. 12 oz coffee..." splits into
+  // separate clauses so coffee exclusion does not wipe out plain water detection.
+  const items = foodDescription.toLowerCase().split(/[,;\n]+|\.\s*/).map(s => s.trim()).filter(Boolean);
   for (const item of items) {
     // Must contain the word "water"
     if (!item.includes('water')) continue;
