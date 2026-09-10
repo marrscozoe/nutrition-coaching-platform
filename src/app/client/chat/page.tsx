@@ -310,12 +310,15 @@ export default function ChatPage() {
     // Load chat cleared flag from DB and then conditionally load past data
     // Use Promise.all to properly await both async functions and avoid race conditions
     // IMPORTANT: Read pending_meal_data BEFORE loadPastMeals runs to avoid duplicate
+    // CRITICAL: Clear pending_meal_data SYNCHRONOUSLY at the top of the useEffect,
+    // before the async chain starts. This prevents any re-render from re-reading it.
+    // It is consumed here (via loadPastMeals) and must not be available to any other
+    // useEffect or re-entrant call.
     const pendingMeal = sessionStorage.getItem('pending_meal_data');
-    const pendingMealData = pendingMeal ? JSON.parse(pendingMeal) : null;
-    // Clear it early so processMealData won't also add it (we'll add it via loadPastMeals with proper formatting)
     if (pendingMeal) {
       sessionStorage.removeItem('pending_meal_data');
     }
+    const pendingMealData = pendingMeal ? JSON.parse(pendingMeal) : null;
 
     loadChatClearedFlag().then(async (clearedAt: string | null) => {
       // Fetch authoritative client data from DB (phase source of truth) BEFORE
