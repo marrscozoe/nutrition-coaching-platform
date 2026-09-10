@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
@@ -51,6 +51,21 @@ export default function ClientDashboard() {
   const [fatTarget, setFatTarget] = useState(0);
   const [starchTarget, setStarchTarget] = useState(0);
   const [waterTarget, setWaterTarget] = useState(0);
+  // Refs to capture current target values for the visibility-change handler
+  // (avoids stale closure over state values captured at handler-creation time)
+  const proteinTargetRef = useRef(0);
+  const vegTargetRef = useRef(0);
+  const fatTargetRef = useRef(0);
+  const starchTargetRef = useRef(0);
+  const waterTargetRef = useRef(0);
+  // Keep refs in sync with target state (so visibility handler always reads current values)
+  useEffect(() => {
+    proteinTargetRef.current = proteinTarget;
+    vegTargetRef.current = vegTarget;
+    fatTargetRef.current = fatTarget;
+    starchTargetRef.current = starchTarget;
+    waterTargetRef.current = waterTarget;
+  }, [proteinTarget, vegTarget, fatTarget, starchTarget, waterTarget]);
   const [proteinRemaining, setProteinRemaining] = useState(0);
   const [vegRemaining, setVegRemaining] = useState(0);
   const [fatRemaining, setFatRemaining] = useState(0);
@@ -66,14 +81,20 @@ export default function ClientDashboard() {
         if (currentUser && currentUser.userType === 'client' && currentUser.user) {
           // getCurrentUser() already extended the session; fetch fresh data
           fetchClientData(currentUser.user.id);
-          // Pass explicit primitives so the call is not affected by stale client-object closures
+          // Use refs to capture current state values — avoids stale closure over
+          // proteinTarget/vegTarget/etc. that were captured when this handler was created
+          proteinTargetRef.current = proteinTarget;
+          vegTargetRef.current = vegTarget;
+          fatTargetRef.current = fatTarget;
+          starchTargetRef.current = starchTarget;
+          waterTargetRef.current = waterTarget;
           fetchRecentMeals(
             currentUser.user.id,
-            proteinTarget,
-            vegTarget,
-            fatTarget,
-            starchTarget,
-            waterTarget,
+            proteinTargetRef.current,
+            vegTargetRef.current,
+            fatTargetRef.current,
+            starchTargetRef.current,
+            waterTargetRef.current,
             client?.gender as 'male' | 'female' | undefined,
             typeof client?.current_phase === 'number' ? client.current_phase : undefined
           );
@@ -97,8 +118,18 @@ export default function ClientDashboard() {
 
     // Fetch fresh client data from server on mount
     fetchClientData(currentUser.user.id);
-    // Fetch recent meals
-    fetchRecentMeals(currentUser.user.id);
+    // Fetch recent meals after client is set (pass all params needed for recalculation).
+    // Calling with just clientId would skip recalculation because targets aren't set yet.
+    fetchRecentMeals(
+      currentUser.user.id,
+      proteinTarget,
+      vegTarget,
+      fatTarget,
+      starchTarget,
+      waterTarget,
+      (currentUser.user as ClientData).gender as 'male' | 'female',
+      typeof (currentUser.user as ClientData).current_phase === 'number' ? (currentUser.user as ClientData).current_phase : undefined
+    );
   }, [router]);
 
   // Helper: parse portion string to number (uses max for ranges like "1-2 cups")
@@ -159,17 +190,24 @@ export default function ClientDashboard() {
   ) {
     if (!client) return;
 
-    const today = new Date().toLocaleDateString('en-CA');
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    console.log('[Home] recalculateRemainingFromMeals: todayStr=', todayStr, 'mealsCount=', meals.length);
 
     const todaysMeals = meals.filter(meal => {
-      let mealDateStr = meal.meal_date;
-      if (!mealDateStr && meal.logged_at) {
-        // Parse logged_at (ISO UTC string) as a proper Date, then convert to local date.
-        // Do NOT concatenate 'T12:00:00' onto an ISO string — that creates Invalid Date.
-        mealDateStr = new Date(meal.logged_at).toLocaleDateString('en-CA');
+      let mealDate: string | null = meal.meal_date ?? null;
+      if (!mealDate && meal.logged_at) {
+        try {
+          mealDate = new Date(meal.logged_at).toLocaleDateString('en-CA');
+        } catch {
+          mealDate = null;
+        }
       }
-      return mealDateStr === today;
+      const matches = mealDate === todayStr;
+      console.log('[Home] meal filter: id=', meal.id, 'mealDate=', mealDate, 'todayStr=', todayStr, 'matches=', matches, 'food=', meal.food_description?.slice(0, 50));
+      return matches;
     });
+
+    console.log('[Home] todaysMeals count=', todaysMeals.length);
 
     // Accumulate actual deducted amounts by parsing each meal's food_description
     let totalProteinOz = 0;
@@ -209,6 +247,11 @@ export default function ClientDashboard() {
       setStarchRemaining(Math.max(0, starchTargetVal - totalStarchCups));
     }
     setWaterRemaining(Math.max(0, waterTargetVal - totalWaterOz));
+    console.log('[Home] set remaining: protein=', Math.max(0, proteinTargetVal - totalProteinOz),
+      'veg=', Math.max(0, vegTargetVal - totalVegCups),
+      'fat=', Math.max(0, fatTargetVal - totalFatTbsp),
+      'water=', Math.max(0, waterTargetVal - totalWaterOz),
+      '(totals logged: p=', totalProteinOz, 'v=', totalVegCups, 'f=', totalFatTbsp, 'w=', totalWaterOz, ')');
   }
 
   async function fetchRecentMeals(
@@ -326,10 +369,10 @@ export default function ClientDashboard() {
     }
   }, [client?.id, client?.current_phase, client?.goal_weight, client?.program_type, client?.gender]);
 
-  // Recalculate remaining whenever recentMeals or targets change
+  // Recalculate remaining whenever recentMeals changes (after fetch resolves)
+  // or when any target value changes (after calculateDailyTargets sets them).
+  // The guard (proteinTarget > 0) ensures we skip the initial-0 state.
   useEffect(() => {
-    // Guard: skip if targets are still at initial-0 state (before calculateDailyTargets runs).
-    // proteinTarget > 0 is a reliable sentinel for "targets have been initialized".
     if (recentMeals.length > 0 && client && proteinTarget > 0) {
       recalculateRemainingFromMeals(
         recentMeals,
@@ -342,7 +385,24 @@ export default function ClientDashboard() {
         client.current_phase
       );
     }
-  }, [recentMeals, proteinTarget, vegTarget, fatTarget, starchTarget, waterTarget, client?.id, client?.current_phase, client?.gender]);
+  }, [recentMeals, client?.id, client?.current_phase, client?.gender]);
+
+  // Separate effect: when proteinTarget transitions from 0 → positive (after
+  // calculateDailyTargets runs), recentMeals may already be populated — recalculate.
+  useEffect(() => {
+    if (proteinTarget > 0 && recentMeals.length > 0 && client) {
+      recalculateRemainingFromMeals(
+        recentMeals,
+        proteinTarget,
+        vegTarget,
+        fatTarget,
+        starchTarget,
+        waterTarget,
+        client.gender as 'male' | 'female',
+        client.current_phase
+      );
+    }
+  }, [proteinTarget]);
 
   if (loading || !client) {
     return (

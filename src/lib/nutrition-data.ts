@@ -1211,12 +1211,23 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
   const result = { proteinOz: 0, vegCups: 0, fatTbsp: 0, starchCups: 0, waterOz: 0 };
   if (!foodDescription || foodDescription.trim() === '') return result;
 
-  const items = foodDescription.split(/[,;\n]+/);
+  // Split food description into individual items.
+  // First split on major delimiters (comma, semicolon, newline), then
+  // further split each chunk on " with " and " and " to isolate each food item.
+  const rawItems = foodDescription.split(/[,;\n]+/);
+  const items: string[] = [];
+  for (const raw of rawItems) {
+    // Split on " with " or " and " to separate compound descriptions.
+    // E.g. "12oz coffee with 1 tbsp heavy cream and 1 tbsp sugar"
+    //   → ["12oz coffee", "1 tbsp heavy cream", "1 tbsp sugar"]
+    const parts = raw.split(/\s+(?:with|and)\s+/i);
+    for (const p of parts) {
+      const trimmed = p.trim();
+      if (trimmed) items.push(trimmed);
+    }
+  }
 
-  for (const rawItem of items) {
-    const item = rawItem.trim();
-    if (!item) continue;
-
+  for (const item of items) {
     const category = classifyFoodItem(item);
     if (!category) continue;
 
