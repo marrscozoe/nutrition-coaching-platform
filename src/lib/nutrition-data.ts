@@ -939,6 +939,16 @@ export function extractWaterOzFromDescription(foodDescription: string, defaultPe
       totalOz += n;
     }
 
+    // Catch "N ozwater" — space between number and oz, no space after oz.
+    // numBeforeUnit handles "N oz water" and "N ozwater" (space between oz and water);
+    // this catches "20 ozwater" where the split between number and oz also failed.
+    // Does NOT match "20oz water" (no space between number and oz — already covered by numBeforeUnit).
+    const ozWaterNoSpace = (lower.match(/\d+\s+ozwater/gi)) || [];
+    for (const m of ozWaterNoSpace) {
+      const n = parseFloat((m.match(/(\d+(?:\.\d+)?)/) || [])[1] || '0');
+      totalOz += n;
+    }
+
     // Try "water N oz" — the number comes after "water".
     const numAfterWater = (lower.match(/water\s+(\d+(?:\.\d+)?)\s*oz/gi)) || [];
     for (const m of numAfterWater) {
@@ -1424,9 +1434,8 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
     }
   }
 
-  // Water: only plain water oz counts (detected separately by caller)
-  // parseFoodDescriptionToPortions returns 0 for waterOz — caller applies
-  // mealContainsPlainWater + explicit oz parsing or per-meal default.
+  // Water: extract plain water oz from the food description.
+  result.waterOz = extractWaterOzFromDescription(foodDescription, 32);
 
   // Round to 1 decimal
   result.proteinOz = Math.round(result.proteinOz * 10) / 10;
