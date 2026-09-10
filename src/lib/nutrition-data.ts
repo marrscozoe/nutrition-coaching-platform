@@ -1305,6 +1305,44 @@ function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'starch' | 
       if (singPattern.test(lower)) return true;
     }
 
+    // Bidirectional last-word matching: when the user's item is shorter than
+    // the food entry (e.g. "chicken" vs "chicken breast", "butter" vs
+    // "Kerrygold gold butter"), check whether the item's food word appears as
+    // the LAST word of the food entry. This handles common short-form input
+    // without requiring exact full-name matches.
+    //
+    // CRITICAL constraint: only accept if the item's food word (last word of the
+    // item, stripped of amount/unit prefixes) is the LAST word of the food entry.
+    // This prevents "water" matching "Water chestnuts" (water=first word of
+    // "water chestnuts", not last), while still allowing "butter" to match
+    // "Kerrygold gold butter" (butter=last word), and "chicken" to match
+    // "chicken breast" (via first-word check below).
+    //
+    // "water" is excluded entirely from bidirectional matching since "water"
+    // in food descriptions almost always means the plain-water beverage, not
+    // "Water chestnuts" — a niche vegetable unlikely to be on this plan.
+    const isWaterWord = lower === 'water' || lower.endsWith(' water') || lower.endsWith(' water.') || lower.endsWith('water') && lower.match(/^\d/);
+    if (lower.length < fnBase.length && !isWaterWord) {
+      const fnWords = fnBase.split(/[\s,]+/);
+      const fnLastWord = fnWords[fnWords.length - 1];
+      // Extract the item's food word (last word after stripping amount/unit tokens)
+      const itemTokens = lower.split(/[\s,]+/).filter(t => !t.match(/^\d/) && !['oz', 'ounce', 'ounces', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'handful', 'handfuls'].includes(t));
+      const itemFoodWord = itemTokens[itemTokens.length - 1] || '';
+      if (fnLastWord && itemFoodWord.endsWith(fnLastWord)) {
+        const itemWordEscaped = fnLastWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const withinPattern = new RegExp(`(?:^|[^a-z0-9])${itemWordEscaped}(?:$|[^a-z0-9])`, 'i');
+        if (withinPattern.test(fnBase)) return true;
+      }
+      // Also check first-word match: "chicken" → "chicken breast" (chicken is
+      // the first word of the food entry, not the last). Only for non-water.
+      const fnFirstWord = fnWords[0];
+      if (fnFirstWord && itemFoodWord === fnFirstWord) {
+        const itemWordEscaped = fnFirstWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = new RegExp(`(?:^|[^a-z0-9])${itemWordEscaped}(?:$|[^a-z0-9])`, 'i');
+        if (pattern.test(fnBase)) return true;
+      }
+    }
+
     return false;
   }
 
