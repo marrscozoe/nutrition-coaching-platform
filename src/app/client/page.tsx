@@ -52,6 +52,9 @@ export default function ClientDashboard() {
   const [starchTarget, setStarchTarget] = useState(0);
   const [waterTarget, setWaterTarget] = useState(0);
   // Refs to capture current target values for the visibility-change handler
+  // Tracks whether the meals fetch has completed (regardless of meal count).
+  // Used to trigger recalculate after fetch resolves, even when meals array is empty.
+  const mealsFetchedRef = useRef(false);
   // (avoids stale closure over state values captured at handler-creation time)
   const proteinTargetRef = useRef(0);
   const vegTargetRef = useRef(0);
@@ -295,6 +298,7 @@ export default function ClientDashboard() {
     } catch (err) {
       console.error('Failed to fetch meals:', err);
     } finally {
+      mealsFetchedRef.current = true;
       setLoading(false);
     }
   }
@@ -368,8 +372,10 @@ export default function ClientDashboard() {
 
   // Recalculate remaining whenever recentMeals changes (after fetch resolves)
   // or when any target value changes (after calculateDailyTargets sets them).
+  // mealsFetchedRef ensures recalculate fires after first fetch completes,
+  // even when recentMeals is empty (fresh day baseline).
   useEffect(() => {
-    if (recentMeals.length > 0 && client && proteinTarget > 0) {
+    if (mealsFetchedRef.current && recentMeals !== null && client && proteinTarget > 0) {
       recalculateRemainingFromMeals(
         recentMeals,
         proteinTarget,
@@ -385,8 +391,9 @@ export default function ClientDashboard() {
 
   // Separate effect: when proteinTarget transitions from 0 → positive (after
   // calculateDailyTargets runs), recentMeals may already be populated — recalculate.
+  // Also fires on proteinTarget changes after first fetch, to handle baseline case.
   useEffect(() => {
-    if (proteinTarget > 0 && recentMeals.length > 0 && client) {
+    if (proteinTarget > 0 && mealsFetchedRef.current && recentMeals !== null && client) {
       recalculateRemainingFromMeals(
         recentMeals,
         proteinTarget,
@@ -716,7 +723,7 @@ export default function ClientDashboard() {
       {/* Recent Meals */}
       <div className="mx-4 mt-6">
         <h2 className="text-sm font-semibold text-brand-cream/80 uppercase tracking-wider mb-3">Recent Meals</h2>
-        {recentMeals.length === 0 ? (
+        {!recentMeals || recentMeals.length === 0 ? (
           <div className="p-6 rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 text-center">
             <p className="text-brand-cream/50 text-sm">No meals logged yet today.</p>
             <Link href="/client/log" className="text-brand-orange text-sm hover:underline mt-2 inline-block">
