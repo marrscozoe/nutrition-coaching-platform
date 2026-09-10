@@ -427,12 +427,19 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Client ID required' }, { status: 401 });
     }
 
-    // Extract meal ID from the URL path: /api/meals/:id
+    // Extract meal ID from URL path /api/meals/:id OR from query param
     const url = new URL(request.url);
     const pathParts = url.pathname.split('/');
-    const mealId = pathParts[pathParts.length - 1];
-
+    let mealId = pathParts[pathParts.length - 1];
     if (!mealId || mealId === 'meals') {
+      // Fallback: try query param or body
+      mealId = url.searchParams.get('mealId') || url.searchParams.get('id');
+    }
+    if (!mealId) {
+      // Try body for DELETE (workaround for route.ts limitation)
+      try { const body = await request.json(); mealId = body.mealId || body.id; } catch {}
+    }
+    if (!mealId) {
       return NextResponse.json({ error: 'Meal ID required' }, { status: 400 });
     }
 
