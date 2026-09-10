@@ -372,10 +372,10 @@ export default function ClientDashboard() {
 
   // Recalculate remaining whenever recentMeals changes (after fetch resolves)
   // or when any target value changes (after calculateDailyTargets sets them).
-  // mealsFetchedRef ensures recalculate fires after first fetch completes,
-  // even when recentMeals is empty (fresh day baseline).
+  // Also fires with 0 meals (fresh day baseline) because recalculateRemainingFromMeals
+  // correctly computes: target - 0 = target.
   useEffect(() => {
-    if (mealsFetchedRef.current && recentMeals !== null && client && proteinTarget > 0) {
+    if (recentMeals !== null && client && proteinTarget > 0) {
       recalculateRemainingFromMeals(
         recentMeals,
         proteinTarget,
@@ -391,9 +391,8 @@ export default function ClientDashboard() {
 
   // Separate effect: when proteinTarget transitions from 0 → positive (after
   // calculateDailyTargets runs), recentMeals may already be populated — recalculate.
-  // Also fires on proteinTarget changes after first fetch, to handle baseline case.
   useEffect(() => {
-    if (proteinTarget > 0 && mealsFetchedRef.current && recentMeals !== null && client) {
+    if (proteinTarget > 0 && recentMeals !== null && client) {
       recalculateRemainingFromMeals(
         recentMeals,
         proteinTarget,
