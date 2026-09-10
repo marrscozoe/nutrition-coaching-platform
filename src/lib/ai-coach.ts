@@ -767,11 +767,16 @@ function itemMatchesFoodList(itemLower: string, foodList: string[]): boolean {
     // Also try entry against item (e.g. "almonds" in "mixed nuts"? no — but "almond" in "almonds"? yes)
     if (entryClean.includes(itemClean)) return true;
     // Check for embedded food words (e.g. "almond" in "almond butter")
+    // Only apply word-splitting for multi-word entries to prevent false positives:
+    // e.g. "Kidney beans" → ["kidney", "beans"] would incorrectly match "green beans"
+    // because "beans" is a substring, not a distinct food word in that context.
+    // Single-word entries are already handled by the direct includes checks above.
     const foodWords = entryClean.split(/[\s,]+/).filter(w => w.length > 2);
-    for (const word of foodWords) {
-      if (word.length > 2 && itemLower.includes(word)) return true;
-      // Also check plural/singular: if item is longer, check if word is in it
-      if (word.length > 2 && itemClean.includes(word)) return true;
+    if (foodWords.length > 1) {
+      for (const word of foodWords) {
+        if (word.length > 2 && itemLower.includes(word)) return true;
+        if (word.length > 2 && itemClean.includes(word)) return true;
+      }
     }
   }
   return false;
