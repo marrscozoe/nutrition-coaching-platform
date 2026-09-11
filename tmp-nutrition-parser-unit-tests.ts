@@ -234,4 +234,77 @@ console.log(`  mixed_sum=${JSON.stringify(mixedSum)}`);
 
 console.log('Order-independence: PASS\n');
 
+// =============================================================================
+// SAUSAGE/BRISKET BUG FIX TESTS
+// =============================================================================
+
+console.log('\n=== SAUSAGE/BRISTET TEST 1: "4oz sausage 4oz beef brisket 1 cup potato salad 1 cup green beans 1 cup French fries 20oz sweet tea" ===');
+const bug1 = parseFoodDescriptionToPortions('4oz sausage 4oz beef brisket 1 cup potato salad 1 cup green beans 1 cup French fries 20oz sweet tea');
+console.log('  proteinOz:', bug1.proteinOz, '(expected: 8)');
+console.log('  vegCups:', bug1.vegCups, '(expected: 1)');
+console.log('  fatTbsp:', bug1.fatTbsp, '(expected: 0)');
+console.log('  starchCups:', bug1.starchCups, '(expected: 2)');
+console.log('  waterOz:', bug1.waterOz, '(expected: 0 — sweet tea excluded)');
+assertApprox(bug1.proteinOz, 8, 'proteinOz (4oz sausage + 4oz beef brisket)');
+assertApprox(bug1.vegCups, 1, 'vegCups (green beans only)');
+assertApprox(bug1.fatTbsp, 0, 'fatTbsp');
+assertApprox(bug1.starchCups, 2, 'starchCups (potato salad + french fries)');
+assertApprox(bug1.waterOz, 0, 'waterOz (sweet tea — not plain water)');
+console.log('SAUSAGE/BRISKET TEST 1: PASS\n');
+
+console.log('\n=== SAUSAGE/BRISKET TEST 2: "4oz sausage" alone ===');
+const bug2 = parseFoodDescriptionToPortions('4oz sausage');
+console.log('  proteinOz:', bug2.proteinOz, '(expected: 4)');
+console.log('  vegCups:', bug2.vegCups, '(expected: 0)');
+console.log('  fatTbsp:', bug2.fatTbsp, '(expected: 0)');
+console.log('  starchCups:', bug2.starchCups, '(expected: 0)');
+assertApprox(bug2.proteinOz, 4, 'proteinOz');
+assertApprox(bug2.vegCups, 0, 'vegCups');
+assertApprox(bug2.fatTbsp, 0, 'fatTbsp');
+assertApprox(bug2.starchCups, 0, 'starchCups');
+console.log('SAUSAGE/BRISKET TEST 2: PASS\n');
+
+console.log('\n=== SAUSAGE/BRISKET TEST 3: "4oz beef brisket" alone ===');
+const bug3 = parseFoodDescriptionToPortions('4oz beef brisket');
+console.log('  proteinOz:', bug3.proteinOz, '(expected: 4)');
+console.log('  vegCups:', bug3.vegCups, '(expected: 0)');
+console.log('  fatTbsp:', bug3.fatTbsp, '(expected: 0)');
+console.log('  starchCups:', bug3.starchCups, '(expected: 0)');
+assertApprox(bug3.proteinOz, 4, 'proteinOz');
+assertApprox(bug3.vegCups, 0, 'vegCups');
+assertApprox(bug3.fatTbsp, 0, 'fatTbsp');
+assertApprox(bug3.starchCups, 0, 'starchCups');
+console.log('SAUSAGE/BRISKET TEST 3: PASS\n');
+
+// =============================================================================
+// REGRESSION: cream still fat, green beans still veg, water still water
+// =============================================================================
+
+console.log('\n=== REGRESSION TEST: cream still fat ===');
+const regCream = parseFoodDescriptionToPortions('2 tablespoon heavy cream');
+console.log('  fatTbsp:', regCream.fatTbsp, '(expected: 2)');
+assertApprox(regCream.fatTbsp, 2, 'fatTbsp (cream)');
+console.log('REGRESSION TEST (cream=fat): PASS\n');
+
+console.log('\n=== REGRESSION TEST: green beans still veg ===');
+const regGreenBeans = parseFoodDescriptionToPortions('1 cup green beans');
+console.log('  vegCups:', regGreenBeans.vegCups, '(expected: 1)');
+assertApprox(regGreenBeans.vegCups, 1, 'vegCups (green beans)');
+console.log('REGRESSION TEST (green beans=veg): PASS\n');
+
+console.log('\n=== REGRESSION TEST: plain water still water ===');
+const regWater = parseFoodDescriptionToPortions('20oz water');
+const plainWater = mealContainsPlainWater('20oz water');
+console.log('  waterOz:', regWater.waterOz, '(expected: 20)');
+console.log('  plainWater:', plainWater, '(expected: true)');
+assertApprox(regWater.waterOz, 20, 'waterOz');
+assert(plainWater === true, 'plainWater should be true');
+console.log('REGRESSION TEST (plain water): PASS\n');
+
+console.log('\n=== REGRESSION TEST: sweet tea NOT counted as water ===');
+const sweetTea = parseFoodDescriptionToPortions('20oz sweet tea');
+console.log('  waterOz:', sweetTea.waterOz, '(expected: 0)');
+assertApprox(sweetTea.waterOz, 0, 'waterOz (sweet tea = 0)');
+console.log('REGRESSION TEST (sweet tea != water): PASS\n');
+
 console.log('\n✅ ALL TESTS PASSED\n');

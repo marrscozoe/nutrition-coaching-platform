@@ -141,7 +141,7 @@ const ALLERGY_BAN_PATTERNS: Record<string, { list: string; patterns: string[] }[
     { list: 'LEAN_PROTEINS', patterns: ['salmon', 'tuna', 'cod', 'halibut', 'tilapia', 'bass', 'trout', 'sardine', 'anchovy', 'mackerel', 'catfish', 'mahi', 'swordfish', 'redfish', 'fish', 'red snapper', 'orange roughy', 'perch', 'pollock', 'herring'] },
   ],
   nightshades: [
-    { list: 'FIBROUS_VEGETABLES', patterns: ['tomato', 'tomatillo', 'pepper', 'eggplant', 'potato'] },
+    { list: 'FIBROUS_VEGETABLES', patterns: ['tomato', 'tomatillo', 'pepper', 'eggplant'] },
   ],
   histamine: [
     { list: 'FIBROUS_VEGETABLES', patterns: ['spinach', 'kale', 'avocado'] },
@@ -270,7 +270,7 @@ export const LEAN_PROTEINS = [
   'Chicken breast',
   'White fish', 'Tuna', 'Salmon', 'Redfish',
   'Eggs (2-3 for men, 1-2 for women)', 'Egg whites',
-  'Lean beef', 'Ground beef', 'Lean pork', 'Turkey breast', 'Shrimp', 'Steak',
+  'Lean beef', 'Ground beef', 'Sirloin', 'Ribeye', 'Brisket', 'Lean pork', 'Turkey breast', 'Shrimp', 'Steak', 'Sausage', 'Pork sausage',
   'Plain non-fat Greek yogurt',
   'Tilapia', 'Cod', 'Halibut', 'Trout', 'Catfish', 'Scallops', 'Crab', 'Lobster',
   'Bison', 'Venison', 'Elk', 'Ostrich',
@@ -282,7 +282,7 @@ export const LEAN_PROTEINS = [
 // NO cheese or dairy while dieting
 
 export const STARCHY_CARBOHYDRATES = [
-  'Red potatoes', 'New potatoes', 'Sweet potatoes', 'Yukon Gold', 'Russet', 'Fingerling', 'Purple',
+  'Red potatoes', 'New potatoes', 'Sweet potatoes', 'Yukon Gold', 'Russet', 'Fingerling', 'Purple', 'French fries', 'Potato salad',
   'Brown rice', 'Wild rice', 'Jasmine rice', 'Basmati rice',
   'Oatmeal', 'Steel cut oats',
   'Barley', 'Bulgur', 'Buckwheat', 'Millet', 'Spelt',
