@@ -481,7 +481,9 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
       exampleSwaps = 'Burger place: Bunless burger + side salad. Mexican (Chipotle): Burrito bowl — skip rice, double veggies, grilled chicken, guac. Pizza: Skip pizza, get salad + grilled protein. Sandwich: Lettuce-wrap or bunless.';
     }
 
-    const restaurantSection = '\n\nRESTAURANT SWAPS:\n' + (phaseNote ? phaseNote + ' ' : '') + (allergyNote ? allergyNote + ' ' : '') + exampleSwaps;
+    // STRONG override directive — must appear at the very top so model cannot miss it
+    const restaurantDirective = '⚠️ OVERRIDE: The user is AT A RESTAURANT. Give the EXACT approved orders below. Do NOT ask "what sounds good" or any other question. Do NOT interview the user. Just give the orders. Reply with ONLY the approved order examples.';
+    const restaurantSection = '\n\n' + restaurantDirective + '\n\nAPPROVED ORDERS:\n' + (phaseNote ? phaseNote + ' ' : '') + (allergyNote ? allergyNote + ' ' : '') + exampleSwaps;
 
     // If also asking about plan, include full plan info
     if (asksAboutPlan) {
