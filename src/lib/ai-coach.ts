@@ -431,7 +431,11 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
     : null;
 
   const lowerMessage = message.toLowerCase();
-  const asksAboutPlan = lowerMessage.includes('what can i eat') || lowerMessage.includes('my plan') || lowerMessage.includes('show me') || lowerMessage.includes('what am i') || lowerMessage.includes('meal example') || lowerMessage.includes('example meal') || lowerMessage.includes('phase') || lowerMessage.includes('portion') || lowerMessage.includes('categories') || lowerMessage.includes('what to eat') || lowerMessage.includes('swap') || lowerMessage.includes('exchange') || lowerMessage.includes('restaurant') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonald') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('eating-out') || lowerMessage.includes('at a restaurant') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru') || lowerMessage.includes(' wendys') || lowerMessage.includes(' panera') || lowerMessage.includes(' chik-fil') || lowerMessage.includes(' qdoba') || lowerMessage.includes(' moe');
+  // Restaurant swap logic — concrete examples immediately, NO interviewing
+  // Fires independently of asksAboutPlan so "I had a burger" triggers swaps without needing plan keywords
+  const asksAboutRestaurant = lowerMessage.includes('restaurant') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonal') || lowerMessage.includes('wendy') || lowerMessage.includes('panera') || lowerMessage.includes('chick-fil') || lowerMessage.includes('qdoba') || lowerMessage.includes('moe') || lowerMessage.includes('taco bell') || lowerMessage.includes('subway') || lowerMessage.includes('burger') || lowerMessage.includes('fries') || lowerMessage.includes('steak') || lowerMessage.includes('bowl') || lowerMessage.includes('burrito') || lowerMessage.includes('taco') || lowerMessage.includes('wrap') || lowerMessage.includes('pizza') || lowerMessage.includes('sushi') || lowerMessage.includes('thai') || lowerMessage.includes('chinese') || lowerMessage.includes('mexican') || lowerMessage.includes('italian') || lowerMessage.includes('sandwich');
+
+  const asksAboutPlan = lowerMessage.includes('what can i eat') || lowerMessage.includes('my plan') || lowerMessage.includes('show me') || lowerMessage.includes('what am i') || lowerMessage.includes('meal example') || lowerMessage.includes('example meal') || lowerMessage.includes('phase') || lowerMessage.includes('portion') || lowerMessage.includes('categories') || lowerMessage.includes('what to eat') || lowerMessage.includes('swap') || lowerMessage.includes('exchange');
 
   // Build dynamic food examples — filter out hard bans (preset allergies + custom bans)
   const allHardBans = [...(context.allergies || []), ...(context.custom_allergy_bans || [])];
@@ -441,19 +445,31 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
   const starchList = (filteredFoodLists?.starchyCarbohydrates || STARCHY_CARBOHYDRATES).join(', ');
   const fatList = (filteredFoodLists?.healthyFats || HEALTHY_FATS).join(', ');
 
-  // Restaurant swap logic — give concrete examples immediately, NO interviewing
-  // This fires independently of asksAboutPlan so "I had a burger" triggers swaps without needing plan keywords
-  const asksAboutRestaurant = lowerMessage.includes('restaurant') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonal') || lowerMessage.includes('wendy') || lowerMessage.includes('panera') || lowerMessage.includes('chick-fil') || lowerMessage.includes('qdoba') || lowerMessage.includes('moe') || lowerMessage.includes('taco bell') || lowerMessage.includes('subway') || lowerMessage.includes('burger') || lowerMessage.includes('fries') || lowerMessage.includes('steak') || lowerMessage.includes('bowl') || lowerMessage.includes('burrito') || lowerMessage.includes('taco') || lowerMessage.includes('wrap') || lowerMessage.includes('pizza') || lowerMessage.includes('sushi') || lowerMessage.includes('thai') || lowerMessage.includes('chinese') || lowerMessage.includes('mexican') || lowerMessage.includes('italian') || lowerMessage.includes('sandwich');
+  if (asksAboutPlan) {
+    // Build Phase 5 plan description if applicable
+    let phase5PlanDesc = '';
+    if (context.currentPhase === 5 && context.phase5Plan && context.phase5Plan.length > 0) {
+      const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
+      const todayRule = context.phase5Plan.find(d => d.day === dayNum);
+      phase5PlanDesc = `\n• You're on DAY ${dayNum} of your 14-day plan: ${todayRule?.label || 'Unknown'}`;
+    }
 
-  if (asksAboutRestaurant) {
-    const phaseNote = context.currentPhase === 1 ? 'Phase 1 = NO STARCH. Skip rice/pasta/bread.' :
-                      context.currentPhase === 2 ? 'Phase 2 = starch only Wed/Sat/Sun.' :
-                      context.currentPhase === 5 ? 'Check your Phase 5 plan for today.' :
-                      context.currentPhase === 6 ? 'Phase 6 = starch OK every meal.' : '';
-    const allHardBans = [...(context.allergies || []), ...(context.custom_allergy_bans || [])];
-    const allergyNote = allHardBans.length > 0 ? ' ALLERGIES: ' + allHardBans.join(', ') + '.' : '';
+    const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - 14 days of lean protein, veggies, healthy fats only' :
+                            context.currentPhase === 2 ? 'STARCH ONLY for BREAKFAST & LUNCH on Wed/Sat/Sun - dinner & snack NEVER get starch' :
+                            context.currentPhase === 5 ? `AGGRESSIVE FAT LOSS - 14-day rotating plan with 3-day blocks${phase5PlanDesc}` :
+                            context.currentPhase === 6 ? 'MUSCLE GAIN - higher carbs and fats to fuel muscle growth' :
+                            'MAINTENANCE - starch every meal, weigh Fri only';
+    
+    const proteinExamples = context.gender === 'male' 
+      ? '6oz protein per meal' 
+      : '4oz protein per meal';
+    const mealExample = context.gender === 'male' 
+      ? '6oz grilled salmon, 2 cups broccoli with olive oil, 1/2 avocado' 
+      : '4oz grilled chicken, 1.5 cups spinach with olive oil, few almonds';
 
-    // Build example swaps by food type — immediate concrete options, no interviewing
+    // Using explicit wording to prevent AI from rephrasing it away.
+
+    // Concrete example swaps by food type — NO interviewing
     let exampleSwaps = '';
     const isBurgerContext = lowerMessage.includes('burger');
     const isChipotleContext = lowerMessage.includes('chipotle');
@@ -481,117 +497,87 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
       exampleSwaps = 'Burger place: Bunless burger + side salad. Mexican (Chipotle): Burrito bowl — skip rice, double veggies, grilled chicken, guac. Pizza: Skip pizza, get salad + grilled protein. Sandwich: Lettuce-wrap or bunless.';
     }
 
-    // STRONG override directive — must appear at the very top so model cannot miss it
-    const restaurantDirective = '⚠️ OVERRIDE: The user is AT A RESTAURANT. Give the EXACT approved orders below. Do NOT ask "what sounds good" or any other question. Do NOT interview the user. Just give the orders. Reply with ONLY the approved order examples.';
+    let restaurantSection = '';
+    const restaurantDirective = '⚠️ OVERRIDE: The user is AT A RESTAURANT. Give the EXACT approved orders below. Do NOT ask "what sounds good" or any other question. Do NOT interview the user. Just give the orders.';
+    const phaseNote = context.currentPhase === 1 ? 'Phase 1 = NO STARCH. Skip rice/pasta/bread.' :
+                      context.currentPhase === 2 ? 'Phase 2 = starch only Wed/Sat/Sun.' :
+                      context.currentPhase === 5 ? 'Check your Phase 5 plan for today.' :
+                      context.currentPhase === 6 ? 'Phase 6 = starch OK every meal.' : '';
+    const allHardBans = [...(context.allergies || []), ...(context.custom_allergy_bans || [])];
+    const allergyNote = allHardBans.length > 0 ? ' ALLERGIES: ' + allHardBans.join(', ') + '.' : '';
+    restaurantSection = '\\n\\n' + restaurantDirective + '\\n\\nAPPROVED ORDERS:\\n' + (phaseNote ? phaseNote + ' ' : '') + (allergyNote ? allergyNote + ' ' : '') + exampleSwaps;
+    return `You're in PHASE ${context.currentPhase}: ${phaseDescription}${restaurantSection}
+
+Portions per meal:
+Protein: ${portions.protein} (${proteinExamples})
+Veggies: ${portions.fibrousVegetables} (${veggieList})
+Fat: ${portions.fat} (${fatList})
+Starch: ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : context.currentPhase === 2 ? 'Only on Wed/Sat/Sun breakfast & lunch' : context.currentPhase === 5 ? 'Varies by day - check your plan for today' : context.currentPhase === 6 ? (context.gender === 'male' ? '3 cups every meal (Phase 6)' : '2 cups every meal (Phase 6)') : 'Every meal'}
+Water: ${context.gender === 'male' ? '32oz' : '20oz'} per meal
+
+YOUR APPROVED FOODS:
+• LEAN PROTEINS: ${proteinList}
+• FIBROUS VEGETABLES: ${veggieList}
+• HEALTHY FATS: ${fatList}
+${context.currentPhase !== 1 ? `• STARCHY CARBOHYDRATES: ${starchList}` : ''}
+
+Example: ${mealExample}
+
+⚠️ IMPORTANT RULES:
+1. When giving advice about foods, ONLY recommend foods from the APPROVED LISTS above
+2. NEVER suggest foods not listed above (no pasta, bread, cereal, etc.)
+3. When you respond about portions, ALWAYS specify "of olive oil" after the fat amount
+4. AVOCADO IS A HEALTHY FAT - encourage it!
+
+${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
+
+Ask me anything about specific foods!`;
+  }
+
+
+  // Restaurant-only: swaps fire without needing asksAboutPlan
+  if (asksAboutRestaurant) {
+    let exampleSwaps = '';
+    const isBurgerContext = lowerMessage.includes('burger');
+    const isChipotleContext = lowerMessage.includes('chipotle');
+    const isPizzaContext = lowerMessage.includes('pizza');
+    const isMexicanContext = lowerMessage.includes('mexican') || lowerMessage.includes('taco') || lowerMessage.includes('burrito') || lowerMessage.includes('qdoba') || lowerMessage.includes('taco bell');
+    const isSandwichContext = lowerMessage.includes('sandwich') || lowerMessage.includes('subway') || lowerMessage.includes('wrap') || lowerMessage.includes('chick-fil');
+    const isAsianContext = lowerMessage.includes('asian') || lowerMessage.includes('thai') || lowerMessage.includes('chinese') || lowerMessage.includes('sushi');
+    const isSaladContext = lowerMessage.includes('salad') && !lowerMessage.includes('chipotle');
+
+    if (isBurgerContext) {
+      exampleSwaps = 'Burger: Bunless burger (no bun) + side salad (no fries); Grilled chicken breast + salad; Skip the fries.';
+    } else if (isChipotleContext) {
+      exampleSwaps = 'Chipotle: Burrito bowl — skip rice, double veggies, grilled chicken, guac (healthy fat), salsa. No cheese/sour cream (dairy).';
+    } else if (isPizzaContext) {
+      exampleSwaps = 'Pizza: Skip the pizza. Order a salad with grilled protein on the side, or grilled chicken + veggies instead.';
+    } else if (isMexicanContext) {
+      exampleSwaps = 'Mexican: Burrito bowl or salad — skip rice/beans, double veggies, grilled protein, guac. No cheese/sour cream (dairy). Tacos: skip tortilla, go bunless or lettuce wrap.';
+    } else if (isSandwichContext) {
+      exampleSwaps = 'Sandwich/wrap: Skip the bread. Go bunless or lettuce-wrap. Add extra veggies and protein. Skip fries/sides.';
+    } else if (isAsianContext) {
+      exampleSwaps = 'Asian: Skip rice/noodles. Order stir-fry with protein and veggies only. No sauce or light sauce. Sushi: skip rice, go sashimi or salad.';
+    } else if (isSaladContext) {
+      exampleSwaps = 'Salad: Go easy on croutons and dressings. Add grilled protein. Skip fried toppings. Oil-based dressing is fine.';
+    } else {
+      exampleSwaps = 'Burger place: Bunless burger + side salad. Mexican (Chipotle): Burrito bowl — skip rice, double veggies, grilled chicken, guac. Pizza: Skip pizza, get salad + grilled protein. Sandwich: Lettuce-wrap or bunless.';
+    }
+
+    const restaurantDirective = '⚠️ OVERRIDE: The user is AT A RESTAURANT. Give the EXACT approved orders below. Do NOT ask "what sounds good" or any other question. Do NOT interview the user. Just give the orders.';
+    const phaseNote = context.currentPhase === 1 ? 'Phase 1 = NO STARCH. Skip rice/pasta/bread.' :
+                      context.currentPhase === 2 ? 'Phase 2 = starch only Wed/Sat/Sun.' :
+                      context.currentPhase === 5 ? 'Check your Phase 5 plan for today.' :
+                      context.currentPhase === 6 ? 'Phase 6 = starch OK every meal.' : '';
+    const allHardBans = [...(context.allergies || []), ...(context.custom_allergy_bans || [])];
+    const allergyNote = allHardBans.length > 0 ? ' ALLERGIES: ' + allHardBans.join(', ') + '.' : '';
     const restaurantSection = '\n\n' + restaurantDirective + '\n\nAPPROVED ORDERS:\n' + (phaseNote ? phaseNote + ' ' : '') + (allergyNote ? allergyNote + ' ' : '') + exampleSwaps;
 
-    // If also asking about plan, include full plan info
-    if (asksAboutPlan) {
-      let phase5PlanDesc = '';
-      if (context.currentPhase === 5 && context.phase5Plan && context.phase5Plan.length > 0) {
-        const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
-        const todayRule = context.phase5Plan.find(d => d.day === dayNum);
-        phase5PlanDesc = `\n• You're on DAY ${dayNum} of your 14-day plan: ${todayRule?.label || 'Unknown'}`;
-      }
-      const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - 14 days of lean protein, veggies, healthy fats only' :
-                              context.currentPhase === 2 ? 'STARCH ONLY for BREAKFAST & LUNCH on Wed/Sat/Sun - dinner & snack NEVER get starch' :
-                              context.currentPhase === 5 ? `AGGRESSIVE FAT LOSS - 14-day rotating plan with 3-day blocks${phase5PlanDesc}` :
-                              context.currentPhase === 6 ? 'MUSCLE GAIN - higher carbs and fats to fuel muscle growth' :
-                              'MAINTENANCE - starch every meal, weigh Fri only';
-      const proteinExamples = context.gender === 'male' ? '6oz protein per meal' : '4oz protein per meal';
-      const mealExample = context.gender === 'male'
-        ? '6oz grilled salmon, 2 cups broccoli with olive oil, 1/2 avocado'
-        : '4oz grilled chicken, 1.5 cups spinach with olive oil, few almonds';
-
-      return `You're in PHASE ${context.currentPhase}: ${phaseDescription}${restaurantSection}
-
-Portions per meal:
-Protein: ${portions.protein} (${proteinExamples})
-Veggies: ${portions.fibrousVegetables} (${veggieList})
-Fat: ${portions.fat} (${fatList})
-Starch: ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : context.currentPhase === 2 ? 'Only on Wed/Sat/Sun breakfast & lunch' : context.currentPhase === 5 ? 'Varies by day - check your plan for today' : context.currentPhase === 6 ? (context.gender === 'male' ? '3 cups every meal (Phase 6)' : '2 cups every meal (Phase 6)') : 'Every meal'}
-Water: ${context.gender === 'male' ? '32oz' : '20oz'} per meal
-
-YOUR APPROVED FOODS:
-• LEAN PROTEINS: ${proteinList}
-• FIBROUS VEGETABLES: ${veggieList}
-• HEALTHY FATS: ${fatList}
-${context.currentPhase !== 1 ? `• STARCHY CARBOHYDRATES: ${starchList}` : ''}
-
-Example: ${mealExample}
-
-⚠️ IMPORTANT RULES:
-1. When giving advice about foods, ONLY recommend foods from the APPROVED LISTS above
-2. NEVER suggest foods not listed above (no pasta, bread, cereal, etc.)
-3. When you respond about portions, ALWAYS specify "of olive oil" after the fat amount
-4. AVOCADO IS A HEALTHY FAT - encourage it!
-
-${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
-`;
-    }
-
-    // Restaurant-only: return swaps immediately without full plan dump
-    return `Here's what you can order:
+    return `Here are your approved orders — pick what fits your meal:
 ${restaurantSection}
 
-⚠️ IMPORTANT: Only recommend foods from the approved lists.
-${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
-`;
+Only order from this list. No other foods.`;
   }
-
-  if (asksAboutPlan) {
-    // Build Phase 5 plan description if applicable
-    let phase5PlanDesc = '';
-    if (context.currentPhase === 5 && context.phase5Plan && context.phase5Plan.length > 0) {
-      const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
-      const todayRule = context.phase5Plan.find(d => d.day === dayNum);
-      phase5PlanDesc = `\n• You're on DAY ${dayNum} of your 14-day plan: ${todayRule?.label || 'Unknown'}`;
-    }
-
-    const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - 14 days of lean protein, veggies, healthy fats only' :
-                            context.currentPhase === 2 ? 'STARCH ONLY for BREAKFAST & LUNCH on Wed/Sat/Sun - dinner & snack NEVER get starch' :
-                            context.currentPhase === 5 ? `AGGRESSIVE FAT LOSS - 14-day rotating plan with 3-day blocks${phase5PlanDesc}` :
-                            context.currentPhase === 6 ? 'MUSCLE GAIN - higher carbs and fats to fuel muscle growth' :
-                            'MAINTENANCE - starch every meal, weigh Fri only';
-    
-    const proteinExamples = context.gender === 'male' 
-      ? '6oz protein per meal' 
-      : '4oz protein per meal';
-    const mealExample = context.gender === 'male' 
-      ? '6oz grilled salmon, 2 cups broccoli with olive oil, 1/2 avocado' 
-      : '4oz grilled chicken, 1.5 cups spinach with olive oil, few almonds';
-
-    // IMPORTANT: The fat source must ALWAYS be specified. Never let AI drop "olive oil" from the response.
-    // Using explicit wording to prevent AI from rephrasing it away.
-
-    return `You're in PHASE ${context.currentPhase}: ${phaseDescription}
-
-Portions per meal:
-Protein: ${portions.protein} (${proteinExamples})
-Veggies: ${portions.fibrousVegetables} (${veggieList})
-Fat: ${portions.fat} (${fatList})
-Starch: ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : context.currentPhase === 2 ? 'Only on Wed/Sat/Sun breakfast & lunch' : context.currentPhase === 5 ? 'Varies by day - check your plan for today' : context.currentPhase === 6 ? (context.gender === 'male' ? '3 cups every meal (Phase 6)' : '2 cups every meal (Phase 6)') : 'Every meal'}
-Water: ${context.gender === 'male' ? '32oz' : '20oz'} per meal
-
-YOUR APPROVED FOODS:
-• LEAN PROTEINS: ${proteinList}
-• FIBROUS VEGETABLES: ${veggieList}
-• HEALTHY FATS: ${fatList}
-${context.currentPhase !== 1 ? `• STARCHY CARBOHYDRATES: ${starchList}` : ''}
-
-Example: ${mealExample}
-
-⚠️ IMPORTANT RULES:
-1. When giving advice about foods, ONLY recommend foods from the APPROVED LISTS above
-2. NEVER suggest foods not listed above (no pasta, bread, cereal, etc.)
-3. When you respond about portions, ALWAYS specify "of olive oil" after the fat amount
-4. AVOCADO IS A HEALTHY FAT - encourage it!
-
-${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
-
-
-  }
-
   // Gate allergy discovery tips — never suggest adding foods as allergies unless client has opted in
   const discoveryGate = !context.allergy_discovery_enabled
     ? `\n\n⚠️ IMPORTANT: Allergy discovery is DISABLED for this client. NEVER suggest adding foods as allergies. NEVER say "want me to add X as a hard allergy" or similar. Hard bans (actual allergies) still apply — never suggest those foods.`
@@ -1490,10 +1476,6 @@ export async function analyzeMealPortion(
     console.log('[DEBUG analyzeMealPortion] AFTER MATCHING: hasFat:', hasFat, '| hasProtein:', hasProtein, '| hasVeg:', hasVeg, '| hasStarch:', hasStarch);
   }
 
-  // Processed protein keywords — these appear in LEAN_PROTEINS (for Home deduction)
-  // but are NOT approved for coaching advice.
-  const processedProteinKeywords = ['sausage', 'pepperoni', 'salami', 'ham', 'bacon', 'hot dog', 'bratwurst', 'pastrami', 'chorizo', 'prosciutto'];
-
   // Build unrecognized items list
   const foodItems = splitIntoFoodItems(foodDescription);
   for (const item of foodItems) {
@@ -1501,13 +1483,7 @@ export async function analyzeMealPortion(
     let found = false;
     // Special case: eggs are recognized as both protein AND fat
     if (itemLower.includes('egg') && !itemLower.includes('eggplant')) { found = true; }
-    // Lean proteins — but processed meats (sausage, pepperoni, etc.) are NOT approved for coaching
-    if (!found && itemMatchesFoodList(itemLower, LEAN_PROTEINS)) {
-      const isProcessedProtein = processedProteinKeywords.some(kw => itemLower.includes(kw));
-      if (!isProcessedProtein) { found = true; }
-      // If processed protein, leave found=false so it goes into unrecognizedItems
-      // and triggers the processed-protein correction below.
-    }
+    if (!found && itemMatchesFoodList(itemLower, LEAN_PROTEINS)) { found = true; }
     if (!found && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) { found = true; }
     if (!found && itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) { found = true; }
     if (!found && itemMatchesFoodList(itemLower, HEALTHY_FATS)) { found = true; }
@@ -1791,15 +1767,6 @@ export async function analyzeMealPortion(
       }
       // If tortillas are present in unrecognized items, they're allowed in Phase 6, so no starch correction needed
     }
-
-    // Processed proteins (sausage, pepperoni, etc.) are NOT approved for coaching in any phase.
-    const processedProteinsPhase6 = unrecognizedItems.filter(item => {
-      const lower = item.toLowerCase();
-      return processedProteinKeywords.some(kw => lower.includes(kw));
-    });
-    if (processedProteinsPhase6.length > 0) {
-      corrections.push(`⚠️ Processed protein — replace with lean steak, chicken breast, or any approved lean protein (see your food list).`);
-    }
   } else if (phase === 1 || phase === 2 || phase === 5) {
     // Phase 5 uses rotating rules - determine if today is a strict day
     let rulePhase = phase;
@@ -1827,16 +1794,6 @@ export async function analyzeMealPortion(
         missingCategories.push('fat');
         corrections.push(`💡 You need ${portions.fat} olive oil or ${portions.avocado} avocado for healthy fat.`);
       }
-    }
-
-    // Check for processed proteins (sausage, pepperoni, salami, etc.) in unrecognized items.
-    // These are NOT on the approved coaching list even though Home deducts them.
-    const processedProteinsInUnrecognized = unrecognizedItems.filter(item => {
-      const lower = item.toLowerCase();
-      return processedProteinKeywords.some(kw => lower.includes(kw));
-    });
-    if (processedProteinsInUnrecognized.length > 0) {
-      corrections.push(`⚠️ Processed protein — sausage and similar are NOT approved coaching advice. Replace with lean steak, chicken breast, or any approved lean protein (see your food list).`);
     }
   } else if (phase === 4) {
     // Phase 4 maintenance: ALL 4 categories (protein, veg, fat, starch) required to be "on phase"
@@ -1874,16 +1831,6 @@ export async function analyzeMealPortion(
         // Processed starch detected — tell client to replace with approved starches
         corrections.push(`💡 Replace the processed starch with an approved starch: rice, beans, potatoes, or sweet potato.`);
       }
-    }
-
-    // Processed proteins (sausage, pepperoni, etc.) are NOT approved for coaching in any phase.
-    // Re-check here since this is the Phase 4 branch.
-    const processedProteinsPhase4 = unrecognizedItems.filter(item => {
-      const lower = item.toLowerCase();
-      return processedProteinKeywords.some(kw => lower.includes(kw));
-    });
-    if (processedProteinsPhase4.length > 0) {
-      corrections.push(`⚠️ Processed protein — replace with lean steak, chicken breast, or any approved lean protein (see your food list).`);
     }
   }
 
@@ -1996,15 +1943,7 @@ export function getMealEvaluationPrompt(
   // flag it explicitly so the AI doesn't give generic "add starch" advice
   // EXCEPTION: In Phase 6, tortillas are explicitly allowed, so don't flag them
   if (analysis.unrecognizedItems.length > 0) {
-    // Processed meats are NOT processed starches — handle separately below.
-    const processedMeatKeywords = ['sausage', 'pepperoni', 'salami', 'ham', 'bacon', 'hot dog', 'bratwurst', 'pastrami', 'chorizo', 'prosciutto'];
-    const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
-
-    const processedMeats = analysis.unrecognizedItems.filter(item => {
-      const lower = item.toLowerCase();
-      return processedMeatKeywords.some(kw => lower.includes(kw));
-    });
-
+    const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'pepperoni', 'salami', 'bacon', 'ham', 'hot dog', 'sausage', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
     const processedStarches = analysis.unrecognizedItems.filter(item => {
       const lower = item.toLowerCase();
       return processedStarchKeywords.some(kw => lower.includes(kw));
@@ -2015,13 +1954,6 @@ export function getMealEvaluationPrompt(
       ? processedStarches.filter(item => !item.toLowerCase().includes('tortilla'))
       : processedStarches;
     
-    if (processedMeats.length > 0) {
-      p += `\n⚠️ PROCESSED PROTEIN — NOT ON APPROVED LIST:\n`;
-      const itemList = processedMeats.join(', ');
-      const isAre = processedMeats.length > 1 ? 'are' : 'is';
-      p += `- ${itemList} ${isAre} a PROCESSED PROTEIN (not approved for coaching). Replace with lean steak, chicken breast, or any approved lean protein.\n`;
-    }
-    
     if (processedStarchesToFlag.length > 0) {
       p += `\n⚠️ PROCESSED STARCH - NOT ON APPROVED LIST:\n`;
       const itemList = processedStarchesToFlag.join(', ');
@@ -2029,10 +1961,8 @@ export function getMealEvaluationPrompt(
       p += `- ${itemList} ${isAre} a PROCESSED STARCH (not on the approved list). Replace with an approved starch: rice, beans, potatoes, or sweet potato.\n`;
     }
     
-    // Show other unrecognized items (not processed meats or processed starches) for AI judgment
-    const otherUnrecognized = analysis.unrecognizedItems.filter(item => 
-      !processedMeats.includes(item) && !processedStarches.includes(item)
-    );
+    // Show other unrecognized items (not processed starches) for AI judgment
+    const otherUnrecognized = analysis.unrecognizedItems.filter(item => !processedStarches.includes(item));
     if (otherUnrecognized.length > 0) {
       p += `\nUNRECOGNIZED (use your judgment): ${otherUnrecognized.join(', ')}\n`;
     }
