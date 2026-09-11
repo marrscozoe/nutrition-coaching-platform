@@ -441,6 +441,102 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
   const starchList = (filteredFoodLists?.starchyCarbohydrates || STARCHY_CARBOHYDRATES).join(', ');
   const fatList = (filteredFoodLists?.healthyFats || HEALTHY_FATS).join(', ');
 
+  // Restaurant swap logic — give concrete examples immediately, NO interviewing
+  // This fires independently of asksAboutPlan so "I had a burger" triggers swaps without needing plan keywords
+  const asksAboutRestaurant = lowerMessage.includes('restaurant') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonal') || lowerMessage.includes('wendy') || lowerMessage.includes('panera') || lowerMessage.includes('chick-fil') || lowerMessage.includes('qdoba') || lowerMessage.includes('moe') || lowerMessage.includes('taco bell') || lowerMessage.includes('subway') || lowerMessage.includes('burger') || lowerMessage.includes('fries') || lowerMessage.includes('steak') || lowerMessage.includes('bowl') || lowerMessage.includes('burrito') || lowerMessage.includes('taco') || lowerMessage.includes('wrap') || lowerMessage.includes('pizza') || lowerMessage.includes('sushi') || lowerMessage.includes('thai') || lowerMessage.includes('chinese') || lowerMessage.includes('mexican') || lowerMessage.includes('italian') || lowerMessage.includes('sandwich');
+
+  if (asksAboutRestaurant) {
+    const phaseNote = context.currentPhase === 1 ? 'Phase 1 = NO STARCH. Skip rice/pasta/bread.' :
+                      context.currentPhase === 2 ? 'Phase 2 = starch only Wed/Sat/Sun.' :
+                      context.currentPhase === 5 ? 'Check your Phase 5 plan for today.' :
+                      context.currentPhase === 6 ? 'Phase 6 = starch OK every meal.' : '';
+    const allHardBans = [...(context.allergies || []), ...(context.custom_allergy_bans || [])];
+    const allergyNote = allHardBans.length > 0 ? ' ALLERGIES: ' + allHardBans.join(', ') + '.' : '';
+
+    // Build example swaps by food type — immediate concrete options, no interviewing
+    let exampleSwaps = '';
+    const isBurgerContext = lowerMessage.includes('burger');
+    const isChipotleContext = lowerMessage.includes('chipotle');
+    const isPizzaContext = lowerMessage.includes('pizza');
+    const isMexicanContext = lowerMessage.includes('mexican') || lowerMessage.includes('taco') || lowerMessage.includes('burrito') || lowerMessage.includes('qdoba') || lowerMessage.includes('taco bell');
+    const isSandwichContext = lowerMessage.includes('sandwich') || lowerMessage.includes('subway') || lowerMessage.includes('wrap') || lowerMessage.includes('chick-fil');
+    const isAsianContext = lowerMessage.includes('asian') || lowerMessage.includes('thai') || lowerMessage.includes('chinese') || lowerMessage.includes('sushi');
+    const isSaladContext = lowerMessage.includes('salad') && !lowerMessage.includes('chipotle');
+
+    if (isBurgerContext) {
+      exampleSwaps = 'Burger: Bunless burger (no bun) + side salad (no fries); Grilled chicken breast + salad; Skip the fries.';
+    } else if (isChipotleContext) {
+      exampleSwaps = 'Chipotle: Burrito bowl — skip rice, double veggies, grilled chicken, guac (healthy fat), salsa. No cheese/sour cream (dairy).';
+    } else if (isPizzaContext) {
+      exampleSwaps = 'Pizza: Skip the pizza. Order a salad with grilled protein on the side, or grilled chicken + veggies instead.';
+    } else if (isMexicanContext) {
+      exampleSwaps = 'Mexican: Burrito bowl or salad — skip rice/beans, double veggies, grilled protein, guac. No cheese/sour cream (dairy). Tacos: skip tortilla, go bunless or lettuce wrap.';
+    } else if (isSandwichContext) {
+      exampleSwaps = 'Sandwich/wrap: Skip the bread. Go bunless or lettuce-wrap. Add extra veggies and protein. Skip fries/sides.';
+    } else if (isAsianContext) {
+      exampleSwaps = 'Asian: Skip rice/noodles. Order stir-fry with protein and veggies only. No sauce or light sauce. Sushi: skip rice, go sashimi or salad.';
+    } else if (isSaladContext) {
+      exampleSwaps = 'Salad: Go easy on croutons and dressings. Add grilled protein. Skip fried toppings. Oil-based dressing is fine.';
+    } else {
+      exampleSwaps = 'Burger place: Bunless burger + side salad. Mexican (Chipotle): Burrito bowl — skip rice, double veggies, grilled chicken, guac. Pizza: Skip pizza, get salad + grilled protein. Sandwich: Lettuce-wrap or bunless.';
+    }
+
+    const restaurantSection = '\n\nRESTAURANT SWAPS:\n' + (phaseNote ? phaseNote + ' ' : '') + (allergyNote ? allergyNote + ' ' : '') + exampleSwaps;
+
+    // If also asking about plan, include full plan info
+    if (asksAboutPlan) {
+      let phase5PlanDesc = '';
+      if (context.currentPhase === 5 && context.phase5Plan && context.phase5Plan.length > 0) {
+        const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
+        const todayRule = context.phase5Plan.find(d => d.day === dayNum);
+        phase5PlanDesc = `\n• You're on DAY ${dayNum} of your 14-day plan: ${todayRule?.label || 'Unknown'}`;
+      }
+      const phaseDescription = context.currentPhase === 1 ? 'NO STARCH - 14 days of lean protein, veggies, healthy fats only' :
+                              context.currentPhase === 2 ? 'STARCH ONLY for BREAKFAST & LUNCH on Wed/Sat/Sun - dinner & snack NEVER get starch' :
+                              context.currentPhase === 5 ? `AGGRESSIVE FAT LOSS - 14-day rotating plan with 3-day blocks${phase5PlanDesc}` :
+                              context.currentPhase === 6 ? 'MUSCLE GAIN - higher carbs and fats to fuel muscle growth' :
+                              'MAINTENANCE - starch every meal, weigh Fri only';
+      const proteinExamples = context.gender === 'male' ? '6oz protein per meal' : '4oz protein per meal';
+      const mealExample = context.gender === 'male'
+        ? '6oz grilled salmon, 2 cups broccoli with olive oil, 1/2 avocado'
+        : '4oz grilled chicken, 1.5 cups spinach with olive oil, few almonds';
+
+      return `You're in PHASE ${context.currentPhase}: ${phaseDescription}${restaurantSection}
+
+Portions per meal:
+Protein: ${portions.protein} (${proteinExamples})
+Veggies: ${portions.fibrousVegetables} (${veggieList})
+Fat: ${portions.fat} (${fatList})
+Starch: ${context.currentPhase === 1 ? 'NO STARCH in Phase 1!' : context.currentPhase === 2 ? 'Only on Wed/Sat/Sun breakfast & lunch' : context.currentPhase === 5 ? 'Varies by day - check your plan for today' : context.currentPhase === 6 ? (context.gender === 'male' ? '3 cups every meal (Phase 6)' : '2 cups every meal (Phase 6)') : 'Every meal'}
+Water: ${context.gender === 'male' ? '32oz' : '20oz'} per meal
+
+YOUR APPROVED FOODS:
+• LEAN PROTEINS: ${proteinList}
+• FIBROUS VEGETABLES: ${veggieList}
+• HEALTHY FATS: ${fatList}
+${context.currentPhase !== 1 ? `• STARCHY CARBOHYDRATES: ${starchList}` : ''}
+
+Example: ${mealExample}
+
+⚠️ IMPORTANT RULES:
+1. When giving advice about foods, ONLY recommend foods from the APPROVED LISTS above
+2. NEVER suggest foods not listed above (no pasta, bread, cereal, etc.)
+3. When you respond about portions, ALWAYS specify "of olive oil" after the fat amount
+4. AVOCADO IS A HEALTHY FAT - encourage it!
+
+${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
+`;
+    }
+
+    // Restaurant-only: return swaps immediately without full plan dump
+    return `Here's what you can order:
+${restaurantSection}
+
+⚠️ IMPORTANT: Only recommend foods from the approved lists.
+${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
+`;
+  }
+
   if (asksAboutPlan) {
     // Build Phase 5 plan description if applicable
     let phase5PlanDesc = '';
@@ -466,27 +562,7 @@ export function getCoachPrompt(context: CoachContext, message: string): string {
     // IMPORTANT: The fat source must ALWAYS be specified. Never let AI drop "olive oil" from the response.
     // Using explicit wording to prevent AI from rephrasing it away.
 
-    // Restaurant step-by-step logic — terse
-    const asksAboutRestaurant = lowerMessage.includes('restaurant') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonal') || lowerMessage.includes('wendy') || lowerMessage.includes('panera') || lowerMessage.includes('chick-fil') || lowerMessage.includes('qdoba') || lowerMessage.includes('moe') || lowerMessage.includes('taco bell') || lowerMessage.includes('subway') || lowerMessage.includes('burger') || lowerMessage.includes('fries') || lowerMessage.includes('steak') || lowerMessage.includes('bowl') || lowerMessage.includes('burrito') || lowerMessage.includes('taco') || lowerMessage.includes('wrap') || lowerMessage.includes('pizza') || lowerMessage.includes('sushi') || lowerMessage.includes('thai') || lowerMessage.includes('chinese') || lowerMessage.includes('mexican') || lowerMessage.includes('italian') || lowerMessage.includes('sandwich');
-    const isFirstRestaurantAsk = asksAboutRestaurant && !lowerMessage.includes('chipotle') && !lowerMessage.includes('mcdonal') && !lowerMessage.includes('wendy') && !lowerMessage.includes('panera') && !lowerMessage.includes('chick-fil') && !lowerMessage.includes('qdoba') && !lowerMessage.includes('moe') && !lowerMessage.includes('taco bell') && !lowerMessage.includes('subway') && !lowerMessage.includes('burger') && !lowerMessage.includes('fries') && !lowerMessage.includes('steak') && !lowerMessage.includes('bowl') && !lowerMessage.includes('burrito') && !lowerMessage.includes('taco') && !lowerMessage.includes('wrap') && !lowerMessage.includes('pizza') && !lowerMessage.includes('sushi') && !lowerMessage.includes('thai') && !lowerMessage.includes('chinese') && !lowerMessage.includes('mexican') && !lowerMessage.includes('italian');
-    const hasSpecificFood = lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonal') || lowerMessage.includes('wendy') || lowerMessage.includes('panera') || lowerMessage.includes('chick-fil') || lowerMessage.includes('qdoba') || lowerMessage.includes('moe') || lowerMessage.includes('taco bell') || lowerMessage.includes('subway') || lowerMessage.includes('burger') || lowerMessage.includes('fries') || lowerMessage.includes('steak') || lowerMessage.includes('bowl') || lowerMessage.includes('burrito') || lowerMessage.includes('taco') || lowerMessage.includes('wrap') || lowerMessage.includes('pizza') || lowerMessage.includes('sushi') || lowerMessage.includes('thai') || lowerMessage.includes('chinese') || lowerMessage.includes('mexican') || lowerMessage.includes('italian') || lowerMessage.includes('sandwich');
-
-    let restaurantSection = '';
-    if (asksAboutRestaurant) {
-      if (isFirstRestaurantAsk) {
-        restaurantSection = '\n\nRESTAURANT MODE — just ask one question back:\n"What sounds good — burger place, Mexican, Asian, pizza, sandwich, or something else?"\nDo NOT give a swap list. Do NOT write an essay. No fluff. Just ask.';
-      } else if (hasSpecificFood) {
-        const phaseNote = context.currentPhase === 1 ? '⚠️ Phase 1 = NO STARCH. Skip rice/pasta/bread.' :
-                          context.currentPhase === 2 ? '⚠️ Phase 2 = starch only Wed/Sat/Sun.' :
-                          context.currentPhase === 5 ? 'Check your Phase 5 plan for today.' :
-                          context.currentPhase === 6 ? 'Phase 6 = starch OK every meal.' : '';
-        const allHardBans = [...(context.allergies || []), ...(context.custom_allergy_bans || [])];
-        const allergyNote = allHardBans.length > 0 ? '⚠️ ALLERGIES: ' + allHardBans.join(', ') + '.' : '';
-        restaurantSection = '\n\nRESTAURANT SWAPS — keep it brief:\n' + (phaseNote ? phaseNote + ' ' : '') + (allergyNote ? allergyNote + ' ' : '') + 'Give 3-5 terse swaps. Example: "Chipotle bowl → skip rice, double veggies, grilled chicken, guac. No cheese (dairy)."';
-      }
-    }
-
-    return `You're in PHASE ${context.currentPhase}: ${phaseDescription}${restaurantSection}
+    return `You're in PHASE ${context.currentPhase}: ${phaseDescription}
 
 Portions per meal:
 Protein: ${portions.protein} (${proteinExamples})
@@ -511,9 +587,7 @@ Example: ${mealExample}
 
 ${isEventClient ? `EVENT IN ${weeksUntilEvent} WEEKS - keep pushing!` : 'Keep crushing it!'}
 
-${(lowerMessage.includes('restaurant') || lowerMessage.includes('fast food') || lowerMessage.includes('eating out') || lowerMessage.includes('eating-out') || lowerMessage.includes('ordering') || lowerMessage.includes('menu item') || lowerMessage.includes('drive thru')) ? ((lowerMessage.includes("i'm at a restaurant") && !lowerMessage.includes('chipotle') && !lowerMessage.includes('mcdonalds') && !lowerMessage.includes('wendys') && !lowerMessage.includes('panera') && !lowerMessage.includes('chick-fil-a') && !lowerMessage.includes('qdoba') && !lowerMessage.includes('moes') && !lowerMessage.includes('taco bell') && !lowerMessage.includes('subway') && !lowerMessage.includes('burger king') && !lowerMessage.includes('kfc') && !lowerMessage.includes('pizza') && !lowerMessage.includes('wing') && !lowerMessage.includes('sushi') && !lowerMessage.includes('thai') && !lowerMessage.includes('chinese') && !lowerMessage.includes('mexican') && !lowerMessage.includes('italian') && !lowerMessage.includes('sandwich') && !lowerMessage.includes('salad') && !lowerMessage.includes('soup') && !lowerMessage.includes('bowl') && !lowerMessage.includes('burrito') && !lowerMessage.includes('taco') && !lowerMessage.includes('wrap') && !lowerMessage.includes('burger') && !lowerMessage.includes('fries') && !lowerMessage.includes('steak') && !lowerMessage.includes('grill') && !lowerMessage.includes('bbq') && !lowerMessage.includes('wings') && !lowerMessage.includes('fast food') && !lowerMessage.includes('ordering')) ? "RESTAURANT MODE - keep it SHORT: Just ask ONE question - What sounds good? Burger, Mexican, Asian, pizza, sandwich or something else? No swap list. No essay. Just ask." : ((lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonalds') || lowerMessage.includes('wendys') || lowerMessage.includes('panera') || lowerMessage.includes('chick-fil-a') || lowerMessage.includes('qdoba') || lowerMessage.includes('moes') || lowerMessage.includes('taco bell') || lowerMessage.includes('subway') || lowerMessage.includes('burger king') || lowerMessage.includes('kfc') || lowerMessage.includes('pizza') || lowerMessage.includes('sushi') || lowerMessage.includes('thai') || lowerMessage.includes('chinese') || lowerMessage.includes('mexican') || lowerMessage.includes('italian') || lowerMessage.includes('salad') || lowerMessage.includes('soup') || lowerMessage.includes('bowl') || lowerMessage.includes('burrito') || lowerMessage.includes('taco') || lowerMessage.includes('wrap') || lowerMessage.includes('burger') || lowerMessage.includes('fries') || lowerMessage.includes('sandwich') || lowerMessage.includes('steak') || lowerMessage.includes('grill') || lowerMessage.includes('bbq') || lowerMessage.includes('wings') || lowerMessage.includes('fast food') || lowerMessage.includes('ordering') || lowerMessage.includes('chipotle') || lowerMessage.includes('mcdonald') || lowerMessage.includes('at a restaurant')) ? ("RESTAURANT MODE - be BRIEF: Give 3-5 specific swaps. " + (context.currentPhase === 1 ? "Phase 1 = NO STARCH. Skip rice/pasta/bread." : context.currentPhase === 2 ? "Phase 2 = starch only Wed/Sat/Sun." : context.currentPhase === 5 ? "Check your Phase 5 plan for today." : context.currentPhase === 6 ? "Phase 6 = starch OK every meal." : "") + (context.allergies && context.allergies.length > 0 ? " ALLERGIES: " + context.allergies.join(', ') + "." : "") + " Format: [what they said] -> [approved swap]. Max 3-4 lines. Example: Chipotle bowl: skip rice, double veggies, grilled chicken, add guac. No cheese/sour cream (dairy).") : "")) : ""}
 
-Ask me anything about specific foods!`;
   }
 
   // Gate allergy discovery tips — never suggest adding foods as allergies unless client has opted in

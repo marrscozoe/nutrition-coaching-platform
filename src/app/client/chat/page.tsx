@@ -16,6 +16,7 @@ interface ClientData {
   goal_weight: number;
   starting_weight: number;
   program_type: string;
+  allergy_discovery_enabled?: boolean;
 }
 
 interface ChatMessage {
@@ -1014,6 +1015,16 @@ export default function ChatPage() {
           <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-brand-orange/20 to-brand-orange/10 border border-brand-orange/30">
             <p className="text-sm text-brand-cream font-medium mb-2">👋 Hey! I'm your AI nutrition coach!</p>
             <p className="text-xs text-brand-cream/70">Ask me anything about your meals or portions!</p>
+            {client?.allergy_discovery_enabled && (
+              <div className="mt-3 pt-3 border-t border-brand-orange/20">
+                <p className="text-xs text-brand-cream/60 font-semibold mb-1">🔍 Allergy Discovery is ON</p>
+                <ol className="text-xs text-brand-cream/60 space-y-0.5 pl-0 list-none">
+                  <li>1️⃣ Log your meals</li>
+                  <li>2️⃣ After eating, tell me how you feel (bloated / pain / fine)</li>
+                  <li>3️⃣ I'll find patterns and may suggest foods to avoid</li>
+                </ol>
+              </div>
+            )}
           </div>
         )}
         {messages.map((message) => (
