@@ -200,12 +200,11 @@ export default function ChatPage() {
         if (storedHistory) {
           try {
             const parsed = JSON.parse(storedHistory);
-            // Extract meal IDs from sessionStorage messages (format: meal-{id}-user)
+            // Extract meal IDs from sessionStorage messages using mealDbId directly
+            // (message IDs are meal-{uuid}-user; UUIDs contain dashes so parsing by '_' fails)
             parsed.forEach((m: any) => {
-              if (m.isMealLog && m.id && m.id.startsWith('meal-')) {
-                // ID format: meal-{id}-user or meal_{id}_{timestamp}
-                const parts = m.id.replace('meal-', 'meal_').split('_');
-                if (parts.length >= 2) existingMealIds.add(parts[1]);
+              if (m.isMealLog && m.mealDbId) {
+                existingMealIds.add(String(m.mealDbId));
               }
             });
           } catch (e) { /* ignore */ }
