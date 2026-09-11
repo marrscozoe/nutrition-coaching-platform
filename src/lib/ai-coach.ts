@@ -1414,6 +1414,10 @@ export async function analyzeMealPortion(
     console.log('[DEBUG analyzeMealPortion] AFTER MATCHING: hasFat:', hasFat, '| hasProtein:', hasProtein, '| hasVeg:', hasVeg, '| hasStarch:', hasStarch);
   }
 
+  // Processed protein keywords — these appear in LEAN_PROTEINS (for Home deduction)
+  // but are NOT approved for coaching advice.
+  const processedProteinKeywords = ['sausage', 'pepperoni', 'salami', 'ham', 'bacon', 'hot dog', 'bratwurst', 'pastrami', 'chorizo', 'prosciutto'];
+
   // Build unrecognized items list
   const foodItems = splitIntoFoodItems(foodDescription);
   for (const item of foodItems) {
@@ -1421,7 +1425,13 @@ export async function analyzeMealPortion(
     let found = false;
     // Special case: eggs are recognized as both protein AND fat
     if (itemLower.includes('egg') && !itemLower.includes('eggplant')) { found = true; }
-    if (!found && itemMatchesFoodList(itemLower, LEAN_PROTEINS)) { found = true; }
+    // Lean proteins — but processed meats (sausage, pepperoni, etc.) are NOT approved for coaching
+    if (!found && itemMatchesFoodList(itemLower, LEAN_PROTEINS)) {
+      const isProcessedProtein = processedProteinKeywords.some(kw => itemLower.includes(kw));
+      if (!isProcessedProtein) { found = true; }
+      // If processed protein, leave found=false so it goes into unrecognizedItems
+      // and triggers the processed-protein correction below.
+    }
     if (!found && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) { found = true; }
     if (!found && itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) { found = true; }
     if (!found && itemMatchesFoodList(itemLower, HEALTHY_FATS)) { found = true; }
@@ -1705,6 +1715,15 @@ export async function analyzeMealPortion(
       }
       // If tortillas are present in unrecognized items, they're allowed in Phase 6, so no starch correction needed
     }
+
+    // Processed proteins (sausage, pepperoni, etc.) are NOT approved for coaching in any phase.
+    const processedProteinsPhase6 = unrecognizedItems.filter(item => {
+      const lower = item.toLowerCase();
+      return processedProteinKeywords.some(kw => lower.includes(kw));
+    });
+    if (processedProteinsPhase6.length > 0) {
+      corrections.push(`⚠️ Processed protein — replace with lean steak, chicken breast, or any approved lean protein (see your food list).`);
+    }
   } else if (phase === 1 || phase === 2 || phase === 5) {
     // Phase 5 uses rotating rules - determine if today is a strict day
     let rulePhase = phase;
@@ -1732,6 +1751,16 @@ export async function analyzeMealPortion(
         missingCategories.push('fat');
         corrections.push(`💡 You need ${portions.fat} olive oil or ${portions.avocado} avocado for healthy fat.`);
       }
+    }
+
+    // Check for processed proteins (sausage, pepperoni, salami, etc.) in unrecognized items.
+    // These are NOT on the approved coaching list even though Home deducts them.
+    const processedProteinsInUnrecognized = unrecognizedItems.filter(item => {
+      const lower = item.toLowerCase();
+      return processedProteinKeywords.some(kw => lower.includes(kw));
+    });
+    if (processedProteinsInUnrecognized.length > 0) {
+      corrections.push(`⚠️ Processed protein — sausage and similar are NOT approved coaching advice. Replace with lean steak, chicken breast, or any approved lean protein (see your food list).`);
     }
   } else if (phase === 4) {
     // Phase 4 maintenance: ALL 4 categories (protein, veg, fat, starch) required to be "on phase"
@@ -1769,6 +1798,16 @@ export async function analyzeMealPortion(
         // Processed starch detected — tell client to replace with approved starches
         corrections.push(`💡 Replace the processed starch with an approved starch: rice, beans, potatoes, or sweet potato.`);
       }
+    }
+
+    // Processed proteins (sausage, pepperoni, etc.) are NOT approved for coaching in any phase.
+    // Re-check here since this is the Phase 4 branch.
+    const processedProteinsPhase4 = unrecognizedItems.filter(item => {
+      const lower = item.toLowerCase();
+      return processedProteinKeywords.some(kw => lower.includes(kw));
+    });
+    if (processedProteinsPhase4.length > 0) {
+      corrections.push(`⚠️ Processed protein — replace with lean steak, chicken breast, or any approved lean protein (see your food list).`);
     }
   }
 
@@ -1881,7 +1920,15 @@ export function getMealEvaluationPrompt(
   // flag it explicitly so the AI doesn't give generic "add starch" advice
   // EXCEPTION: In Phase 6, tortillas are explicitly allowed, so don't flag them
   if (analysis.unrecognizedItems.length > 0) {
-    const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'pepperoni', 'salami', 'bacon', 'ham', 'hot dog', 'sausage', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
+    // Processed meats are NOT processed starches — handle separately below.
+    const processedMeatKeywords = ['sausage', 'pepperoni', 'salami', 'ham', 'bacon', 'hot dog', 'bratwurst', 'pastrami', 'chorizo', 'prosciutto'];
+    const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
+
+    const processedMeats = analysis.unrecognizedItems.filter(item => {
+      const lower = item.toLowerCase();
+      return processedMeatKeywords.some(kw => lower.includes(kw));
+    });
+
     const processedStarches = analysis.unrecognizedItems.filter(item => {
       const lower = item.toLowerCase();
       return processedStarchKeywords.some(kw => lower.includes(kw));
@@ -1892,6 +1939,13 @@ export function getMealEvaluationPrompt(
       ? processedStarches.filter(item => !item.toLowerCase().includes('tortilla'))
       : processedStarches;
     
+    if (processedMeats.length > 0) {
+      p += `\n⚠️ PROCESSED PROTEIN — NOT ON APPROVED LIST:\n`;
+      const itemList = processedMeats.join(', ');
+      const isAre = processedMeats.length > 1 ? 'are' : 'is';
+      p += `- ${itemList} ${isAre} a PROCESSED PROTEIN (not approved for coaching). Replace with lean steak, chicken breast, or any approved lean protein.\n`;
+    }
+    
     if (processedStarchesToFlag.length > 0) {
       p += `\n⚠️ PROCESSED STARCH - NOT ON APPROVED LIST:\n`;
       const itemList = processedStarchesToFlag.join(', ');
@@ -1899,8 +1953,10 @@ export function getMealEvaluationPrompt(
       p += `- ${itemList} ${isAre} a PROCESSED STARCH (not on the approved list). Replace with an approved starch: rice, beans, potatoes, or sweet potato.\n`;
     }
     
-    // Show other unrecognized items (not processed starches) for AI judgment
-    const otherUnrecognized = analysis.unrecognizedItems.filter(item => !processedStarches.includes(item));
+    // Show other unrecognized items (not processed meats or processed starches) for AI judgment
+    const otherUnrecognized = analysis.unrecognizedItems.filter(item => 
+      !processedMeats.includes(item) && !processedStarches.includes(item)
+    );
     if (otherUnrecognized.length > 0) {
       p += `\nUNRECOGNIZED (use your judgment): ${otherUnrecognized.join(', ')}\n`;
     }
