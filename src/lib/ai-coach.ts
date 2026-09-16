@@ -2028,15 +2028,40 @@ export function getMealEvaluationPrompt(
   }
 
   // Coaching rules - keep it simple, AI formats in Allen's voice
-  p += `\nYOUR JOB:\n`;
+  // CRITICAL: Make corrections MANDATORY, not optional
+  p += `\nYOUR JOB - FOLLOW THIS EXACTLY:\n`;
   if (isSnack) {
     p += `- If allowed: "Good snack! 💪"\n`;
     p += `- If problems: explain what's wrong, 1 sentence max\n`;
   } else {
-    p += `- Allen's voice — short, punchy, direct. 1-3 sentences max.\n`;
-    p += `- If CORRECTIONS: include the portion corrections in your response\n`;
-    p += `- If REMOVE or MISSING: give short coaching on what to change\n`;
-    p += `- If NO CORRECTIONS, NO REMOVE, NO MISSING: "Nice! Keep it up! 💪"\n`;
+    // Build the EXACT response the AI MUST use
+    const exactResponseParts: string[] = [];
+    // Add all corrections verbatim
+    for (const correction of (analysis.corrections || [])) {
+      exactResponseParts.push(correction.replace(/^💡\s*/, ''));
+    }
+    // Add REMOVE items
+    for (const item of analysis.disallowedItems) {
+      exactResponseParts.push(`⚠️ Remove: ${item}`);
+    }
+    // Add MISSING items with EXACT wording
+    if (analysis.missingCategories.includes('protein')) exactResponseParts.push(`You need ${m ? '6oz' : '4oz'} lean protein`);
+    if (analysis.missingCategories.includes('vegetable')) exactResponseParts.push(`You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables`);
+    if (analysis.missingCategories.includes('starch')) exactResponseParts.push(`You need ${portions.starch} sweet potato`);
+    if (analysis.missingCategories.includes('fat')) exactResponseParts.push(`You need ${m ? '2 tbsp' : '1 tbsp'} olive oil or ${portions.avocado} avocado`);
+    if (analysis.missingCategories.includes('water')) exactResponseParts.push(`You need ${m ? '32oz' : '20oz'} water`);
+    
+    if (exactResponseParts.length > 0) {
+      // AI MUST use exactly these messages, nothing else
+      p += `- YOU MUST SAY THESE THINGS (use Allen's voice, short and punchy):\n`;
+      for (const part of exactResponseParts) {
+        p += `  • ${part}\n`;
+      }
+      p += `- DO NOT add any other advice or foods not listed above\n`;
+      p += `- DO NOT suggest adding foods that are not in MISSING or CORRECTIONS\n`;
+    } else {
+      p += `- "Nice! Keep it up! 💪"\n`;
+    }
     p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
     p += `- NEVER mention a food unless it appears in CORRECTIONS, REMOVE, or MISSING above\n`;
   }
