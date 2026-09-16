@@ -627,13 +627,12 @@ When client describes a meal they ate or are eating, you MUST check ALL of these
    - Phase 1: NO starch allowed — if they have starch, tell them to drop it
    - Phase 2: Starch only allowed at breakfast/lunch on Wed/Sat/Sun — if they have starch at wrong meal/day, tell them
    - Phase 5: Starch rules vary by day — today is ${context.phase5RuleType === 'phase1' ? 'a Phase 1 day (NO starch)' : context.phase5RuleType === 'phase2' ? 'a Phase 2 day (starch breakfast/lunch only)' : context.phase5RuleType === 'phase4' ? 'a Phase 4 day (starch every meal)' : 'an unknown day type (check plan)'}
-   - Phase 4: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '2 cups' : '1 cup'}
+   - Phase 4/6: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? (context.currentPhase === 6 ? '3 cups' : '2 cups') : (context.currentPhase === 6 ? '2 cups' : '1 cup')} (Phase 6 allows MORE starch)
    - PROCESSED STARCH — if client describes eating pizza, pepperoni, salami, ham, hot dog, bacon, sausage, burrito, taco, sandwich, sub, wrap, pasta dish, fried rice, or similar processed starches: these are NOT on the approved starch list. Tell them to REPLACE with an approved starch: sweet potato, red potato, beans, millet, oats, or rice. Do NOT say "add rice on top" — tell them to SWAP the processed food for the approved starch.
-   - Phase 6: Starch is allowed — if missing, tell them to add ${context.gender === 'male' ? '3 cups' : '2 cups'} (Phase 6 allows MORE starch)
    
 4. HEALTHY FAT — Is there fat? (${evalFatExamples})
    - Phase 1/2/4/5: Missing → tell them to add ${context.gender === 'male' ? '2 tbsp' : '1 tbsp'} fat
-   - Phase 6: Missing → tell them to add ${context.gender === 'male' ? '3 tbsp' : '3 tbsp'} fat (Phase 6 allows MORE fat)
+   - Phase 6: Missing → tell them to add ${context.gender === 'male' ? '3 tbsp' : '2 tbsp'} fat (Phase 6 allows MORE fat)
    
 5. WATER — Did they mention water?
    - Missing → tell them to drink ${context.gender === 'male' ? '32oz' : '20oz'} water with this meal
@@ -1582,6 +1581,25 @@ export async function analyzeMealPortion(
       corrections.push(`⚠️ Phase 1 - NO starch! Skip the starch completely.`);
     }
   }
+  // Phase 1: NO dairy allowed (heavy cream is dairy, not a valid fat in Phase 1)
+  if (phase === 1) {
+    const dairyKeywords = ['heavy cream', 'milk', 'cheese', 'yogurt', 'butter', 'cream', 'ice cream', 'whey', 'cottage cheese', 'sour cream', 'cream cheese', 'ghee'];
+    const foundDairy = dairyKeywords.filter(k => foodLower.includes(k));
+    if (foundDairy.length > 0) {
+      disallowedItems.push(...foundDairy);
+      corrections.push(`⚠️ Phase 1 — NO dairy! Remove: ${foundDairy.join(', ')}. Dairy is not allowed in Phase 1.`);
+      // If the only fat was dairy (heavy cream), re-check fat by excluding dairy items
+      const nonDairyFoodItems = foodItems.filter(item => {
+        const itemL = item.toLowerCase();
+        return !dairyKeywords.some(dk => itemL.includes(dk));
+      });
+      let stillHasFat = false;
+      for (const item of nonDairyFoodItems) {
+        if (itemMatchesFoodList(item.toLowerCase(), HEALTHY_FATS)) { stillHasFat = true; break; }
+      }
+      if (!stillHasFat) hasFat = false;
+    }
+  }
   // Phase 2: Starch allowed Wed/Sat/Sun breakfast/lunch ONLY
   else if (phase === 2 && hasStarch) {
     const isBreakfastOrLunch = mealType === 'breakfast' || mealType === 'lunch' || context.mealType === 'breakfast' || context.mealType === 'lunch';
@@ -1639,7 +1657,7 @@ export async function analyzeMealPortion(
     const foundSugar = sugarKeywords.filter(k => foodLower.includes(k));
     if (foundSugar.length > 0) {
       disallowedItems.push(...foundSugar);
-      corrections.push(`⚠️ No sugar allowed in this phase! Remove the sugar/sweet items: ${foundSugar.join(', ')}.`);
+      corrections.push(`⚠️ Phase ${phase} — NO sugar allowed! Remove the sugar/sweet items: ${foundSugar.join(', ')}.`);
     }
   }
 
@@ -1924,6 +1942,18 @@ export function getMealEvaluationPrompt(
   const m = gender === 'male';
   const portions = getPortions(gender, phase);
 
+  // Build allergy-filtered food lists for the evaluation protocol
+  const allergies = [...(context.allergies || []), ...(context.custom_allergy_bans || [])];
+  const filteredLists = allergies.length > 0 ? getFilteredFoodLists(allergies) : null;
+
+  // For Phase 1: also filter out dairy items from fat list since Phase 1 disallows dairy
+  let fatExamplesForPhase = (filteredLists?.healthyFats || HEALTHY_FATS);
+  if (phase === 1) {
+    const dairyFatItems = ['heavy cream', 'kerrygold', 'safflower oil', 'coconut oil', 'mct oil'];
+    fatExamplesForPhase = fatExamplesForPhase.filter(f => !dairyFatItems.some(d => f.toLowerCase().includes(d)));
+  }
+  const evalFatExamples = fatExamplesForPhase.join(', ');
+
   // Phase rules (one line each)
   const phaseRules: Record<number, string> = {
     1: 'NO starch, NO sugar — protein, veggies, fat only',
@@ -2018,12 +2048,13 @@ export function getMealEvaluationPrompt(
 
   // MISSING section - required categories not present (Phase 4 missing starch, etc.)
   // IMPORTANT: Use EXACT format "You need X" so AI cannot misinterpret portions
+  // NOTE: fat is handled in YOUR JOB / exactResponseParts (which includes "olive oil or avocado")
+  // to avoid duplication — do NOT add fat here.
   if (!isSnack && analysis.missingCategories.length > 0) {
     p += `\nMISSING — Quote these EXACTLY in your response (do NOT change the food or amount):\n`;
     if (analysis.missingCategories.includes('protein')) p += `- "You need ${m ? '6oz' : '4oz'} lean protein"\n`;
     if (analysis.missingCategories.includes('vegetable')) p += `- "You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables"\n`;
     if (analysis.missingCategories.includes('starch')) p += `- "You need ${portions.starch} sweet potato" OR "You need ${portions.starch} red potato" OR "You need ${portions.starch} beans" OR "You need ${portions.starch} fruit"\n`;
-    if (analysis.missingCategories.includes('fat')) p += `- "You need ${m ? '2 tbsp' : '1 tbsp'} olive oil"\n`;
     if (analysis.missingCategories.includes('water')) p += `- "You need ${m ? '32oz' : '20oz'} water"\n`;
   }
 
