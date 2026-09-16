@@ -832,6 +832,13 @@ export default function ClientDashboard() {
                     <p className="text-xs text-yellow-400 font-semibold">⚠️ Only with Phase 5 plan</p>
                   </div>
                 )}
+
+                {client.current_phase === 6 && (
+                  <div className="mx-5 mt-4 p-3 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                    <p className="text-xs text-orange-400 font-semibold">⚠️ Processed/non-approved starches not allowed in Phase 6 — choose approved starches</p>
+                    <p className="text-xs text-orange-300/70 mt-1">e.g., sweet potato, red potato, Yukon gold</p>
+                  </div>
+                )}
               </>
             )}
 
