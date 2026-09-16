@@ -798,9 +798,9 @@ export interface MealData {
  * Handles commas, "and", and various separators.
  */
 function splitIntoFoodItems(foodDescription: string): string[] {
-  // Split on common separators: commas, "and", newlines, semicolons
+  // Split on common separators: commas, "and", newlines, semicolons, plus signs, slashes, ampersands
   const items = foodDescription
-    .split(/[,\n;]+|\band\b/i)
+    .split(/[,\n;+\/&]+|\band\b/i)
     .map(item => item.trim())
     .filter(item => item.length > 0);
   return items;
@@ -1019,6 +1019,14 @@ export function extractMealData(
     mealType: context.mealType,
     mealDate: context.mealDate,
   };
+
+  // Sugar detection — Phase 1/2/5 all disallow sugar
+  // Scan the full food description for sugar-related keywords
+  const sugarKeywords = ['sugar', 'candy', 'soda', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'ice cream', 'cereal', 'sweet'];
+  const hasSugar = phase !== 4 && phase !== 6 && sugarKeywords.some(k => foodLower.includes(k));
+  if (hasSugar) {
+    disallowedItems.push('Sugar (disallowed in this phase)');
+  }
 
   return {
     recognizedItems,
@@ -1624,6 +1632,18 @@ export async function analyzeMealPortion(
   }
 
   // =============================================
+  // SUGAR CHECK — Phase 1/2/5 all disallow sugar
+  // =============================================
+  if (phase === 1 || phase === 2 || phase === 5) {
+    const sugarKeywords = ['sugar', 'candy', 'soda', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'ice cream', 'cereal', 'sweet'];
+    const foundSugar = sugarKeywords.filter(k => foodLower.includes(k));
+    if (foundSugar.length > 0) {
+      disallowedItems.push(...foundSugar);
+      corrections.push(`⚠️ No sugar allowed in this phase! Remove the sugar/sweet items: ${foundSugar.join(', ')}.`);
+    }
+  }
+
+  // =============================================
   // ALLERGY CHECK — flag foods banned by hard allergies
   // =============================================
   const allergies = context.allergies || [];
@@ -1906,10 +1926,10 @@ export function getMealEvaluationPrompt(
 
   // Phase rules (one line each)
   const phaseRules: Record<number, string> = {
-    1: 'NO starch — protein, veggies, fat only',
-    2: 'Starch only Wed/Sat/Sun breakfast & lunch',
+    1: 'NO starch, NO sugar — protein, veggies, fat only',
+    2: 'Starch only Wed/Sat/Sun breakfast & lunch — NO sugar',
     4: 'Starch every meal — maintenance',
-    5: `Phase 5 — rotating 3-day blocks`,
+    5: `Phase 5 — rotating 3-day blocks — NO sugar`,
     6: 'Starch every meal — Phase 6',
   };
 
@@ -1964,7 +1984,21 @@ export function getMealEvaluationPrompt(
     // Show other unrecognized items (not processed starches) for AI judgment
     const otherUnrecognized = analysis.unrecognizedItems.filter(item => !processedStarches.includes(item));
     if (otherUnrecognized.length > 0) {
-      p += `\nUNRECOGNIZED (use your judgment): ${otherUnrecognized.join(', ')}\n`;
+      // Flag sugar items explicitly for Phase 1/2/5 — sugar is always disallowed in these phases
+      const sugarKeywords = ['sugar', 'candy', 'soda', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'ice cream', 'sweet'];
+      const sugarItems = otherUnrecognized.filter(item =>
+        sugarKeywords.some(k => item.toLowerCase().includes(k))
+      );
+      const nonSugarUnrecognized = otherUnrecognized.filter(item =>
+        !sugarItems.includes(item)
+      );
+      if (sugarItems.length > 0 && (phase === 1 || phase === 2 || phase === 5)) {
+        p += `\n⚠️ SUGAR DETECTED — NOT ALLOWED in Phase ${phase}!\n`;
+        p += `- Remove: ${sugarItems.join(', ')}\n`;
+      }
+      if (nonSugarUnrecognized.length > 0) {
+        p += `\nUNRECOGNIZED (use your judgment): ${nonSugarUnrecognized.join(', ')}\n`;
+      }
     }
   }
 
