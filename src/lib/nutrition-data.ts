@@ -277,6 +277,7 @@ export const LEAN_PROTEINS = [
   'Egg beaters', 'Liquid eggs',
   'Protein powder',
   'Whey protein',
+  'Protein bar',
   'Bacon (nitrate-free, twice per week)',
 ];
 // NO cheese or dairy while dieting
@@ -1166,10 +1167,24 @@ function parseFraction(s: string): number {
 function extractAmount(item: string, foodPos: number = -1): { amount: number; unit: string } {
   // Match all number+unit pairs in the item string with their start positions.
   const pattern = /([\d]+(?:\.[\d]+)?(?:\s*\/\s*[\d]+)?|(?:[\d]+\s*\/\s*[\d]+))\s*(oz|ounce|ounces|cups?|tbsp|tablespoons?|handfuls?|handful|egg|eggs|g|gram|grams)\b/gi;
+  // Also match no-space gram forms: "40g", "40gram", "40grams" (no space between number and g/gram)
+  const noSpacePattern = /([\d]+(?:\.[\d]+)?)\s*(g|gram|grams)\b/gi;
   const matches: { amountStr: string; unit: string; start: number; end: number }[] = [];
   let m: RegExpExecArray | null;
   while ((m = pattern.exec(item)) !== null) {
     matches.push({ amountStr: m[1].trim(), unit: m[2].toLowerCase(), start: m.index, end: m.index + m[0].length });
+  }
+  // Handle no-space gram forms (e.g., "40g", "40gram") — only if not already matched
+  while ((m = noSpacePattern.exec(item)) !== null) {
+    // Skip if this span is already covered by a pattern match (avoid duplicates)
+    const alreadyMatched = matches.some(existing => m!.index >= existing.start && m!.index < existing.end);
+    if (!alreadyMatched) {
+      // Only accept if the unit is exactly "g", "gram", or "grams" (no-space form)
+      const unit = m[2].toLowerCase();
+      if (unit === 'g' || unit === 'gram' || unit === 'grams') {
+        matches.push({ amountStr: m[1].trim(), unit, start: m.index, end: m.index + m[0].length });
+      }
+    }
   }
   if (matches.length === 0) return { amount: 1, unit: '' };
   if (matches.length === 1) {
