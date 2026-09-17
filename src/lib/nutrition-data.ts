@@ -1165,7 +1165,7 @@ function parseFraction(s: string): number {
  */
 function extractAmount(item: string, foodPos: number = -1): { amount: number; unit: string } {
   // Match all number+unit pairs in the item string with their start positions.
-  const pattern = /([\d]+(?:\.[\d]+)?(?:\s*\/\s*[\d]+)?|(?:[\d]+\s*\/\s*[\d]+))\s*(oz|ounce|ounces|cups?|tbsp|tablespoons?|handfuls?|handful|egg|eggs)\b/gi;
+  const pattern = /([\d]+(?:\.[\d]+)?(?:\s*\/\s*[\d]+)?|(?:[\d]+\s*\/\s*[\d]+))\s*(oz|ounce|ounces|cups?|tbsp|tablespoons?|handfuls?|handful|egg|eggs|g|gram|grams)\b/gi;
   const matches: { amountStr: string; unit: string; start: number; end: number }[] = [];
   let m: RegExpExecArray | null;
   while ((m = pattern.exec(item)) !== null) {
@@ -1346,10 +1346,11 @@ function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'starch' | 
     return false;
   }
 
-  // Check lean proteins (whey/bacon excluded from deduction)
+  // Check lean proteins (bacon excluded from deduction; whey/protein powder ARE protein)
   for (const food of LEAN_PROTEINS) {
     const foodLower = food.toLowerCase();
-    if (foodLower.includes('whey') || foodLower.includes('bacon')) continue;
+    // Only skip bacon — whey protein powder counts as protein for Home deduction
+    if (foodLower.includes('bacon')) continue;
     if (itemContainsFood(food)) return 'protein';
   }
 
@@ -1381,6 +1382,8 @@ function normalizeToCategoryUnit(amount: number, unit: string, category: 'protei
   if (category === 'protein') {
     // "egg" / "eggs" → 1 oz each
     if (u === 'egg' || u === 'eggs') return amount;
+    // grams → oz (protein powder: g ÷ 6.7 = oz)
+    if (u === 'g' || u === 'gram' || u === 'grams') return Math.round((amount / 6.7) * 10) / 10;
     // oz assumed otherwise
     return amount;
   }

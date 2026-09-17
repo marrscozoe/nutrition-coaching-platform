@@ -819,6 +819,22 @@ function itemMatchesFoodList(itemLower: string, foodList: string[]): boolean {
   // Strip portion descriptions before matching (e.g. "Almonds (3 small handfuls...)" → "Almonds")
   const stripPortion = (s: string) => s.split('(')[0].toLowerCase().trim();
   const itemClean = stripPortion(itemLower);
+
+  // Guard: plain water (beverage) must never match fibrous vegetables via "Water chestnuts".
+  // "water" as the last word of a multi-word entry (e.g. "water chestnuts") should not
+  // match a plain-water beverage item. Use word-boundary check: the word must appear as a
+  // distinct token, not just as a substring of the item.
+  // e.g. "24oz water" → word "water" is a standalone token → do NOT match water chestnuts
+  // e.g. "water chestnuts" → matched via direct includes above
+  function hasWordBoundaryMatch(item: string, word: string): boolean {
+    try {
+      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, 'i').test(item);
+    } catch {
+      return item.includes(word);
+    }
+  }
+
   for (const foodEntry of foodList) {
     const entryClean = stripPortion(foodEntry);
     // Direct match after stripping portion text
@@ -832,11 +848,29 @@ function itemMatchesFoodList(itemLower: string, foodList: string[]): boolean {
     // e.g. "Kidney beans" → ["kidney", "beans"] would incorrectly match "green beans"
     // because "beans" is a substring, not a distinct food word in that context.
     // Single-word entries are already handled by the direct includes checks above.
+    // Use word-boundary matching so "water" in "24oz water" does NOT match
+    // "Water chestnuts" (water is last word of entry → matched only if item ends with "water")
     const foodWords = entryClean.split(/[\s,]+/).filter(w => w.length > 2);
     if (foodWords.length > 1) {
+      const lastWord = foodWords[foodWords.length - 1];
       for (const word of foodWords) {
-        if (word.length > 2 && itemLower.includes(word)) return true;
-        if (word.length > 2 && itemClean.includes(word)) return true;
+        // For the last word of the entry, only match if the item ends with that word
+        // (prevents "24oz water" from matching "water chestnuts")
+        const isLastWord = word === lastWord;
+        if (isLastWord) {
+          // Only match if item ends with this word (standalone token at end)
+          if (word.length > 2 && itemLower.endsWith(word)) {
+            // Also verify it's a standalone token at the end (word boundary before it)
+            const prefix = itemLower.slice(0, -word.length).trimEnd();
+            if (prefix === '' || !/[a-z0-9]$/i.test(prefix)) {
+              return true;
+            }
+          }
+        } else {
+          // For non-last words, require word-boundary match to avoid substring false positives
+          if (word.length > 2 && hasWordBoundaryMatch(itemLower, word)) return true;
+          if (word.length > 2 && hasWordBoundaryMatch(itemClean, word)) return true;
+        }
       }
     }
   }
@@ -898,9 +932,13 @@ export function extractMealData(
       }
     }
 
-    // Check vegetable
+    // Check vegetable — but plain water/coffee must never set hasVeg.
+    // A plain-water item is: starts with number+unit then contains only "water" (e.g. "24oz water", "water 32 oz").
+    // These should not match "Water chestnuts" via the word-boundary fix above.
     if (!found && !hasVeg) {
-      if (itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) {
+      const isPlainWaterItem = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(itemLower.trim()) ||
+        /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(itemLower.trim());
+      if (!isPlainWaterItem && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) {
         recognizedItems.push({ item, category: 'vegetable' });
         hasVeg = true;
         found = true;
@@ -1474,8 +1512,11 @@ export async function analyzeMealPortion(
       }
 
       // Priority matching: check categories in order, skip rest once matched
+      // Plain water must never set hasVeg (would falsely match Water chestnuts)
+      const isPlainWaterItem = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(itemLower.trim()) ||
+        /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(itemLower.trim());
       if (!found && itemMatchesFoodList(itemLower, LEAN_PROTEINS)) { hasProtein = true; found = true; }
-      if (!found && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) { hasVeg = true; found = true; }
+      if (!found && !isPlainWaterItem && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) { hasVeg = true; found = true; }
       if (!found && itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) { hasStarch = true; found = true; }
       if (!found && itemMatchesFoodList(itemLower, HEALTHY_FATS)) { hasFat = true; found = true; }
       if (!found && itemMatchesFoodList(itemLower, SUPPLEMENTS)) { hasSupplement = true; found = true; }
@@ -1563,6 +1604,8 @@ export async function analyzeMealPortion(
   const corrections: string[] = [];
   const disallowedItems: string[] = [];
   const missingCategories: string[] = [];
+  // Track fat tip emission to prevent duplicate fat guidance
+  let fatTipEmitted = false;
 
   // Water check - per meal requirement: 32oz for men, 20oz for women
   const waterRequired = context.gender === 'male' ? 32 : 20;
@@ -1597,7 +1640,13 @@ export async function analyzeMealPortion(
       for (const item of nonDairyFoodItems) {
         if (itemMatchesFoodList(item.toLowerCase(), HEALTHY_FATS)) { stillHasFat = true; break; }
       }
-      if (!stillHasFat) hasFat = false;
+      if (!stillHasFat) {
+        hasFat = false;
+        // No non-dairy approved fat found — this is the ONE fat tip for the meal.
+        // Portion correction for dairy fat is skipped (dairyFatOnlyInPhase1or2or5 handles it).
+        corrections.push(`💡 You need ${portions.fat} olive oil or ${portions.avocado} avocado for healthy fat.`);
+        fatTipEmitted = true;
+      }
     }
   }
   // Phase 2: Starch allowed Wed/Sat/Sun breakfast/lunch ONLY
@@ -1700,25 +1749,28 @@ export async function analyzeMealPortion(
   // =============================================
   // CHECK STATED PORTIONS
   // =============================================
-  // For each recognized food item, check if the stated portion is correct
+  // For each recognized food item, check if the stated portion is correct.
   // RULES:
   // - If NO portion stated -> assume correct (no correction)
   // - If portion stated AND wrong -> add correction
   // - If portion stated AND correct -> no correction
-  // 
-  // IMPORTANT: Check ALL categories for each food item, not just the first match!
-  // For compound items like "2 cups asparagus with 1 tablespoon olive oil",
-  // we need to check BOTH the vegetable portion (asparagus) AND the fat portion (olive oil).
+  //
+  // IMPORTANT: Fat tip at most once per meal. If Phase 1 dairy removal already emitted
+  // a fat tip (fatTipEmitted=true), skip fat portion corrections here.
+  // Dairy fat in Phase 1 does not get a portion correction — the REMOVE dairy message
+  // + "need approved fat" tip from the dairy removal section covers it.
+  const dairyKeywords = ['heavy cream', 'milk', 'cheese', 'yogurt', 'butter', 'cream', 'ice cream', 'whey', 'cottage cheese', 'sour cream', 'cream cheese', 'ghee'];
+
   for (const item of foodItems) {
     const itemLower = item.toLowerCase();
-    
+
     // Collect all matched categories for this item
     interface MatchedCategory {
       category: 'protein' | 'vegetable' | 'starch' | 'fat';
       matchedFood: string;
     }
     const matchedCategories: MatchedCategory[] = [];
-    
+
     // Special case: eggs are both protein AND fat
     if (itemLower.includes('egg') && !itemLower.includes('eggplant')) {
       matchedCategories.push({ category: 'protein', matchedFood: 'egg' });
@@ -1726,7 +1778,7 @@ export async function analyzeMealPortion(
     } else {
       // Check each category and collect ALL matches
       // Don't break early - we need to find ALL foods in this item
-      
+
       // Check protein
       for (const protein of LEAN_PROTEINS) {
         if (itemLower.includes(protein.toLowerCase())) {
@@ -1734,43 +1786,46 @@ export async function analyzeMealPortion(
           // Don't break - there might be other foods too
         }
       }
-      
+
       // Check vegetable
       for (const veg of FIBROUS_VEGETABLES) {
         if (itemLower.includes(veg.toLowerCase())) {
           matchedCategories.push({ category: 'vegetable', matchedFood: veg });
         }
       }
-      
+
       // Check starch
       for (const starch of STARCHY_CARBOHYDRATES) {
         if (itemLower.includes(starch.toLowerCase())) {
           matchedCategories.push({ category: 'starch', matchedFood: starch });
         }
       }
-      
-      // Check fat
+
+      // Check fat — skip if Phase 1 dairy removal already handled fat tip
       for (const fat of HEALTHY_FATS) {
         if (itemLower.includes(fat.toLowerCase())) {
           matchedCategories.push({ category: 'fat', matchedFood: fat });
         }
       }
     }
-    
+
     // For each matched category, check if the portion is wrong
     for (const match of matchedCategories) {
+      // Skip fat portion corrections if Phase 1 dairy removal already emitted a fat tip
+      if (match.category === 'fat' && fatTipEmitted) continue;
       console.log('[DEBUG analyzeMealPortion] checking item:', item, 'category:', match.category, 'matchedFood:', match.matchedFood);
       const portionCorrection = checkItemPortionCorrection(
-        item, 
-        match.category, 
-        portions, 
-        context.gender, 
+        item,
+        match.category,
+        portions,
+        context.gender,
         match.matchedFood
       );
       console.log('[DEBUG analyzeMealPortion] portionCorrection:', portionCorrection);
       if (portionCorrection) {
         console.log('[DEBUG analyzeMealPortion] ADDING correction to array:', `💡 ${portionCorrection}`);
         corrections.push(`💡 ${portionCorrection}`);
+        if (match.category === 'fat') fatTipEmitted = true;
       }
     }
   }
@@ -1828,9 +1883,10 @@ export async function analyzeMealPortion(
         missingCategories.push('vegetable');
         corrections.push(`💡 You need ${portions.fibrousVegetables} fibrous vegetables.`);
       }
-      if (!hasFat) {
+      if (!hasFat && !fatTipEmitted) {
         missingCategories.push('fat');
         corrections.push(`💡 You need ${portions.fat} olive oil or ${portions.avocado} avocado for healthy fat.`);
+        fatTipEmitted = true;
       }
     }
   } else if (phase === 4) {
@@ -1847,7 +1903,10 @@ export async function analyzeMealPortion(
     if (!hasFat) {
       console.log('[DEBUG Phase4 FAT] !hasFat is TRUE - adding fat to missingCategories and corrections');
       missingCategories.push('fat');
-      corrections.push(`💡 Notice: Don't forget healthy fat like olive oil, avocado, or nuts. Stay hydrated with water too!`);
+      if (!fatTipEmitted) {
+        corrections.push(`💡 Notice: Don't forget healthy fat like olive oil, avocado, or nuts. Stay hydrated with water too!`);
+        fatTipEmitted = true;
+      }
     } else {
       console.log('[DEBUG Phase4 FAT] hasFat is TRUE - NOT adding fat correction');
     }
