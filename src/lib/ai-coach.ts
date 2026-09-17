@@ -974,17 +974,54 @@ export function extractMealData(
     }
   }
 
-  // Fallback fibrous veg detection: scan the full food description directly.
-  // Handles compound items where split/match may not catch all veg (e.g. "1 cup green beans carrots peas").
-  // Simple substring check: if any fibrous veg name appears in the food description, set hasVeg.
-  if (!hasVeg) {
-    for (const veg of FIBROUS_VEGETABLES) {
-      const vegBase = veg.split('(')[0].trim().toLowerCase();
-      if (vegBase.length > 2 && foodLower.includes(vegBase)) {
-        // Exclude false positives: "water" in food desc likely means plain-water beverage, not "water chestnuts"
-        if (vegBase === 'water' && !foodLower.includes('chestnuts')) continue;
-        hasVeg = true;
-        break;
+  // Fallback category detection: scan the full food description for ALL categories.
+  // Handles compound items where splitIntoFoodItems didn't separate them cleanly
+  // (e.g. "green beans with olive oil" stays as one item, "3 beef enchiladas flour tortillas").
+  // Per-item matching handles most cases; this catches anything the per-item loop missed.
+  // Guard: plain water must never trigger veg/fat/starch from "Water chestnuts".
+  const hasPlainWater = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(foodLower.trim()) ||
+    /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(foodLower.trim());
+  if (!hasPlainWater) {
+    // Protein fallback
+    if (!hasProtein) {
+      for (const protein of LEAN_PROTEINS) {
+        const proteinBase = protein.split('(')[0].trim().toLowerCase();
+        if (proteinBase.length > 2 && foodLower.includes(proteinBase)) {
+          hasProtein = true;
+          break;
+        }
+      }
+    }
+    // Veg fallback (existing logic, extended with plain-water guard above)
+    if (!hasVeg) {
+      for (const veg of FIBROUS_VEGETABLES) {
+        const vegBase = veg.split('(')[0].trim().toLowerCase();
+        if (vegBase.length > 2 && foodLower.includes(vegBase)) {
+          // Exclude false positives: "water" in food desc likely means plain-water beverage, not "water chestnuts"
+          if (vegBase === 'water' && !foodLower.includes('chestnuts')) continue;
+          hasVeg = true;
+          break;
+        }
+      }
+    }
+    // Fat fallback
+    if (!hasFat) {
+      for (const fat of HEALTHY_FATS) {
+        const fatBase = fat.split('(')[0].trim().toLowerCase();
+        if (fatBase.length > 2 && foodLower.includes(fatBase)) {
+          hasFat = true;
+          break;
+        }
+      }
+    }
+    // Starch fallback
+    if (!hasStarch) {
+      for (const starch of STARCHY_CARBOHYDRATES) {
+        const starchBase = starch.split('(')[0].trim().toLowerCase();
+        if (starchBase.length > 2 && foodLower.includes(starchBase)) {
+          hasStarch = true;
+          break;
+        }
       }
     }
   }
@@ -1553,6 +1590,57 @@ export async function analyzeMealPortion(
       }
     }
     console.log('[DEBUG analyzeMealPortion] AFTER MATCHING: hasFat:', hasFat, '| hasProtein:', hasProtein, '| hasVeg:', hasVeg, '| hasStarch:', hasStarch);
+
+    // Full-string fallback for ALL categories: catches compound items where split didn't separate them cleanly.
+    // E.g. "green beans with olive oil" stays as one item; the per-item loop may miss fat if the item
+    // string doesn't cleanly contain an HEALTHY_FATS entry as a distinct word.
+    // Guard: plain water must never trigger veg/fat/starch from "Water chestnuts".
+    const hasPlainWater = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(foodLower.trim()) ||
+      /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(foodLower.trim());
+    if (!hasPlainWater) {
+      // Protein fallback
+      if (!hasProtein) {
+        for (const protein of LEAN_PROTEINS) {
+          const proteinBase = protein.split('(')[0].trim().toLowerCase();
+          if (proteinBase.length > 2 && foodLower.includes(proteinBase)) {
+            hasProtein = true;
+            break;
+          }
+        }
+      }
+      // Fat fallback
+      if (!hasFat) {
+        for (const fat of HEALTHY_FATS) {
+          const fatBase = fat.split('(')[0].trim().toLowerCase();
+          if (fatBase.length > 2 && foodLower.includes(fatBase)) {
+            hasFat = true;
+            break;
+          }
+        }
+      }
+      // Veg fallback
+      if (!hasVeg) {
+        for (const veg of FIBROUS_VEGETABLES) {
+          const vegBase = veg.split('(')[0].trim().toLowerCase();
+          if (vegBase.length > 2 && foodLower.includes(vegBase)) {
+            if (vegBase === 'water' && !foodLower.includes('chestnuts')) continue;
+            hasVeg = true;
+            break;
+          }
+        }
+      }
+      // Starch fallback
+      if (!hasStarch) {
+        for (const starch of STARCHY_CARBOHYDRATES) {
+          const starchBase = starch.split('(')[0].trim().toLowerCase();
+          if (starchBase.length > 2 && foodLower.includes(starchBase)) {
+            hasStarch = true;
+            break;
+          }
+        }
+      }
+    }
+    console.log('[DEBUG analyzeMealPortion] AFTER FULL-STRING FALLBACK: hasFat:', hasFat, '| hasProtein:', hasProtein, '| hasVeg:', hasVeg, '| hasStarch:', hasStarch);
   }
 
   // Build unrecognized items list — an item is unrecognized if it matched NO category
@@ -2176,14 +2264,44 @@ export function getMealEvaluationPrompt(
     if (analysis.missingCategories.includes('fat')) exactResponseParts.push(`You need ${m ? '2 tbsp' : '1 tbsp'} olive oil or ${portions.avocado} avocado`);
     if (analysis.missingCategories.includes('water')) exactResponseParts.push(`You need ${m ? '32oz' : '20oz'} water`);
 
-    // Deduplicate: normalize text and keep only first occurrence per category.
-    // This prevents duplicate tips when corrections[] already contain the same missing-category tip.
+    // Deduplicate corrections first: normalize text and keep only first occurrence.
+    // This prevents duplicate tips when corrections[] already contains the same tip.
     const seenNorm = new Set<string>();
-    const dedupedParts: string[] = [];
+    const dedupedCorrections: string[] = [];
     for (const part of exactResponseParts) {
       const norm = part.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
       if (!seenNorm.has(norm)) {
         seenNorm.add(norm);
+        dedupedCorrections.push(part);
+      }
+    }
+
+    // Build set of categories already covered by deduped corrections.
+    // Check normalized correction text for category keywords so we can skip
+    // the MISSING section tip for that category and avoid duplicates.
+    const coveredCategories = new Set<string>();
+    for (const part of dedupedCorrections) {
+      const norm = part.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+      if (norm.includes('protein')) coveredCategories.add('protein');
+      if (norm.includes('vegetable') || norm.includes('fibrous veg')) coveredCategories.add('vegetable');
+      if (norm.includes('fat') || norm.includes('olive oil') || norm.includes('avocado')) coveredCategories.add('fat');
+      if (norm.includes('starch') || norm.includes('sweet potato') || norm.includes('red potato') || norm.includes('rice')) coveredCategories.add('starch');
+    }
+
+    // Add MISSING items only for categories NOT already covered by a correction.
+    if (analysis.missingCategories.includes('protein') && !coveredCategories.has('protein')) exactResponseParts.push(`You need ${m ? '6oz' : '4oz'} lean protein`);
+    if (analysis.missingCategories.includes('vegetable') && !coveredCategories.has('vegetable') && !hasRecognizedVeg) exactResponseParts.push(`You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables`);
+    if (analysis.missingCategories.includes('starch') && !coveredCategories.has('starch')) exactResponseParts.push(`You need ${portions.starch} sweet potato`);
+    if (analysis.missingCategories.includes('fat') && !coveredCategories.has('fat')) exactResponseParts.push(`You need ${m ? '2 tbsp' : '1 tbsp'} olive oil or ${portions.avocado} avocado`);
+    if (analysis.missingCategories.includes('water')) exactResponseParts.push(`You need ${m ? '32oz' : '20oz'} water`);
+
+    // Final dedupe pass on the combined list
+    const seenNorm2 = new Set<string>();
+    const dedupedParts: string[] = [];
+    for (const part of exactResponseParts) {
+      const norm = part.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+      if (!seenNorm2.has(norm)) {
+        seenNorm2.add(norm);
         dedupedParts.push(part);
       }
     }
