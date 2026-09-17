@@ -913,67 +913,63 @@ export function extractMealData(
   // For each food item, find which category it matches
   for (const item of foodItems) {
     const itemLower = item.toLowerCase();
-    let found = false;
 
-    // Check each category using substring matching (case-insensitive)
+    // Detect ALL categories in this item — no "found" guard.
+    // Each category is checked independently; hasX flags prevent duplicate recognizedItems entries.
+
+    // Eggs: BOTH protein AND fat
+    if (itemLower.includes('egg') && !itemLower.includes('eggplant')) {
+      if (!hasProtein) { recognizedItems.push({ item, category: 'protein' }); hasProtein = true; }
+      if (!hasFat) { recognizedItems.push({ item, category: 'fat' }); hasFat = true; }
+    }
     // Check protein
-    if (!hasProtein) {
-      // SPECIAL CASE: Eggs are BOTH protein AND fat — check before general protein loop
-      // The LEAN_PROTEINS entry is "Eggs (2-3 for men, 1-2 for women)" which doesn't match plain "egg"
-      // so we handle eggs specially to recognize them as protein AND fat
-      if (itemLower.includes('egg') && !itemLower.includes('eggplant')) {
-        recognizedItems.push({ item, category: 'protein' });
-        hasProtein = true;
-        found = true;
-      } else if (itemMatchesFoodList(itemLower, LEAN_PROTEINS)) {
-        recognizedItems.push({ item, category: 'protein' });
-        hasProtein = true;
-        found = true;
-      }
+    else if (itemMatchesFoodList(itemLower, LEAN_PROTEINS)) {
+      if (!hasProtein) { recognizedItems.push({ item, category: 'protein' }); hasProtein = true; }
     }
 
     // Check vegetable — but plain water/coffee must never set hasVeg.
     // A plain-water item is: starts with number+unit then contains only "water" (e.g. "24oz water", "water 32 oz").
-    // These should not match "Water chestnuts" via the word-boundary fix above.
-    if (!found && !hasVeg) {
+    // These should not match "Water chestnuts".
+    if (!hasVeg) {
       const isPlainWaterItem = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(itemLower.trim()) ||
         /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(itemLower.trim());
       if (!isPlainWaterItem && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) {
         recognizedItems.push({ item, category: 'vegetable' });
         hasVeg = true;
-        found = true;
       }
     }
 
     // Check starch
-    if (!found && !hasStarch) {
+    if (!hasStarch) {
       if (itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) {
         recognizedItems.push({ item, category: 'starch' });
         hasStarch = true;
-        found = true;
       }
     }
 
     // Check fat
-    if (!found && !hasFat) {
+    if (!hasFat) {
       if (itemMatchesFoodList(itemLower, HEALTHY_FATS)) {
         recognizedItems.push({ item, category: 'fat' });
         hasFat = true;
-        found = true;
       }
     }
 
     // Check supplements
-    if (!found && !hasSupplement) {
+    if (!hasSupplement) {
       if (itemMatchesFoodList(itemLower, SUPPLEMENTS)) {
         recognizedItems.push({ item, category: 'supplement' });
         hasSupplement = true;
-        found = true;
       }
     }
+  }
 
-    // If not found in any category, add to unrecognized
-    if (!found) {
+  // Mark items as unrecognized only if they weren't recognized as any category
+  // (After the loop, unrecognizedItems only contains items that matched no category)
+  for (const item of foodItems) {
+    const itemLower = item.toLowerCase();
+    const isRecognized = recognizedItems.some(r => r.item === item);
+    if (!isRecognized) {
       unrecognizedItems.push(item);
     }
   }
@@ -1509,49 +1505,71 @@ export async function analyzeMealPortion(
       hasFat = true;
     }
 
-    // Match against food lists using PRIORITY matching (same as extractMealData)
-    // Priority order: protein → veg → starch → fat. Once matched, skip remaining categories.
-    // This prevents false positives like "green beans" matching both FIBROUS_VEGETABLES and
-    // STARCHY_CARBOHYDRATES (via "beans" substring from "Kidney beans", etc.)
+    // Match against food lists — detect ALL categories per item (no "found" guard).
+    // Each food item can contribute to multiple categories (e.g. "green beans with olive oil" = veg + fat).
     const mealFoodItems = splitIntoFoodItems(foodDescription);
     console.log('[DEBUG analyzeMealPortion] foodItems:', JSON.stringify(mealFoodItems));
     for (const item of mealFoodItems) {
       const itemLower = item.toLowerCase();
-      let found = false;
 
-      // Eggs are BOTH protein AND fat — handle before the priority loop
+      // Eggs: BOTH protein AND fat
       if (itemLower.includes('egg') && !itemLower.includes('eggplant')) {
         hasProtein = true;
         hasFat = true;
-        found = true;
+      }
+      // Protein
+      else if (itemMatchesFoodList(itemLower, LEAN_PROTEINS)) {
+        hasProtein = true;
       }
 
-      // Priority matching: check categories in order, skip rest once matched
-      // Plain water must never set hasVeg (would falsely match Water chestnuts)
-      const isPlainWaterItem = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(itemLower.trim()) ||
-        /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(itemLower.trim());
-      if (!found && itemMatchesFoodList(itemLower, LEAN_PROTEINS)) { hasProtein = true; found = true; }
-      if (!found && !isPlainWaterItem && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) { hasVeg = true; found = true; }
-      if (!found && itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) { hasStarch = true; found = true; }
-      if (!found && itemMatchesFoodList(itemLower, HEALTHY_FATS)) { hasFat = true; found = true; }
-      if (!found && itemMatchesFoodList(itemLower, SUPPLEMENTS)) { hasSupplement = true; found = true; }
+      // Vegetable — plain water must never set hasVeg (would falsely match Water chestnuts)
+      if (!hasVeg) {
+        const isPlainWaterItem = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(itemLower.trim()) ||
+          /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(itemLower.trim());
+        if (!isPlainWaterItem && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) {
+          hasVeg = true;
+        }
+      }
+
+      // Starch
+      if (!hasStarch) {
+        if (itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) {
+          hasStarch = true;
+        }
+      }
+
+      // Fat
+      if (!hasFat) {
+        if (itemMatchesFoodList(itemLower, HEALTHY_FATS)) {
+          hasFat = true;
+        }
+      }
+
+      // Supplements
+      if (!hasSupplement) {
+        if (itemMatchesFoodList(itemLower, SUPPLEMENTS)) {
+          hasSupplement = true;
+        }
+      }
     }
     console.log('[DEBUG analyzeMealPortion] AFTER MATCHING: hasFat:', hasFat, '| hasProtein:', hasProtein, '| hasVeg:', hasVeg, '| hasStarch:', hasStarch);
   }
 
-  // Build unrecognized items list
+  // Build unrecognized items list — an item is unrecognized if it matched NO category
   const foodItems = splitIntoFoodItems(foodDescription);
   for (const item of foodItems) {
     const itemLower = item.toLowerCase();
-    let found = false;
-    // Special case: eggs are recognized as both protein AND fat
-    if (itemLower.includes('egg') && !itemLower.includes('eggplant')) { found = true; }
-    if (!found && itemMatchesFoodList(itemLower, LEAN_PROTEINS)) { found = true; }
-    if (!found && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) { found = true; }
-    if (!found && itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) { found = true; }
-    if (!found && itemMatchesFoodList(itemLower, HEALTHY_FATS)) { found = true; }
-    if (!found && itemMatchesFoodList(itemLower, SUPPLEMENTS)) { found = true; }
-    if (!found) unrecognizedItems.push(item);
+    // Eggs recognized as both protein and fat
+    if (itemLower.includes('egg') && !itemLower.includes('eggplant')) continue;
+    if (itemMatchesFoodList(itemLower, LEAN_PROTEINS)) continue;
+    // Plain water guard for veg
+    const isPlainWaterItem = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(itemLower.trim()) ||
+      /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(itemLower.trim());
+    if (!isPlainWaterItem && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) continue;
+    if (itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) continue;
+    if (itemMatchesFoodList(itemLower, HEALTHY_FATS)) continue;
+    if (itemMatchesFoodList(itemLower, SUPPLEMENTS)) continue;
+    unrecognizedItems.push(item);
   }
 
   // =============================================
