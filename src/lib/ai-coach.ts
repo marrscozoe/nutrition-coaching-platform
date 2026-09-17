@@ -337,6 +337,7 @@ export interface CoachContext {
   allergies?: string[]; // hard-ban food allergies (never suggest these foods)
   custom_allergy_bans?: string[]; // client-typed hard ban items (never suggest these foods)
   allergy_discovery_enabled?: boolean; // whether client wants discovery tips (default false)
+  lastMealFood?: string; // food_description of the most recent meal today (Chicago), for allergy discovery
 }
 
 // Phase 5: 14-day plan where each day is randomly assigned ONE of three behaviors:
@@ -660,6 +661,7 @@ CLIENT CONTEXT:
 - Goal: ${context.goalWeight}lbs, Started: ${context.startingWeight}lbs, Current: ${context.currentWeight}lbs
 ${isEventClient ? `- Event in ${weeksUntilEvent} weeks` : ''}
 ${allergies.length > 0 ? `- ⚠️ ALLERGIES (HARD BAN — NEVER suggest these foods): ${allergies.map(a => `${a} (${ALLERGY_TYPES[a] || a})`).join(', ')}. These foods must NEVER appear in meal suggestions.` : '- No allergies on file'}
+${context.lastMealFood ? `- 🍽️ MOST RECENT MEAL (today, for reference): ${context.lastMealFood}` : ''}
 
 PHASE RULES (for YOUR reference only — give personalized advice for THIS client, not generic phase descriptions):
 - Phase 1: ${portions.protein} protein, ${portions.fibrousVegetables} veggies, ${portions.fat} fat, NO starch, NO dairy, NO sugar, ${context.gender === 'male' ? '32oz per meal' : '20oz per meal'} water
@@ -2245,67 +2247,87 @@ export function getMealEvaluationPrompt(
     p += `- If allowed: "Good snack! 💪"\n`;
     p += `- If problems: explain what's wrong, 1 sentence max\n`;
   } else {
-    // Build the EXACT response the AI MUST use
-    const exactResponseParts: string[] = [];
-    // Add all corrections verbatim
-    for (const correction of (analysis.corrections || [])) {
-      exactResponseParts.push(correction.replace(/^💡\s*/, ''));
+    // -----------------------------------------------------------------------
+    // FIX: Deduplicate tips ONCE, before building coveredCategories.
+    // corrections[] already contains category tips (veg/fat/protein/starch) from
+    // analyzeMealPortion's MISSING check. Then the MISSING section below ALSO
+    // pushes the same tips again if !coveredCategories.has('category').
+    // The previous code built coveredCategories from an intermediate deduped list,
+    // then added MISSING items (which were already covered) back to exactResponseParts.
+    // Result: tips appeared in CORRECTIONS section + YOU MUST SAY THESE THINGS twice.
+    //
+    // Fix: deduplicate all corrections first, build coveredCategories from that
+    // clean set, then only add MISSING items for categories NOT yet covered.
+    // -----------------------------------------------------------------------
+
+    // Helper: normalize a tip string for deduplication comparison.
+    function normTip(s: string): string {
+      return s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
     }
-    // Add REMOVE items
+
+    // Deduplicate analysis.corrections upfront — removes duplicate tips from the source.
+    const seenTipNorm = new Set<string>();
+    const dedupedAnalysisCorrections: string[] = [];
+    for (const corr of (analysis.corrections || [])) {
+      const stripped = corr.replace(/^💡\s*/, '');
+      const n = normTip(stripped);
+      if (!seenTipNorm.has(n)) {
+        seenTipNorm.add(n);
+        dedupedAnalysisCorrections.push(stripped);
+      }
+    }
+
+    // Build coveredCategories from the already-deduped corrections list.
+    const coveredCategories = new Set<string>();
+    for (const part of dedupedAnalysisCorrections) {
+      const n = normTip(part);
+      if (n.includes('protein')) coveredCategories.add('protein');
+      if (n.includes('vegetable') || n.includes('fibrous veg')) coveredCategories.add('vegetable');
+      if (n.includes('fat') || n.includes('olive oil') || n.includes('avocado')) coveredCategories.add('fat');
+      if (n.includes('starch') || n.includes('sweet potato') || n.includes('red potato') || n.includes('rice')) coveredCategories.add('starch');
+    }
+
+    // Check if fibrous veg was genuinely recognized in the meal.
+    // Use coveredCategories (set from deduped corrections) as the authoritative check,
+    // supplemented by mealData recognizedItems (handles compound-item edge cases).
+    const hasRecognizedVeg = coveredCategories.has('vegetable') ||
+      mealData.recognizedItems.some(i => i.category === 'vegetable');
+
+    // Build exactResponseParts: deduped corrections + REMOVE + MISSING (if not covered).
+    const exactResponseParts: string[] = [...dedupedAnalysisCorrections];
+
     for (const item of analysis.disallowedItems) {
       exactResponseParts.push(`⚠️ Remove: ${item}`);
     }
-    // Add MISSING items with EXACT wording
-    // Skip veg tip if fibrous veg was already recognized in mealData (handles compound item detection edge cases)
-    const hasRecognizedVeg = mealData.recognizedItems.some(i => i.category === 'vegetable');
-    if (analysis.missingCategories.includes('protein')) exactResponseParts.push(`You need ${m ? '6oz' : '4oz'} lean protein`);
-    if (analysis.missingCategories.includes('vegetable') && !hasRecognizedVeg) exactResponseParts.push(`You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables`);
-    if (analysis.missingCategories.includes('starch')) exactResponseParts.push(`You need ${portions.starch} sweet potato`);
-    if (analysis.missingCategories.includes('fat')) exactResponseParts.push(`You need ${m ? '2 tbsp' : '1 tbsp'} olive oil or ${portions.avocado} avocado`);
-    if (analysis.missingCategories.includes('water')) exactResponseParts.push(`You need ${m ? '32oz' : '20oz'} water`);
 
-    // Deduplicate corrections first: normalize text and keep only first occurrence.
-    // This prevents duplicate tips when corrections[] already contains the same tip.
-    const seenNorm = new Set<string>();
-    const dedupedCorrections: string[] = [];
-    for (const part of exactResponseParts) {
-      const norm = part.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
-      if (!seenNorm.has(norm)) {
-        seenNorm.add(norm);
-        dedupedCorrections.push(part);
-      }
+    if (analysis.missingCategories.includes('protein') && !coveredCategories.has('protein')) {
+      exactResponseParts.push(`You need ${m ? '6oz' : '4oz'} lean protein`);
+    }
+    // Only emit "need fibrous vegetables" tip if NO fibrous veg was recognized.
+    if (analysis.missingCategories.includes('vegetable') && !hasRecognizedVeg) {
+      exactResponseParts.push(`You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables`);
+    }
+    if (analysis.missingCategories.includes('starch') && !coveredCategories.has('starch')) {
+      exactResponseParts.push(`You need ${portions.starch} sweet potato`);
+    }
+    if (analysis.missingCategories.includes('fat') && !coveredCategories.has('fat')) {
+      exactResponseParts.push(`You need ${m ? '2 tbsp' : '1 tbsp'} olive oil or ${portions.avocado} avocado`);
+    }
+    // Water: always include if missing (no prior correction can cover it).
+    if (analysis.missingCategories.includes('water')) {
+      exactResponseParts.push(`You need ${m ? '32oz' : '20oz'} water`);
     }
 
-    // Build set of categories already covered by deduped corrections.
-    // Check normalized correction text for category keywords so we can skip
-    // the MISSING section tip for that category and avoid duplicates.
-    const coveredCategories = new Set<string>();
-    for (const part of dedupedCorrections) {
-      const norm = part.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
-      if (norm.includes('protein')) coveredCategories.add('protein');
-      if (norm.includes('vegetable') || norm.includes('fibrous veg')) coveredCategories.add('vegetable');
-      if (norm.includes('fat') || norm.includes('olive oil') || norm.includes('avocado')) coveredCategories.add('fat');
-      if (norm.includes('starch') || norm.includes('sweet potato') || norm.includes('red potato') || norm.includes('rice')) coveredCategories.add('starch');
-    }
-
-    // Add MISSING items only for categories NOT already covered by a correction.
-    if (analysis.missingCategories.includes('protein') && !coveredCategories.has('protein')) exactResponseParts.push(`You need ${m ? '6oz' : '4oz'} lean protein`);
-    if (analysis.missingCategories.includes('vegetable') && !coveredCategories.has('vegetable') && !hasRecognizedVeg) exactResponseParts.push(`You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables`);
-    if (analysis.missingCategories.includes('starch') && !coveredCategories.has('starch')) exactResponseParts.push(`You need ${portions.starch} sweet potato`);
-    if (analysis.missingCategories.includes('fat') && !coveredCategories.has('fat')) exactResponseParts.push(`You need ${m ? '2 tbsp' : '1 tbsp'} olive oil or ${portions.avocado} avocado`);
-    if (analysis.missingCategories.includes('water')) exactResponseParts.push(`You need ${m ? '32oz' : '20oz'} water`);
-
-    // Final dedupe pass on the combined list
+    // Final dedupe pass — one tip per normalized text in the final list.
     const seenNorm2 = new Set<string>();
-    const dedupedParts: string[] = [];
+    const uniqueResponseParts: string[] = [];
     for (const part of exactResponseParts) {
-      const norm = part.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
-      if (!seenNorm2.has(norm)) {
-        seenNorm2.add(norm);
-        dedupedParts.push(part);
+      const n = normTip(part);
+      if (!seenNorm2.has(n)) {
+        seenNorm2.add(n);
+        uniqueResponseParts.push(part);
       }
     }
-    const uniqueResponseParts = dedupedParts;
 
     if (uniqueResponseParts.length > 0) {
       // AI MUST use exactly these messages, nothing else

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/db';
+import { v4 as uuidv4 } from 'uuid';
 import {
   chatWithChatAI, 
   CoachContext, 
@@ -90,9 +91,66 @@ export async function POST(request: NextRequest) {
       allergy_discovery_enabled: client.allergy_discovery_enabled ?? false,
     };
 
-    // Get recent symptoms for allergy discovery — only when discovery is enabled
+    // Detect digestive-issue keywords in the incoming message
+    const lowerMessage = message.toLowerCase();
+    const mentionsDigestiveIssue = lowerMessage.includes('bloated') || lowerMessage.includes('bloating') || lowerMessage.includes('stomach pain') || lowerMessage.includes('stomach ache') || lowerMessage.includes('gassy') || lowerMessage.includes('gut hurts');
+
+    // When allergy discovery is ON and user mentions a digestive issue:
+    // 1. Find the most recent meal logged today (America/Chicago) to link the symptom to
+    // 2. Log the symptom immediately so tracking starts on the FIRST bloated report
+    // 3. Pass that meal's food_description into the coach context so the reply can reference specific foods
+    let lastMealFood: string | undefined;
+    if (context.allergy_discovery_enabled && mentionsDigestiveIssue) {
+      const nowChicago = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+      const todayStart = new Date(nowChicago.getFullYear(), nowChicago.getMonth(), nowChicago.getDate(), 0, 0, 0).toISOString();
+      const todayEnd   = new Date(nowChicago.getFullYear(), nowChicago.getMonth(), nowChicago.getDate(), 23, 59, 59, 999).toISOString();
+
+      const { data: recentMeals } = await supabase
+        .from('meals')
+        .select('id, food_description')
+        .eq('client_id', clientId)
+        .gte('logged_at', todayStart)
+        .lte('logged_at', todayEnd)
+        .order('logged_at', { ascending: false })
+        .limit(1);
+
+      const lastMeal = recentMeals?.[0];
+
+      if (lastMeal) {
+        lastMealFood = lastMeal.food_description ?? undefined;
+
+        // Log the symptom NOW — linked to this meal; no gate requiring prior symptom rows
+        const symptomType = lowerMessage.includes('stomach pain') || lowerMessage.includes('stomach ache') || lowerMessage.includes('gut hurts')
+          ? 'stomach_pain'
+          : 'bloating';
+        await supabase.from('symptoms').insert({
+          id: uuidv4(),
+          client_id: clientId,
+          type: symptomType,
+          meal_id: lastMeal.id,
+          notes: null,
+          created_at: new Date().toISOString(),
+        });
+        console.log(`[ALLERGY DISCOVERY] Logged ${symptomType} linked to meal ${lastMeal.id} for client ${clientId}`);
+      } else {
+        // No meal found today — still log the symptom (unlinked) so tracking begins
+        const symptomType = lowerMessage.includes('stomach pain') || lowerMessage.includes('stomach ache') || lowerMessage.includes('gut hurts')
+          ? 'stomach_pain'
+          : 'bloating';
+        await supabase.from('symptoms').insert({
+          id: uuidv4(),
+          client_id: clientId,
+          type: symptomType,
+          meal_id: null,
+          notes: null,
+          created_at: new Date().toISOString(),
+        });
+        console.log(`[ALLERGY DISCOVERY] Logged ${symptomType} (no meal) for client ${clientId}`);
+      }
+    }
+
+    // Get recent symptoms count (after the new symptom was just inserted above)
     let symptomCount = 0;
-    let hasBloatingPattern = false;
     if (context.allergy_discovery_enabled) {
       const nowChicago = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }));
       const sevenDaysAgo = new Date(nowChicago.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -103,14 +161,15 @@ export async function POST(request: NextRequest) {
         .gte('created_at', sevenDaysAgo)
         .order('created_at', { ascending: false });
       symptomCount = recentSymptoms?.length || 0;
-      hasBloatingPattern = symptomCount >= 2;
     }
 
-    // Discovery tip: if client mentions bloating/stomach pain and has 2+ logged symptoms in last 7 days
-    const lowerMessage = message.toLowerCase();
-    const mentionsDigestiveIssue = lowerMessage.includes('bloated') || lowerMessage.includes('bloating') || lowerMessage.includes('stomach pain') || lowerMessage.includes('stomach ache') || lowerMessage.includes('gassy') || lowerMessage.includes('gut hurts');
-    // Discovery tip only shows when the client has opted in via Profile (allergy_discovery_enabled = true)
-    const showDiscoveryTip = context.allergy_discovery_enabled && mentionsDigestiveIssue && hasBloatingPattern;
+    // Inject meal food into coach context for allergy discovery
+    if (lastMealFood) {
+      context.lastMealFood = lastMealFood;
+    }
+    // Discovery tip: if client mentions bloating/stomach pain and has opted into allergy discovery
+    // (gate no longer requires prior symptom rows — first bloated report starts tracking)
+    const showDiscoveryTip = context.allergy_discovery_enabled && mentionsDigestiveIssue;
 
     // Handle meal analysis request - HYBRID FLOW (code + AI)
     if (mealData) {
@@ -346,10 +405,13 @@ export async function POST(request: NextRequest) {
     }
 
     const coachPrompt = getCoachPrompt(context, message);
-    // Add discovery tip if client mentions digestive issues and has 2+ symptoms in last 7 days
+    // Add discovery tip when client mentions digestive issues and has opted into allergy discovery
     let discoveryTip = '';
     if (showDiscoveryTip) {
-      discoveryTip = `\n\n⚠️ ALLERGY DISCOVERY TIP: This client has reported ${symptomCount} digestive symptoms in the last 7 days (bloating/stomach pain). If you suspect a food intolerance, say: "I'm noticing you mentioned bloating a few times lately. Some foods like dairy or gluten can cause that. Want me to add [suspected food] as a hard allergy so I'll never suggest it?"`;
+      const mealContextNote = context.lastMealFood
+        ? ` Their most recent meal today was: ${context.lastMealFood}. Use these specific foods to guide your suspicion.`
+        : '';
+      discoveryTip = `\n\n⚠️ ALLERGY DISCOVERY TIP: This client has reported ${symptomCount} digestive symptom(s) in the last 7 days (bloating/stomach pain).${mealContextNote} If you suspect a food intolerance, offer to add the suspected food as a hard allergy so it will never be suggested again.`;
     }
     const systemMessage: AIMessage = { role: 'system', content: coachPrompt + discoveryTip };
     const result = await chatWithChatAI([systemMessage], message, preferredProvider);
