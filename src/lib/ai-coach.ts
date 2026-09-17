@@ -1006,6 +1006,45 @@ export function extractMealData(
         }
       }
     }
+    // Additional direct word scan for fibrous veg — catches compound items like
+    // "green beans carrots peas" where the per-item loop may fail to match due to
+    // partial starch/veg overlap, and the fallback may miss multi-word veg entries.
+    // Check each FIBROUS_VEGETABLES entry's key word(s) directly in the food description.
+    if (!hasVeg && !hasPlainWater) {
+      for (const vegEntry of FIBROUS_VEGETABLES) {
+        const vegBase = vegEntry.split('(')[0].trim().toLowerCase();
+        // Skip entries that are plain common words that could be food-item suffixes
+        // ("water" → "water chestnuts" is already guarded above; "peas" is a STARCHY_CARB)
+        if (vegBase === 'water' && !foodLower.includes('chestnuts')) continue;
+        if (vegBase.length < 3) continue;
+        // Check: does the food description contain this veg entry as a distinct word/token?
+        // For multi-word entries like "green beans", check if the whole phrase appears,
+        // OR if any individual key word (length > 4) appears as a standalone word.
+        if (foodLower.includes(vegBase)) {
+          hasVeg = true;
+          break;
+        }
+        // Also scan for individual key words in multi-word entries
+        const words = vegBase.split(/[\s,]+/).filter(w => w.length > 4);
+        for (const word of words) {
+          // Only match as standalone word to avoid false positives (e.g., "beans" in "green beans" only)
+          try {
+            const esc = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            if (new RegExp(`(?:^|[^a-z])${esc}(?:$|[^a-z])`, 'i').test(foodLower)) {
+              hasVeg = true;
+              break;
+            }
+          } catch {
+            // Fallback for regex errors
+            if (foodLower.includes(word)) {
+              hasVeg = true;
+              break;
+            }
+          }
+        }
+        if (hasVeg) break;
+      }
+    }
     // Fat fallback
     if (!hasFat) {
       for (const fat of HEALTHY_FATS) {
@@ -1629,6 +1668,37 @@ export async function analyzeMealPortion(
             hasVeg = true;
             break;
           }
+        }
+      }
+      // Additional direct word scan for fibrous veg — catches compound items like
+      // "1 cup green beans carrots peas" where the per-item loop may miss partial matches
+      // and the primary fallback doesn't reliably detect multi-word veg entries.
+      if (!hasVeg && !hasPlainWater) {
+        for (const vegEntry of FIBROUS_VEGETABLES) {
+          const vegBase = vegEntry.split('(')[0].trim().toLowerCase();
+          if (vegBase === 'water' && !foodLower.includes('chestnuts')) continue;
+          if (vegBase.length < 3) continue;
+          if (foodLower.includes(vegBase)) {
+            hasVeg = true;
+            break;
+          }
+          // Also scan for individual key words in multi-word entries
+          const words = vegBase.split(/[\s,]+/).filter(w => w.length > 4);
+          for (const word of words) {
+            try {
+              const esc = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              if (new RegExp(`(?:^|[^a-z])${esc}(?:$|[^a-z])`, 'i').test(foodLower)) {
+                hasVeg = true;
+                break;
+              }
+            } catch {
+              if (foodLower.includes(word)) {
+                hasVeg = true;
+                break;
+              }
+            }
+          }
+          if (hasVeg) break;
         }
       }
       // Starch fallback
@@ -2261,9 +2331,8 @@ export function getMealEvaluationPrompt(
     // -----------------------------------------------------------------------
 
     // Helper: normalize a tip string for deduplication comparison.
-    function normTip(s: string): string {
-      return s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
-    }
+    const normTip = (s: string): string =>
+      s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 
     // Deduplicate analysis.corrections upfront — removes duplicate tips from the source.
     const seenTipNorm = new Set<string>();
