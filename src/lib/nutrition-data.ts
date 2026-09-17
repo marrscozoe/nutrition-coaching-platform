@@ -1467,9 +1467,38 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
     }
   }
 
+  // Protein keyword patterns for the off-list fallback heuristic
+  // Uses word boundaries to avoid false matches like "protein" inside "chicken protein"
+  const PROTEIN_KEYWORD_PATTERNS = [
+    /\bprotein bar\b/i,
+    /\bprotein powder\b/i,
+    /\bwhey\b/i,
+    /\bcasein\b/i,
+    /\bcollagen\b/i,
+  ];
+
   for (const item of items) {
     const category = classifyFoodItem(item);
-    if (!category) continue;
+
+    // FALLBACK: if no list match but item clearly implies a protein category,
+    // apply the grams÷6.7=protein oz conversion for Home tracking ONLY.
+    // The approved-list check still gates chat corrections (coach).
+    if (!category) {
+      const lower = item.toLowerCase();
+      const hasProteinKeyword = PROTEIN_KEYWORD_PATTERNS.some(pat => pat.test(lower));
+      if (hasProteinKeyword) {
+        // Extract gram amount (including no-space forms: 40g, 40gram, 40grams)
+        const gramMatch =
+          /([\d]+(?:\.[\d]+)?)\s*(g|gram|grams)\b/i.exec(lower) ||   // spaced "40 gram"
+          /([\d]+(?:\.[\d]+)?)(g|gram|grams)\b/i.exec(lower);         // no-space "40g/40gram"
+        const amount = gramMatch ? parseFloat(gramMatch[1]) : 1;
+        const proteinOz = Math.round((amount / 6.7) * 10) / 10;
+        result.proteinOz += proteinOz;
+        continue;
+      }
+      // Not recognized → skip silently (Home: no deduction; coach: separate correction logic)
+      continue;
+    }
 
     // Special case: egg whites skip if eggs counted; eggs count as protein
     const lower = item.toLowerCase();
