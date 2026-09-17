@@ -978,6 +978,21 @@ export function extractMealData(
     }
   }
 
+  // Fallback fibrous veg detection: scan the full food description directly.
+  // Handles compound items where split/match may not catch all veg (e.g. "1 cup green beans carrots peas").
+  // Simple substring check: if any fibrous veg name appears in the food description, set hasVeg.
+  if (!hasVeg) {
+    for (const veg of FIBROUS_VEGETABLES) {
+      const vegBase = veg.split('(')[0].trim().toLowerCase();
+      if (vegBase.length > 2 && foodLower.includes(vegBase)) {
+        // Exclude false positives: "water" in food desc likely means plain-water beverage, not "water chestnuts"
+        if (vegBase === 'water' && !foodLower.includes('chestnuts')) continue;
+        hasVeg = true;
+        break;
+      }
+    }
+  }
+
   // Also check for unrecognized items by looking for any unmatched
   // food-related words in the description
   // Water check (separate from food categories)
@@ -2135,16 +2150,31 @@ export function getMealEvaluationPrompt(
       exactResponseParts.push(`⚠️ Remove: ${item}`);
     }
     // Add MISSING items with EXACT wording
+    // Skip veg tip if fibrous veg was already recognized in mealData (handles compound item detection edge cases)
+    const hasRecognizedVeg = mealData.recognizedItems.some(i => i.category === 'vegetable');
     if (analysis.missingCategories.includes('protein')) exactResponseParts.push(`You need ${m ? '6oz' : '4oz'} lean protein`);
-    if (analysis.missingCategories.includes('vegetable')) exactResponseParts.push(`You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables`);
+    if (analysis.missingCategories.includes('vegetable') && !hasRecognizedVeg) exactResponseParts.push(`You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables`);
     if (analysis.missingCategories.includes('starch')) exactResponseParts.push(`You need ${portions.starch} sweet potato`);
     if (analysis.missingCategories.includes('fat')) exactResponseParts.push(`You need ${m ? '2 tbsp' : '1 tbsp'} olive oil or ${portions.avocado} avocado`);
     if (analysis.missingCategories.includes('water')) exactResponseParts.push(`You need ${m ? '32oz' : '20oz'} water`);
-    
-    if (exactResponseParts.length > 0) {
+
+    // Deduplicate: normalize text and keep only first occurrence per category.
+    // This prevents duplicate tips when corrections[] already contain the same missing-category tip.
+    const seenNorm = new Set<string>();
+    const dedupedParts: string[] = [];
+    for (const part of exactResponseParts) {
+      const norm = part.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+      if (!seenNorm.has(norm)) {
+        seenNorm.add(norm);
+        dedupedParts.push(part);
+      }
+    }
+    const uniqueResponseParts = dedupedParts;
+
+    if (uniqueResponseParts.length > 0) {
       // AI MUST use exactly these messages, nothing else
       p += `- YOU MUST SAY THESE THINGS (use Allen's voice, short and punchy):\n`;
-      for (const part of exactResponseParts) {
+      for (const part of uniqueResponseParts) {
         p += `  • ${part}\n`;
       }
       p += `- DO NOT add any other advice or foods not listed above\n`;

@@ -307,4 +307,40 @@ console.log('  waterOz:', sweetTea.waterOz, '(expected: 0)');
 assertApprox(sweetTea.waterOz, 0, 'waterOz (sweet tea = 0)');
 console.log('REGRESSION TEST (sweet tea != water): PASS\n');
 
+// =============================================================================
+// PROTEIN BAR SPACED-GRAM FIX TESTS
+// Ensure all four gram forms parse to ~6.0 oz (40g ÷ 6.7)
+// Fix: commit 386aee19 — FALLBACK path for off-list protein keywords
+// =============================================================================
+
+console.log('\n=== PROTEIN BAR: 40g protein bar ===');
+const pb1 = parseFoodDescriptionToPortions('40g protein bar');
+console.log('  proteinOz:', pb1.proteinOz, '(expected: ~6.0)');
+assertApprox(pb1.proteinOz, 6.0, 'proteinOz (40g protein bar)');
+console.log('Protein bar 40g: PASS\n');
+
+console.log('\n=== PROTEIN BAR: 40 gram protein bar ===');
+const pb2 = parseFoodDescriptionToPortions('40 gram protein bar');
+console.log('  proteinOz:', pb2.proteinOz, '(expected: ~6.0)');
+assertApprox(pb2.proteinOz, 6.0, 'proteinOz (40 gram protein bar)');
+console.log('Protein bar 40gram (spaced): PASS\n');
+
+console.log('\n=== PROTEIN BAR: 40 grams protein bar ===');
+const pb3 = parseFoodDescriptionToPortions('40 grams protein bar');
+console.log('  proteinOz:', pb3.proteinOz, '(expected: ~6.0)');
+assertApprox(pb3.proteinOz, 6.0, 'proteinOz (40 grams protein bar)');
+console.log('Protein bar 40grams (spaced plural): PASS\n');
+
+console.log('\n=== PROTEIN BAR: 40gram protein bar (no space) ===');
+const pb4 = parseFoodDescriptionToPortions('40gram protein bar');
+console.log('  proteinOz:', pb4.proteinOz, '(expected: ~6.0)');
+assertApprox(pb4.proteinOz, 6.0, 'proteinOz (40gram protein bar)');
+console.log('Protein bar 40gram (no-space): PASS\n');
+
+console.log('\n=== PROTEIN BAR: powder regression — 40g protein powder ===');
+const pbPowder = parseFoodDescriptionToPortions('40g protein powder');
+console.log('  proteinOz:', pbPowder.proteinOz, '(expected: ~6.0)');
+assertApprox(pbPowder.proteinOz, 6.0, 'proteinOz (40g protein powder)');
+console.log('Protein powder 40g: PASS\n');
+
 console.log('\n✅ ALL TESTS PASSED\n');
