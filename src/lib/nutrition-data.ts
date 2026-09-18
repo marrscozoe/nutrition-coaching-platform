@@ -1355,7 +1355,7 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
   }
 
   // Check if the item string contains the base food name as a distinct word
-  function itemContainsFood(foodName: string): boolean {
+  function itemContainsFood(foodName: string, allowBidirectional: boolean): boolean {
     const fnBase = baseName(foodName).toLowerCase();
     if (!fnBase) return false;
 
@@ -1406,7 +1406,7 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
     // Only apply bidirectional matching when the item has MULTIPLE words. This prevents
     // standalone single-word items like "butter" from matching "Butter beans" (starch) via
     // first-word bidirectional check. Multi-word items like "3 beef" still work correctly.
-    if (lower.length < fnBase.length && !isWaterWord && itemWordCount > 1) {
+    if (lower.length < fnBase.length && !isWaterWord && allowBidirectional) {
       const fnLastWord = fnWords[fnWords.length - 1];
       // Extract the item's food word (last word after stripping amount/unit tokens)
       const itemTokens = lower.split(/[\s,]+/).filter(t => !t.match(/^\d/) && !['oz', 'ounce', 'ounces', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'handful', 'handfuls'].includes(t));
@@ -1448,22 +1448,22 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
     const foodLower = food.toLowerCase();
     // Only skip bacon — whey protein powder counts as protein for Home deduction
     if (foodLower.includes('bacon')) continue;
-    if (itemContainsFood(food)) { console.log(`[DEBUG protein] item="${item}", food="${food}"`); return 'protein'; }
+    if (itemContainsFood(food, true)) { console.log(`[DEBUG protein] item="${item}", food="${food}"`); return 'protein'; }
   }
 
   // Check fibrous vegetables
   for (const food of FIBROUS_VEGETABLES) {
-    if (itemContainsFood(food)) { console.log(`[DEBUG veg] item="${item}", food="${food}"`); return 'veg'; }
+    if (itemContainsFood(food, false)) { console.log(`[DEBUG veg] item="${item}", food="${food}"`); return 'veg'; }
   }
 
   // Check starchy carbohydrates
   for (const food of STARCHY_CARBOHYDRATES) {
-    if (itemContainsFood(food)) { console.log(`[DEBUG starch] item="${item}", food="${food}"`); return 'starch'; }
+    if (itemContainsFood(food, false)) { console.log(`[DEBUG starch] item="${item}", food="${food}"`); return 'starch'; }
   }
 
   // Check healthy fats
   for (const food of HEALTHY_FATS) {
-    if (itemContainsFood(food)) { console.log(`[DEBUG fat] item="${item}", food="${food}"`); return 'fat'; }
+    if (itemContainsFood(food, false)) { console.log(`[DEBUG fat] item="${item}", food="${food}"`); return 'fat'; }
   }
 
   return null;
