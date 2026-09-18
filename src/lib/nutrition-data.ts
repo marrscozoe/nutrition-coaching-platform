@@ -1334,7 +1334,7 @@ function findFoodTokenPosition(item: string, category: 'protein' | 'veg' | 'fat'
  */
 export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'starch' | null {
   const lower = item.toLowerCase();
-  if (!lower || lower === 'photo logged') { console.log(`[DEBUG classifyFoodItem] item="${item}", lower="${lower}"`); return null; }
+  if (!lower || lower === 'photo logged') return null;
   // DEBUG
   if (item.includes("butter") || item.includes("beef") || item.includes("avocado")) {
     console.log(`[DEBUG classifyFoodItem] item="${item}"`);
@@ -1356,7 +1356,6 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
 
   // Check if the item string contains the base food name as a distinct word
   function itemContainsFood(foodName: string, allowBidirectional: boolean): boolean {
-    // DEBUG at start
     const fnBase = baseName(foodName).toLowerCase();
     if (!fnBase) return false;
 
@@ -1430,15 +1429,10 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
     // FALLBACK: check if ANY word from the food entry appears as a standalone word
     // in the item string. This handles cases like "beef" in "3 beef enchiladas" where
     // the item is longer than the food entry and none of the above checks apply.
-    // Skip when food is a single word (word-boundary handles those), or when item has
-    // fewer/equal words than food (item is not a compound food description).
-    if (itemWordCount > fnWords.length && lower.length > fnBase.length) {
-      // Only check words AFTER the first word of multi-word foods.
-      // For "Lean beef" (fnWords=["lean","beef"]), we only check "beef" (the 2nd word).
-      // This prevents "butter" in "1 tbsp butter" from matching "Butter beans" (first word).
-      // Single-word foods (fnWords.length=1) use word-boundary matching, no fallback needed.
-      const startIdx = fnWords.length > 1 ? 1 : fnWords.length;
-      for (const word of fnWords.slice(startIdx)) {
+    // Only apply when the item has MULTIPLE words (compound food description), to avoid
+    // matching standalone single-word items like "butter" to "Kerrygold gold butter".
+    if (itemWordCount > 1) {
+      for (const word of fnWords) {
         if (word.length <= 3) continue; // skip short words to avoid false positives
         const wordEscaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const wordPattern = new RegExp(`(?:^|[^a-z0-9])${wordEscaped}(?:$|[^a-z0-9])`, 'i');
@@ -1446,7 +1440,6 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
       }
     }
 
-    console.log(`[DEBUG itemContainsFood] item="${item}", food="${foodName}", returning false`);
     return false;
   }
 
