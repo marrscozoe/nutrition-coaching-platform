@@ -48,7 +48,7 @@ export default function TrainerDashboard() {
 
     if (!checkAuth()) return;
 
-    // Re-check auth whenever the page becomes visible again.
+    // Re-check auth whenever the page becomes visible or gains focus.
     // This catches bfcache restores (Safari/other browsers) where the page
     // is reactivated without re-running useEffect, preventing a stale-auth
     // trainer dashboard from showing after logout+back-button navigation.
@@ -57,14 +57,19 @@ export default function TrainerDashboard() {
         checkAuth();
       }
     }
+    window.addEventListener('focus', handleVisibilityChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [router]);
 
   async function fetchClients(trainerId: string) {
     try {
       const res = await fetch('/api/trainer/clients', {
         headers: { 'x-trainer-id': trainerId },
+        cache: 'no-store',
       });
       if (!res.ok) {
         console.error('Failed to fetch clients:', res.status);

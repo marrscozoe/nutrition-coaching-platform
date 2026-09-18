@@ -79,15 +79,13 @@ const withPWA = require('next-pwa')({
       },
     },
     {
+      // NetworkOnly for ALL API routes — trainer client list must always be fresh.
+      // Server-side Cache-Control headers on /api/trainer/* handle no-store, but
+      // the SW must never serve a stale trainer list from its own cache.
       urlPattern: /^https:\/\/api\./i,
-      handler: 'NetworkFirst',
+      handler: 'NetworkOnly',
       options: {
-        cacheName: 'api-cache',
         networkTimeoutSeconds: 10,
-        expiration: {
-          maxEntries: 32,
-          maxAgeSeconds: 60 * 60, // 1 hour
-        },
       },
     },
     {

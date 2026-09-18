@@ -44,17 +44,22 @@ export default function TrainerClientsPage() {
         checkAuth();
       }
     }
+    window.addEventListener('focus', handleVisibilityChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [router]);
 
   async function fetchClients(trainerId: string) {
     try {
       const res = await fetch('/api/trainer/clients', {
         headers: { 'x-trainer-id': trainerId },
+        cache: 'no-store',
       });
       const data = await res.json();
-      setClients(data.clients || []);
+      setClients((data.clients || []).filter((c: any) => c !== null));
     } catch (err) {
       console.error('Failed to fetch clients:', err);
     } finally {
