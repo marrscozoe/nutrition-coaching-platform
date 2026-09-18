@@ -84,9 +84,6 @@ const withPWA = require('next-pwa')({
       // the SW must never serve a stale trainer list from its own cache.
       urlPattern: /^https:\/\/api\./i,
       handler: 'NetworkOnly',
-      options: {
-        networkTimeoutSeconds: 10,
-      },
     },
     {
       urlPattern: /\/_next\/data\/.+\/.+\.json$/i,
