@@ -1166,7 +1166,8 @@ function parseFraction(s: string): number {
  */
 export function extractAmount(item: string, foodPos: number = -1): { amount: number; unit: string } {
   // Match all number+unit pairs in the item string with their start positions.
-  const pattern = /([\d]+(?:\.[\d]+)?(?:\s*\/\s*[\d]+)?|(?:[\d]+\s*\/\s*[\d]+))\s*(oz|ounce|ounces|cups?|tbsp|tablespoons?|tsp|teaspoons?|handfuls?|handful|egg|eggs|g|gram|grams)\b/gi;
+  // Optional "whole " before egg/eggs so "3 whole eggs" → amount 3, unit eggs
+  const pattern = /([\d]+(?:\.[\d]+)?(?:\s*\/\s*[\d]+)?|(?:[\d]+\s*\/\s*[\d]+))\s*(?:whole\s+)?(oz|ounce|ounces|cups?|tbsp|tablespoons?|tsp|teaspoons?|handfuls?|handful|egg|eggs|g|gram|grams)\b/gi;
   // Also match no-space gram forms: "40g", "40gram", "40grams" (no space between number and g/gram)
   const noSpacePattern = /([\d]+(?:\.[\d]+)?)\s*(g|gram|grams)\b/gi;
   const matches: { amountStr: string; unit: string; start: number; end: number }[] = [];
@@ -1588,23 +1589,26 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
     // NOT the first number in the whole string.
     const foodPos = findFoodTokenPosition(item, category);
 
-    // Special case: egg whites count as protein but have 0 fat
+    // Egg whites: protein only, 0 fat — must continue so we do not double-count
+    // or treat unit "egg" as whole-egg fat.
     const lower = item.toLowerCase();
-    if (lower.includes('egg white') || lower.includes('egg whites')) {
+    const isEggWhite = lower.includes('egg white');
+    if (isEggWhite) {
       const { amount: ewAmount, unit: ewUnit } = extractAmount(item, foodPos);
       const ewNormalized = normalizeToCategoryUnit(ewAmount, ewUnit, category);
       result.proteinOz += ewNormalized;
-      // fat stays 0
+      continue;
     }
     const { amount, unit } = extractAmount(item, foodPos);
     const normalized = normalizeToCategoryUnit(amount, unit, category);
 
-    // Detect "whole egg" / "whole eggs" entries (with or without explicit number).
-    // The unit regex strips "whole " prefix and captures "egg" or "eggs" for
-    // "N whole eggs", but "whole egg" without a number has unit="whole egg" or unit="".
-    // Also catch the case where item is literally "whole egg" or "whole eggs" (no amount).
+    // Shell / whole eggs (not whites): protein + 0.5 tbsp fat per egg.
+    // "3 whole eggs" parses via optional whole- in extractAmount; also accept
+    // bare "eggs" / "whole egg(s)" with empty unit from implicit amount.
     const isWholeEgg = unit === 'egg' || unit === 'eggs' || unit === 'whole egg' || unit === 'whole eggs'
-      || lower === 'whole egg' || lower === 'whole eggs';
+      || lower === 'whole egg' || lower === 'whole eggs'
+      || /\bwhole\s+eggs?\b/.test(lower)
+      || /\beggs?\b/.test(lower);
 
     switch (category) {
       case 'protein':
