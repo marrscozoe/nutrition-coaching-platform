@@ -1004,6 +1004,10 @@ export function extractMealData(
           break;
         }
       }
+      // Also check for plain "beef" as protein word (handles "3 beef enchiladas" etc.)
+      if (!hasProtein && foodLower.includes('beef')) {
+        hasProtein = true;
+      }
     }
     // Veg fallback (existing logic, extended with plain-water guard above)
     if (!hasVeg) {
@@ -1226,18 +1230,25 @@ function extractPortionBeforeFood(item: string, matchedFood: string): string | n
   const textBeforeFood = item.substring(0, foodIndex);
   console.log('[DEBUG extractPortionBeforeFood] item:', item, 'matchedFood:', matchedFood, 'textBeforeFood:', textBeforeFood);
   
-  // Now search for portion patterns in the text BEFORE the food
+  // STRICT portion binding: the portion must be IMMEDIATELY before the food
+  // (only whitespace between portion and food).
+  // This prevents "2 cups green beans with olive oil" from binding "2 cups" to olive oil.
+  // Only "2 tbsp olive oil" or "2 tablespoons olive oil" binds correctly to olive oil.
+  const strictTextBeforeFood = textBeforeFood.trimEnd();
+  
+  // Now search for portion patterns - but only in the STRICT portion of text
+  // (the text that is immediately adjacent to the food)
   const portionPatterns = [
-    /(\d+\/\d+)\s*(oz|ounce|tbsp|tablespoon|cup|cups|tablespoons|ounces)?/i,  // "1/2 cup", "1/2 oz"
-    /(\d+\.?\d*)\s*(oz|ounce|tbsp|tablespoon|cup|cups|tablespoons|ounces)/i,   // "6 oz", "2 cups"
+    /(\d+\/\d+)\s*(oz|ounce|tbsp|tablespoon|cup|cups|tablespoons|ounces)?$/i,  // "1/2 cup", "1/2 oz" at END
+    /(\d+\.?\d*)\s*(oz|ounce|tbsp|tablespoon|cup|cups|tablespoons|ounces)$/i,   // "6 oz", "2 cups" at END
   ];
   
-  // Find the LAST portion pattern in the text before the food
-  // (since the portion for the food is most likely immediately before it)
+  // Find the portion pattern ONLY if it appears at the END of the strict text
+  // (meaning it's immediately before the food with only trailing whitespace)
   let lastMatch: string | null = null;
   
   for (const pattern of portionPatterns) {
-    const match = textBeforeFood.match(pattern);
+    const match = strictTextBeforeFood.match(pattern);
     console.log('[DEBUG extractPortionBeforeFood] pattern:', pattern, 'match:', match);
     if (match) {
       // If no unit captured, just return the number
@@ -1247,9 +1258,14 @@ function extractPortionBeforeFood(item: string, matchedFood: string): string | n
         lastMatch = match[1] + ' ' + match[2];
       }
       console.log('[DEBUG extractPortionBeforeFood] lastMatch updated to:', lastMatch);
+      // Only take the first (most adjacent) match - portions must be at the end
+      break;
     }
   }
   
+  // If no strict match found, don't fall back to loose matching.
+  // Per Allen's rule: no amount stated → assume correct portion (no tip).
+  // This prevents incorrectly binding portions from other foods in compound items.
   console.log('[DEBUG extractPortionBeforeFood] returning:', lastMatch);
   return lastMatch;
 }
@@ -1658,6 +1674,10 @@ export async function analyzeMealPortion(
             hasProtein = true;
             break;
           }
+        }
+        // Also check for plain "beef" as protein word (handles "3 beef enchiladas" etc.)
+        if (!hasProtein && foodLower.includes('beef')) {
+          hasProtein = true;
         }
       }
       // Fat fallback
