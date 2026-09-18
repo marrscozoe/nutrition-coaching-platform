@@ -1428,11 +1428,12 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
 
     // FALLBACK: check if ANY word from the food entry appears as a standalone word
     // in the item string. This handles cases like "beef" in "3 beef enchiladas" where
-    // the item is longer than the food entry and none of the above checks apply.
-    // Only apply when the item has MULTIPLE words (compound food description), to avoid
-    // matching standalone single-word items like "butter" to "Kerrygold gold butter".
-    if (itemWordCount > 1) {
-      for (const word of fnWords) {
+    // the item has >= the food entry's word count and none of the above checks apply.
+    // For multi-word foods (e.g. "Lean beef"), only check words AFTER the first word.
+    // This prevents "butter" in "1 tbsp butter" from matching "Butter beans" (first word).
+    if (itemWordCount >= fnWords.length) {
+      const startIdx = fnWords.length > 1 ? 1 : 0;
+      for (const word of fnWords.slice(startIdx)) {
         if (word.length <= 3) continue; // skip short words to avoid false positives
         const wordEscaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const wordPattern = new RegExp(`(?:^|[^a-z0-9])${wordEscaped}(?:$|[^a-z0-9])`, 'i');
