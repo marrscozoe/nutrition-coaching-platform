@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
     };
     const token = Buffer.from(JSON.stringify(tokenData)).toString('base64url');
 
+    console.log('[PreSignup] Creating token with trainer_id:', trainer_id, 'type:', typeof trainer_id);
+
     return NextResponse.json({
       success: true,
       token,

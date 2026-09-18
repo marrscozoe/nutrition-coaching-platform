@@ -65,6 +65,7 @@ function OnboardingContent() {
     setError('');
 
     try {
+      console.log('[Onboarding] Submitting signup with token present:', !!token, 'trainerId from URL:', trainerId);
       // Create account
       const res = await fetch('/api/auth/signup', {
         method: 'POST',

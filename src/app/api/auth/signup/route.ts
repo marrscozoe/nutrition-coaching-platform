@@ -84,6 +84,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // If the token carried a trainer_id, the INSERT MUST have a trainer_id — no exceptions
+      const tokenHadTrainer = tokenData.trainer_id != null;
+      const insertWouldHaveNullTrainer = trainerId == null;
+
+      if (tokenHadTrainer && insertWouldHaveNullTrainer) {
+        console.error('[Signup] FATAL: token had trainer_id but insert would be null', {
+          email: tokenData.email,
+          tokenTrainerId: tokenData.trainer_id,
+        });
+        return NextResponse.json(
+          { error: 'Signup error: trainer link was used but trainer assignment failed. Please try again.' },
+          { status: 500 }
+        );
+      }
+
       // Token is self-contained, no need to delete from database
     } else {
       // Traditional signup with direct credentials
