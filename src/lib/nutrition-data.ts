@@ -1583,6 +1583,11 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
       continue;
     }
 
+    // Find the position of the food token within the item string so we can
+    // extract the amount that is closest to (and therefore bound to) that token —
+    // NOT the first number in the whole string.
+    const foodPos = findFoodTokenPosition(item, category);
+
     // Special case: egg whites count as protein but have 0 fat
     const lower = item.toLowerCase();
     if (lower.includes('egg white') || lower.includes('egg whites')) {
@@ -1591,11 +1596,6 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
       result.proteinOz += ewNormalized;
       // fat stays 0
     }
-
-    // Find the position of the food token within the item string so we can
-    // extract the amount that is closest to (and therefore bound to) that token —
-    // NOT the first number in the whole string.
-    const foodPos = findFoodTokenPosition(item, category);
     const { amount, unit } = extractAmount(item, foodPos);
     const normalized = normalizeToCategoryUnit(amount, unit, category);
 
