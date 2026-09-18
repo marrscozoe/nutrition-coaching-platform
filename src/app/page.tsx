@@ -100,7 +100,15 @@ export default function HomePage() {
           setError('Login failed: invalid session data');
         }
       } else {
-        // Signup - call pre-signup API to get a secure token, then redirect to onboarding
+        // Signup - redirect to /signup with trainer param if present, otherwise use pre-signup
+        const urlParams = new URLSearchParams(window.location.search);
+        const trainerParam = urlParams.get('trainer');
+        if (trainerParam) {
+          // Trainer link reached homepage - redirect to proper signup page so trainer_id is captured
+          router.push(`/signup?trainer=${encodeURIComponent(trainerParam)}`);
+          return;
+        }
+
         setLoading(true);
         try {
           const res = await fetch('/api/auth/pre-signup', {
