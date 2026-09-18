@@ -1335,6 +1335,10 @@ function findFoodTokenPosition(item: string, category: 'protein' | 'veg' | 'fat'
 export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'starch' | null {
   const lower = item.toLowerCase();
   if (!lower || lower === 'photo logged') return null;
+  // DEBUG
+  if (item.includes("butter") || item.includes("beef") || item.includes("avocado")) {
+    console.log(`[DEBUG classifyFoodItem] item="${item}"`);
+  }
 
   // Guard: plain water (beverage) must never be classified as any food category.
   // Prevents "32oz water" from being classified as veg via "Water chestnuts".
@@ -1440,22 +1444,22 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
     const foodLower = food.toLowerCase();
     // Only skip bacon — whey protein powder counts as protein for Home deduction
     if (foodLower.includes('bacon')) continue;
-    if (itemContainsFood(food)) return 'protein';
+    if (itemContainsFood(food)) { console.log(`[DEBUG protein] item="${item}", food="${food}"`); return 'protein'; }
   }
 
   // Check fibrous vegetables
   for (const food of FIBROUS_VEGETABLES) {
-    if (itemContainsFood(food)) return 'veg';
+    if (itemContainsFood(food)) { console.log(`[DEBUG veg] item="${item}", food="${food}"`); return 'veg'; }
   }
 
   // Check starchy carbohydrates
   for (const food of STARCHY_CARBOHYDRATES) {
-    if (itemContainsFood(food)) return 'starch';
+    if (itemContainsFood(food)) { console.log(`[DEBUG starch] item="${item}", food="${food}"`); return 'starch'; }
   }
 
   // Check healthy fats
   for (const food of HEALTHY_FATS) {
-    if (itemContainsFood(food)) return 'fat';
+    if (itemContainsFood(food)) { console.log(`[DEBUG fat] item="${item}", food="${food}"`); return 'fat'; }
   }
 
   return null;
