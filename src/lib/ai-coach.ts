@@ -799,9 +799,12 @@ export interface MealData {
  * Handles commas, "and", and various separators.
  */
 function splitIntoFoodItems(foodDescription: string): string[] {
-  // Split on common separators: commas, "and", newlines, semicolons, plus signs, slashes, ampersands
+  // Split on sentence/phrase boundaries, NOT internal punctuation.
+  // We use periods (meal items) and semicolons as delimiters.
+  // This prevents dates like "Mon, Sep 14" from being split mid-phrase.
+  // Commas and "and" are NOT used as delimiters — they appear inside food items.
   const items = foodDescription
-    .split(/[,\n;+\/&]+|\band\b/i)
+    .split(/[.;]+/)
     .map(item => item.trim())
     .filter(item => item.length > 0);
   return items;
@@ -821,6 +824,12 @@ function itemMatchesFoodList(itemLower: string, foodList: string[]): boolean {
   // Strip portion descriptions before matching (e.g. "Almonds (3 small handfuls...)" → "Almonds")
   const stripPortion = (s: string) => s.split('(')[0].toLowerCase().trim();
   const itemClean = stripPortion(itemLower);
+
+  // Guard: plain water (beverage) must never match fibrous vegetables via "Water chestnuts".
+  // "water" as a standalone token in the item means plain water, not a veg.
+  const isPlainWaterItem = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(itemClean) ||
+    /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(itemClean);
+  if (isPlainWaterItem) return false;
 
   // Guard: plain water (beverage) must never match fibrous vegetables via "Water chestnuts".
   // "water" as the last word of a multi-word entry (e.g. "water chestnuts") should not
@@ -949,9 +958,11 @@ export function extractMealData(
       }
     }
 
-    // Check fat
+    // Check fat — but plain water must never set hasFat
     if (!hasFat) {
-      if (itemMatchesFoodList(itemLower, HEALTHY_FATS)) {
+      const isPlainWaterItem = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(itemLower.trim()) ||
+        /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(itemLower.trim());
+      if (!isPlainWaterItem && itemMatchesFoodList(itemLower, HEALTHY_FATS)) {
         recognizedItems.push({ item, category: 'fat' });
         hasFat = true;
       }

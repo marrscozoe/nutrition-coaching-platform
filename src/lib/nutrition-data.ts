@@ -288,7 +288,7 @@ export const STARCHY_CARBOHYDRATES = [
   'Oatmeal', 'Steel cut oats',
   'Barley', 'Bulgur', 'Buckwheat', 'Millet', 'Spelt',
   'Peas', 'Corn', 'Lentils', 'Kidney beans', 'Pinto beans', 'Black beans', 'Garbanzo beans', 'Chickpeas', 'Cannellini beans', 'Navy beans', 'Lima beans', 'Butter beans', 'Black Eyed Peas',
-  
+  'Tortilla', 'Flour tortilla', 'Corn tortilla',
   'Plantain', 'Parsnips', 'Acorn squash', 'Delicata squash',
 ];
 // Fresh or frozen, NO CANS
@@ -1164,9 +1164,9 @@ function parseFraction(s: string): number {
  * Handles fractions ("1/2", "3/4"), decimals ("1.5"), ranges ("1-2" uses max).
  * Returns { amount, unit }.
  */
-function extractAmount(item: string, foodPos: number = -1): { amount: number; unit: string } {
+export function extractAmount(item: string, foodPos: number = -1): { amount: number; unit: string } {
   // Match all number+unit pairs in the item string with their start positions.
-  const pattern = /([\d]+(?:\.[\d]+)?(?:\s*\/\s*[\d]+)?|(?:[\d]+\s*\/\s*[\d]+))\s*(oz|ounce|ounces|cups?|tbsp|tablespoons?|handfuls?|handful|egg|eggs|g|gram|grams)\b/gi;
+  const pattern = /([\d]+(?:\.[\d]+)?(?:\s*\/\s*[\d]+)?|(?:[\d]+\s*\/\s*[\d]+))\s*(oz|ounce|ounces|cups?|tbsp|tablespoons?|tsp|teaspoons?|handfuls?|handful|egg|eggs|g|gram|grams)\b/gi;
   // Also match no-space gram forms: "40g", "40gram", "40grams" (no space between number and g/gram)
   const noSpacePattern = /([\d]+(?:\.[\d]+)?)\s*(g|gram|grams)\b/gi;
   const matches: { amountStr: string; unit: string; start: number; end: number }[] = [];
@@ -1186,7 +1186,36 @@ function extractAmount(item: string, foodPos: number = -1): { amount: number; un
       }
     }
   }
-  if (matches.length === 0) return { amount: 1, unit: '' };
+  if (matches.length === 0) {
+    // No explicit amount-unit pair found. Look for an implicit amount: any number
+    // before the food position (e.g. "3 beef" → implicit 3 oz protein).
+    // Skip numbers that are adjacent to '/' (part of a fraction like "1/2" or "2/3").
+    if (foodPos > 0) {
+      const implicitPattern = /(^|[^a-z0-9])(\d+(?:\.[\d]+)?)(?=\s|$)/gi;
+      let bestImplicit: { amountStr: string; start: number } | null = null;
+      let m2: RegExpExecArray | null;
+      while ((m2 = implicitPattern.exec(item)) !== null) {
+        const numStart = m2.index + (m2[1] ? m2[1].length : 0);
+        // Only accept if number is BEFORE the food token
+        if (numStart < foodPos) {
+          // Skip if this number is part of a fraction: next char is '/' (e.g. "1/2")
+          // or prev char is '/' (e.g. "2/3 cup")
+          const matchEnd = numStart + m2[2].length;
+          const nextChar = item[matchEnd];
+          const prevChar = numStart > 0 ? item[numStart - 1] : '';
+          const isFraction = (nextChar === '/' || prevChar === '/');
+          if (!isFraction) {
+            bestImplicit = { amountStr: m2[2], start: numStart };
+          }
+        }
+      }
+      if (bestImplicit) {
+        const { amount } = parseAmountStr(bestImplicit.amountStr, '');
+        return { amount, unit: '' };
+      }
+    }
+    return { amount: 1, unit: '' };
+  }
   if (matches.length === 1) {
     // Single match — use it
     const match = matches[0];
@@ -1212,6 +1241,15 @@ function extractAmount(item: string, foodPos: number = -1): { amount: number; un
   // (e.g., "water 20 oz" where oz comes after)
   if (bestDist === Infinity) {
     best = matches[matches.length - 1];
+  }
+
+  // Fix: if the amount is at position 0 (start of item string) and the food token is
+  // far from the start (>15 chars), the amount is for the FIRST food in this item,
+  // not for this food. Return null so the caller assumes correct portion.
+  // E.g. "2 cups green beans with olive oil" → 2 cups at pos 0 binds to green beans
+  // (first food), NOT to olive oil at pos 21.
+  if (best.start === 0 && foodPos > 15) {
+    return { amount: 1, unit: '' };
   }
 
   return parseAmountStr(best.amountStr, best.unit);
@@ -1269,6 +1307,17 @@ function findFoodTokenPosition(item: string, category: 'protein' | 'veg' | 'fat'
       const singMatch = singPattern.exec(lower);
       if (singMatch) return singMatch.index;
     }
+
+    // Word-level fallback: check if ANY word from the food entry appears as a standalone word
+    // in the item string. This handles cases like "beef" in "3 beef enchiladas" where the item
+    // is longer than the food entry.
+    for (const word of words) {
+      if (word.length <= 3) continue; // skip short words to avoid false positives
+      const wordEscaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const wordPattern = new RegExp(`(?:^|[^a-z0-9])${wordEscaped}(?:$|[^a-z0-9])`, 'i');
+      const wordMatch = wordPattern.exec(lower);
+      if (wordMatch) return wordMatch.index;
+    }
   }
   return -1;
 }
@@ -1283,9 +1332,17 @@ function findFoodTokenPosition(item: string, category: 'protein' | 'veg' | 'fat'
  * - Plurals: "sweet potato" matches "sweet potatoes"
  * - Partial words: avoids "chicken" matching inside "chicken breast" as protein
  */
-function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'starch' | null {
+export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'starch' | null {
   const lower = item.toLowerCase();
   if (!lower || lower === 'photo logged') return null;
+
+  // Guard: plain water (beverage) must never be classified as any food category.
+  // Prevents "32oz water" from being classified as veg via "Water chestnuts".
+  // Catches: "water", "32oz water", "water 32oz", "water 32 ounces"
+  const isPlainWater = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(lower.trim()) ||
+    /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(lower.trim()) ||
+    /^water$/i.test(lower.trim());
+  if (isPlainWater) return null;
 
   // Extract the base food name: take text before any parenthetical note
   function baseName(foodName: string): string {
@@ -1303,6 +1360,9 @@ function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'starch' | 
     const escaped = fnBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pattern = new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, 'i');
     if (pattern.test(lower)) return true;
+
+    // Split food entry into words for word-level checks (used in multiple places below)
+    const fnWords = fnBase.split(/[\s,]+/);
 
     // Plural/singular bridge: "sweet potatoes" ↔ "sweet potato"
     // Remove trailing 'es' (potatoes→potato) or 's' (apples→apple) from the LAST WORD only
@@ -1338,7 +1398,6 @@ function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'starch' | 
     // "Water chestnuts" — a niche vegetable unlikely to be on this plan.
     const isWaterWord = lower === 'water' || lower.endsWith(' water') || lower.endsWith(' water.') || lower.endsWith('water') && lower.match(/^\d/);
     if (lower.length < fnBase.length && !isWaterWord) {
-      const fnWords = fnBase.split(/[\s,]+/);
       const fnLastWord = fnWords[fnWords.length - 1];
       // Extract the item's food word (last word after stripping amount/unit tokens)
       const itemTokens = lower.split(/[\s,]+/).filter(t => !t.match(/^\d/) && !['oz', 'ounce', 'ounces', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'handful', 'handfuls'].includes(t));
@@ -1355,6 +1414,21 @@ function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'starch' | 
         const itemWordEscaped = fnFirstWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const pattern = new RegExp(`(?:^|[^a-z0-9])${itemWordEscaped}(?:$|[^a-z0-9])`, 'i');
         if (pattern.test(fnBase)) return true;
+      }
+    }
+
+    // FALLBACK: check if ANY word from the food entry appears as a standalone word
+    // in the item string. This handles cases like "beef" in "3 beef enchiladas" where
+    // the item is longer than the food entry and none of the above checks apply.
+    // Only apply when the item has MULTIPLE words (compound food description), to avoid
+    // matching standalone single-word items like "butter" to "Kerrygold gold butter".
+    const itemWordCount = lower.trim().split(/[\s,]+/).length;
+    if (itemWordCount > 1) {
+      for (const word of fnWords) {
+        if (word.length <= 3) continue; // skip short words to avoid false positives
+        const wordEscaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const wordPattern = new RegExp(`(?:^|[^a-z0-9])${wordEscaped}(?:$|[^a-z0-9])`, 'i');
+        if (wordPattern.test(lower)) return true;
       }
     }
 
