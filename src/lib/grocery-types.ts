@@ -1,7 +1,7 @@
 export interface GroceryItem {
   id: string;
   item_name: string;
-  category: 'protein' | 'veggies' | 'starch' | 'fats' | 'eggs';
+  category: 'protein' | 'veggies' | 'starch' | 'fats' | 'eggs' | 'other';
   shop_amount: number | null;
   unit: 'lb' | 'cups' | 'oz' | 'carton' | null;
   checked: boolean;

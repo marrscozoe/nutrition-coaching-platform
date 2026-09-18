@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     const allSuggestions = [
       ...suggestedProteins.map(p => ({ client_id: clientId, item_name: p, category: 'protein' as const, shop_amount: 2, unit: 'lb' })),
       ...suggestedVeggies.map(v => ({ client_id: clientId, item_name: v, category: 'veggies' as const, shop_amount: 4, unit: 'cups' })),
-      ...suggestedFats.map(f => ({ client_id: clientId, item_name: f, category: 'fats' as const, shop_amount: 1, unit: 'lb' })),
+      ...suggestedFats.map(f => ({ client_id: clientId, item_name: f, category: 'fats' as const, shop_amount: 1, unit: 'oz' })),
       ...suggestedStarches.map(s => ({ client_id: clientId, item_name: s, category: 'starch' as const, shop_amount: 2, unit: 'cups' })),
       ...suggestedEggs.map(e => ({ client_id: clientId, item_name: e, category: 'eggs' as const, shop_amount: 1, unit: 'carton' })),
     ];

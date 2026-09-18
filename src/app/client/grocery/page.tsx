@@ -139,9 +139,10 @@ const CATEGORY_LABELS: Record<string, { label: string; emoji: string }> = {
   starch: { label: 'Starch', emoji: '🍠' },
   fats: { label: 'Fats', emoji: '🥑' },
   eggs: { label: 'Eggs', emoji: '🥚' },
+  other: { label: 'Other / Custom', emoji: '📝' },
 };
 
-type TabKey = 'protein' | 'veggies' | 'starch' | 'fats' | 'eggs';
+type TabKey = 'protein' | 'veggies' | 'starch' | 'fats' | 'eggs' | 'other';
 
 export default function GroceryPage() {
   const router = useRouter();
@@ -160,6 +161,9 @@ export default function GroceryPage() {
   const [mealCount, setMealCount] = useState(12);
   const [mealCountEditing, setMealCountEditing] = useState(false);
   const [mealCountVal, setMealCountVal] = useState(12);
+  const [customItemName, setCustomItemName] = useState('');
+  const [customItemAmount, setCustomItemAmount] = useState(0);
+  const [customItemUnit, setCustomItemUnit] = useState<'oz' | 'cups' | 'lb'>('oz');
 
 
   useEffect(() => {
@@ -200,7 +204,9 @@ export default function GroceryPage() {
     const remaining = { ...adjustedTotals };
     for (const item of items) {
       if (!item.shop_amount || !item.unit) continue;
-      const std = toStandardUnit(item.shop_amount, item.unit);
+      // Skip 'other' custom items — they don't count against totals
+      if (item.category === 'other') continue;
+      const std = toStandardUnit(item.shop_amount, item.unit, item.category);
       switch (item.category) {
         case 'protein': remaining.protein_lb = Math.max(0, remaining.protein_lb - std); break;
         case 'veggies': remaining.veggies_cups = Math.max(0, remaining.veggies_cups - std); break;
@@ -240,10 +246,13 @@ export default function GroceryPage() {
     if (res.ok) {
       const newItem = await res.json();
       setItems(prev => [...prev, newItem]);
+      setAddModalOpen(false);
+      setSelectedFood('');
+      setAddAmount(0);
+    } else {
+      const err = await res.json().catch(() => ({ error: 'Failed to add item' }));
+      alert(err.error || 'Failed to add item. Please try again.');
     }
-    setAddModalOpen(false);
-    setSelectedFood('');
-    setAddAmount(0);
   }
 
   async function handleToggleItem(item: GroceryItem) {
@@ -274,6 +283,29 @@ export default function GroceryPage() {
     setItems([]);
   }
 
+  async function handleAddCustomItem() {
+    if (!client || !customItemName.trim()) return;
+    const res = await fetch('/api/grocery/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-client-id': client.id },
+      body: JSON.stringify({
+        item_name: customItemName.trim(),
+        category: 'other',
+        shop_amount: customItemAmount > 0 ? customItemAmount : null,
+        unit: customItemAmount > 0 ? customItemUnit : null,
+      }),
+    });
+    if (res.ok) {
+      const newItem = await res.json();
+      setItems(prev => [...prev, newItem]);
+      setCustomItemName('');
+      setCustomItemAmount(0);
+    } else {
+      const err = await res.json().catch(() => ({ error: 'Failed to add custom item' }));
+      alert(err.error || 'Failed to add custom item. Please try again.');
+    }
+  }
+
   const saveNotesDebounced = useCallback(
     debounce(async (clientId: string, n: string) => {
       await fetch('/api/grocery/list', {
@@ -302,12 +334,14 @@ export default function GroceryPage() {
       case 'starch': return 'cups';
       case 'fats': return 'oz';
       case 'eggs': return 'carton';
+      case 'other': return 'oz'; // custom items default to oz
     }
   }
 
   function openAddModal(food: string) {
     setSelectedFood(food);
-    setAddAmount(0);
+    // Eggs default to 1 carton so Add button isn't disabled
+    setAddAmount(activeTab === 'eggs' ? 1 : 0);
     setAddUnit(defaultUnitForCategory(activeTab));
     setAddModalOpen(true);
   }
@@ -322,6 +356,7 @@ export default function GroceryPage() {
       : [],
     fats: filterFoodsForAllergies(HEALTHY_FATS, allergies, customBans),
     eggs: ['Eggs (12)', 'Eggs (18)', 'Eggs (24)'],
+    other: [], // custom items: no predefined list
   };
 
   if (loading) {
@@ -474,11 +509,51 @@ export default function GroceryPage() {
             {/* Food list */}
             <div className="mt-2 space-y-1">
               {foodLists[activeTab].length === 0 ? (
-                <p className="text-sm text-brand-cream/40 italic py-4 text-center">
-                  {activeTab === 'starch' && !starchAllowed
-                    ? 'Starch is not available in your phase.'
-                    : 'No foods available.'}
-                </p>
+                activeTab === 'other' ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-brand-cream/50 italic">Add any item not on the list above.</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customItemName}
+                        onChange={e => setCustomItemName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && customItemName.trim()) handleAddCustomItem(); }}
+                        placeholder="Item name (required)"
+                        className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm focus:border-brand-orange/60 focus:outline-none"
+                      />
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="number"
+                        value={customItemAmount || ''}
+                        onChange={e => setCustomItemAmount(parseFloat(e.target.value) || 0)}
+                        placeholder="Qty (opt)"
+                        className="w-20 px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm focus:border-brand-orange/60 focus:outline-none"
+                        min="0" step="0.5"
+                      />
+                      <select
+                        value={customItemUnit}
+                        onChange={e => setCustomItemUnit(e.target.value as any)}
+                        className="px-2 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm"
+                      >
+                        <option value="oz">oz</option>
+                        <option value="lb">lb</option>
+                        <option value="cups">cups</option>
+                      </select>
+                      <button
+                        onClick={handleAddCustomItem}
+                        disabled={!customItemName.trim()}
+                        className="px-4 py-2 rounded-lg bg-brand-orange text-white text-sm font-semibold disabled:opacity-40 hover:bg-brand-orange/90 transition-colors"
+                      >Add</button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-brand-cream/40 italic py-4 text-center">
+                    {activeTab === 'starch' && !starchAllowed
+                      ? 'Starch is not available in your phase.'
+                      : 'No foods available.'}
+                  </p>
+                )
               ) : (
                 foodLists[activeTab].map(food => (
                   <button
@@ -525,7 +600,15 @@ export default function GroceryPage() {
             ) : (
               <div className="space-y-3">
                 {(Object.keys(CATEGORY_LABELS) as TabKey[]).map(cat => {
-                  const catItems = items.filter(i => i.category === cat && (i.shop_amount ?? 0) > 0);
+                  // 'other' (custom) items: show all regardless of amount
+                  // standard categories: only show items with amount > 0 (count toward totals)
+                  // eggs: show all (always visible so user can keep adding/checking off)
+                  const catItems = items.filter(i => {
+                    if (i.category !== cat) return false;
+                    if (cat === 'other') return true;
+                    if (cat === 'eggs') return true;
+                    return (i.shop_amount ?? 0) > 0;
+                  });
                   if (catItems.length === 0) return null;
                   return (
                     <div key={cat} className="rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 p-3">

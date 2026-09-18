@@ -17,6 +17,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'item_name and category required' }, { status: 400 });
   }
 
+  const VALID_CATEGORIES = ['protein', 'veggies', 'starch', 'fats', 'eggs', 'other'];
+  if (!VALID_CATEGORIES.includes(category)) {
+    return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
+  }
+
   const supabase = getAdminClient();
 
   const { data, error } = await supabase

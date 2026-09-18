@@ -1142,14 +1142,42 @@ export function get12MealTotals(gender: 'male' | 'female', phase: number): Adjus
 
 /**
  * Convert shop amount to standard units for countdown.
+ * @param amount - raw numeric amount
+ * @param unit - raw unit string (lb, oz, cups, carton)
+ * @param category - item category to determine standard unit:
+ *   protein → standard lb (oz → lb via /16)
+ *   fats    → standard oz (lb → oz via *16)
+ *   veggies/starch → standard cups
+ *   eggs    → standard carton
  */
-export function toStandardUnit(amount: number, unit: string): number {
-  switch (unit) {
-    case 'lb': return amount;
-    case 'oz': return amount / 16;
-    case 'cups': return amount;
-    case 'carton': return amount;
-    default: return amount;
+export function toStandardUnit(amount: number, unit: string, category?: string): number {
+  switch (category) {
+    case 'protein':
+      // protein standard = lb
+      switch (unit) {
+        case 'lb': return amount;
+        case 'oz': return amount / 16; // oz → lb
+        default: return amount;
+      }
+    case 'fats':
+      // fats standard = oz
+      switch (unit) {
+        case 'oz': return amount;
+        case 'lb': return amount * 16; // lb → oz
+        default: return amount;
+      }
+    case 'veggies':
+    case 'starch':
+      return amount; // cups
+    case 'eggs':
+      return amount; // carton
+    default:
+      // Backward compat: oz → lb (original behavior)
+      switch (unit) {
+        case 'lb': return amount;
+        case 'oz': return amount / 16;
+        default: return amount;
+      }
   }
 }
 
