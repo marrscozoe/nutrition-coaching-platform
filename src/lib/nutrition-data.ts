@@ -1594,12 +1594,19 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
     const { amount, unit } = extractAmount(item, foodPos);
     const normalized = normalizeToCategoryUnit(amount, unit, category);
 
+    // Detect "whole egg" / "whole eggs" entries (with or without explicit number).
+    // The unit regex strips "whole " prefix and captures "egg" or "eggs" for
+    // "N whole eggs", but "whole egg" without a number has unit="whole egg" or unit="".
+    // Also catch the case where item is literally "whole egg" or "whole eggs" (no amount).
+    const isWholeEgg = unit === 'egg' || unit === 'eggs' || unit === 'whole egg' || unit === 'whole eggs'
+      || lower === 'whole egg' || lower === 'whole eggs';
+
     switch (category) {
       case 'protein':
         result.proteinOz += normalized;
         // Whole eggs also count as fat: 1 egg = 0.5 tbsp fat
         // Use original `amount` (from extractAmount) since `normalized` is also oz for eggs
-        if (unit === 'egg' || unit === 'eggs') {
+        if (isWholeEgg) {
           result.fatTbsp += Math.round(amount * 0.5 * 10) / 10;
         }
         break;
