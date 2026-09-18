@@ -1230,6 +1230,18 @@ function extractPortionBeforeFood(item: string, matchedFood: string): string | n
   const textBeforeFood = item.substring(0, foodIndex);
   console.log('[DEBUG extractPortionBeforeFood] item:', item, 'matchedFood:', matchedFood, 'textBeforeFood:', textBeforeFood);
   
+  // PORTION BINDING: If the matched food appears AFTER "with" or "and" in the item,
+  // any portion before the conjunction binds to the FIRST food, NOT the matched food.
+  // e.g. "2 cups green beans with olive oil" → "2 cups" binds to green beans, NOT olive oil.
+  // So if matchedFood is after "with"/"and", return null (no stated portion for matchedFood).
+  // Per Allen's rule: no amount stated → assume correct portion (no tip).
+  const conjunctionPattern = /(?:^|\s)(with|and)(?:$|\s)/i;
+  const conjunctionMatch = textBeforeFood.match(conjunctionPattern);
+  if (conjunctionMatch) {
+    console.log('[DEBUG extractPortionBeforeFood] matchedFood is after "' + conjunctionMatch[1] + '" — portion before conjunction binds to first food, not matchedFood. Returning null.');
+    return null;
+  }
+  
   // STRICT portion binding: the portion must be IMMEDIATELY before the food
   // (only whitespace between portion and food).
   // This prevents "2 cups green beans with olive oil" from binding "2 cups" to olive oil.
