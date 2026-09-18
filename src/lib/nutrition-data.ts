@@ -1595,7 +1595,14 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
     const normalized = normalizeToCategoryUnit(amount, unit, category);
 
     switch (category) {
-      case 'protein': result.proteinOz += normalized; break;
+      case 'protein':
+        result.proteinOz += normalized;
+        // Whole eggs also count as fat: 1 egg = 0.5 tbsp fat
+        // Use original `amount` (from extractAmount) since `normalized` is also oz for eggs
+        if (unit === 'egg' || unit === 'eggs') {
+          result.fatTbsp += Math.round(amount * 0.5 * 10) / 10;
+        }
+        break;
       case 'veg':     result.vegCups     += normalized; break;
       case 'fat':     result.fatTbsp     += normalized; break;
       case 'starch':   result.starchCups  += normalized; break;
