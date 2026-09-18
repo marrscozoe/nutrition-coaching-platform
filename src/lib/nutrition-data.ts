@@ -1367,6 +1367,8 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
 
     // Split food entry into words for word-level checks (used in multiple places below)
     const fnWords = fnBase.split(/[\s,]+/);
+    // Count words in the item for constraining bidirectional matching
+    const itemWordCount = lower.trim().split(/[\s,]+/).length;
 
     // Plural/singular bridge: "sweet potatoes" ↔ "sweet potato"
     // Remove trailing 'es' (potatoes→potato) or 's' (apples→apple) from the LAST WORD only
@@ -1401,7 +1403,10 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
     // in food descriptions almost always means the plain-water beverage, not
     // "Water chestnuts" — a niche vegetable unlikely to be on this plan.
     const isWaterWord = lower === 'water' || lower.endsWith(' water') || lower.endsWith(' water.') || lower.endsWith('water') && lower.match(/^\d/);
-    if (lower.length < fnBase.length && !isWaterWord) {
+    // Only apply bidirectional matching when the item has MULTIPLE words. This prevents
+    // standalone single-word items like "butter" from matching "Butter beans" (starch) via
+    // first-word bidirectional check. Multi-word items like "3 beef" still work correctly.
+    if (lower.length < fnBase.length && !isWaterWord && itemWordCount > 1) {
       const fnLastWord = fnWords[fnWords.length - 1];
       // Extract the item's food word (last word after stripping amount/unit tokens)
       const itemTokens = lower.split(/[\s,]+/).filter(t => !t.match(/^\d/) && !['oz', 'ounce', 'ounces', 'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'handful', 'handfuls'].includes(t));
@@ -1426,7 +1431,6 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
     // the item is longer than the food entry and none of the above checks apply.
     // Only apply when the item has MULTIPLE words (compound food description), to avoid
     // matching standalone single-word items like "butter" to "Kerrygold gold butter".
-    const itemWordCount = lower.trim().split(/[\s,]+/).length;
     if (itemWordCount > 1) {
       for (const word of fnWords) {
         if (word.length <= 3) continue; // skip short words to avoid false positives
