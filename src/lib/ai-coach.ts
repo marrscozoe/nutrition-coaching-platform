@@ -23,6 +23,7 @@ import {
   filterFoodsForAllergies,
   getAllowedStarches,
   getFilteredFoodLists,
+  ALCOHOL_KEYWORDS,
 } from './nutrition-data';
 
 // Re-export Phase5Day and phase 5 helpers for backward compatibility
