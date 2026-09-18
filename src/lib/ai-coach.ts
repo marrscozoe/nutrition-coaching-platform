@@ -1947,6 +1947,16 @@ export async function analyzeMealPortion(
   }
 
   // =============================================
+  // ALCOHOL CHECK — banned in all phases (1, 2, 4, 5, 6)
+  // =============================================
+  if (ALCOHOL_KEYWORDS.some(k => foodLower.includes(k))) {
+    const foundAlcohol = ALCOHOL_KEYWORDS.filter(k => foodLower.includes(k));
+    disallowedItems.push(...foundAlcohol);
+    corrections.push(`⚠️ No alcohol in any phase! Alcohol is banned: ${foundAlcohol.join(', ')}.`);
+    // NOTE: do NOT clear hasProtein/hasFat/hasVeg — those were set by actual food items.
+    // Alcohol is not a protein/fat source; it simply gets added to disallowedItems.
+  }
+
   // ALLERGY CHECK — flag foods banned by hard allergies
   // =============================================
   const allergies = context.allergies || [];
