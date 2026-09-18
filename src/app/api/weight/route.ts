@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db_all, db_run, getAdminClient, insertCoachMessage, hasRecentCoachMessage } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
+import { generatePhase5Plan } from '@/lib/ai-coach';
+
+// Allen law 2026-09-18: compute current week from phase + days elapsed
+function computeCurrentWeekWeight(phase: number, daysInPhase: number): number {
+  if (phase === 1 || phase === 5) {
+    return Math.min(2, Math.floor(daysInPhase / 7) + 1);
+  } else if (phase === 2) {
+    return Math.min(2, Math.floor(daysInPhase / 7) + 1);
+  } else {
+    // Phase 4/6 maintenance: week 4 (display only)
+    return 4;
+  }
+}
+
+// Wrapper using weight route's db_run pattern
+function generatePhase5PlanWeight() {
+  // Use the same plan generation logic from ai-coach
+  return generatePhase5Plan();
+}
 
 // GET - Fetch weight history for a client
 export async function GET(request: NextRequest) {
@@ -156,35 +175,36 @@ export async function POST(request: NextRequest) {
           }
 
           // Calculate current_week based on phase and days in phase
-          let newWeek = updatedClient.current_week || 1;
-          if (currentPhase === 1) {
-            newWeek = 1;
-          } else if (currentPhase === 2) {
-            newWeek = Math.min(2, Math.floor(daysInPhase / 7) + 1);
-          } else if (currentPhase === 5) {
-            newWeek = Math.min(3, Math.floor(daysInPhase / 14) + 1);
-          } else if (currentPhase === 4 || currentPhase === 6) {
-            newWeek = 4;
-          }
+          // Allen law 2026-09-18: compute from days, not hardcode
+          const computedWeek = computeCurrentWeekWeight(currentPhase, daysInPhase);
 
           if (newPhase !== currentPhase) {
-            if (newPhase === 4) {
+            // Allen law 2026-09-18: phase advance → always reset week to 1
+            // Allen law 2026-09-18: entering Phase 5 → init phase5_plan + phase5_start_date
+            const advanceWeek = 1;
+            if (newPhase === 5) {
+              const phase5Plan = generatePhase5PlanWeight();
+              await db_run(
+                `UPDATE clients SET current_phase = ?, phase_start_date = ?, current_week = ?, phase5_plan = ?, phase5_start_date = ?, good_meal_streak = 0, updated_at = ? WHERE id = ?`,
+                newPhase, now, advanceWeek, JSON.stringify(phase5Plan), now.split('T')[0], now, clientId
+              );
+            } else if (newPhase === 4) {
               // Transitioning to Phase 4 (maintenance): reset streak
               await db_run(
                 `UPDATE clients SET current_phase = ?, phase_start_date = ?, current_week = ?, good_meal_streak = 0, updated_at = ? WHERE id = ?`,
-                newPhase, resetPhaseStart ? now : phaseStartDate, newWeek, now, clientId
+                newPhase, now, 4, now, clientId
               );
             } else {
               await db_run(
                 `UPDATE clients SET current_phase = ?, phase_start_date = ?, current_week = ?, updated_at = ? WHERE id = ?`,
-                newPhase, resetPhaseStart ? now : phaseStartDate, newWeek, now, clientId
+                newPhase, now, 1, now, clientId
               );
             }
-          } else if (newWeek !== updatedClient.current_week) {
-            // Update week even if phase didn't change
+          } else if (computedWeek !== (updatedClient.current_week || 1)) {
+            // Week drifted — correct it without touching phase
             await db_run(
               `UPDATE clients SET current_week = ?, updated_at = ? WHERE id = ?`,
-              newWeek, now, clientId
+              computedWeek, now, clientId
             );
           }
         }

@@ -3,6 +3,23 @@ import { db_all, db_get, db_run, getAdminClient, MealLog, insertCoachMessage, ha
 import { v4 as uuidv4 } from 'uuid';
 import { generatePhase5Plan, getTomorrowPhase, getTomorrowStarchMessage } from '@/lib/ai-coach';
 
+// Allen law 2026-09-18: compute current week from phase + days elapsed
+// Phase 1/5 (14-day): Week 1 = days 0-6, Week 2 = days 7-13
+// Phase 2 (7-day): Week 1 = days 0-6
+// Phase 4/6 (maintenance): Week 4 (maintenance, no auto-advance by week)
+function computeCurrentWeek(phase: number, daysInPhase: number): number {
+  if (phase === 1 || phase === 5) {
+    // 14-day phases: week 1 = days 0-6, week 2 = days 7-13
+    return Math.min(2, Math.floor(daysInPhase / 7) + 1);
+  } else if (phase === 2) {
+    // 7-day phases: always week 1 (1 week per phase)
+    return Math.min(2, Math.floor(daysInPhase / 7) + 1);
+  } else {
+    // Phase 4/6 maintenance: week 4 (display only)
+    return 4;
+  }
+}
+
 // PATCH - Update an existing meal log
 export async function PATCH(request: NextRequest) {
   let supabase;
@@ -257,8 +274,8 @@ export async function POST(request: NextRequest) {
         // Note: streak is updated as part of this update (newStreak was computed above)
         if (currentPhase === 5 && client.phase5_start_date) {
           const phase5StartDate = new Date(client.phase5_start_date + 'T12:00:00');
-          const daysSinceStart = Math.floor((new Date(now).getTime() - phase5StartDate.getTime()) / (1000 * 60 * 60 * 24));
-          if (daysSinceStart >= 14) {
+          const daysSincePhase5Start = Math.floor((new Date(now).getTime() - phase5StartDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysSincePhase5Start >= 14) {
             // Plan expired - generate new 14-day plan
             const newPhase5Plan = generatePhase5Plan();
             await supabase
@@ -290,14 +307,36 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Compute current_week based on phase and days elapsed
+        // Allen law 2026-09-18: reuse daysInPhase already declared above
+        const computedWeek = computeCurrentWeek(currentPhase, daysInPhase);
+
         if (newPhase !== currentPhase) {
-          // Advance phase and reset phase_start_date
+          // Phase changed — always reset week to 1 and init Phase 5 plan if needed
+          const advanceUpdate: Record<string, any> = {
+            current_phase: newPhase,
+            phase_start_date: now,
+            current_week: 1,
+            good_meal_streak: resetStreak ? 0 : newStreak,
+            updated_at: now,
+          };
+          // Allen law 2026-09-18: entering Phase 5 → init phase5_plan + phase5_start_date
+          if (newPhase === 5) {
+            const newPhase5Plan = generatePhase5Plan();
+            advanceUpdate.phase5_plan = JSON.stringify(newPhase5Plan);
+            advanceUpdate.phase5_start_date = now.split('T')[0];
+          }
+          await supabase
+            .from('clients')
+            .update(advanceUpdate)
+            .eq('id', clientId);
+        } else if (computedWeek !== (client.current_week || 1)) {
+          // Week drifted — correct it without touching phase
           await supabase
             .from('clients')
             .update({
-              current_phase: newPhase,
-              phase_start_date: now,
-              good_meal_streak: resetStreak ? 0 : newStreak,
+              current_week: computedWeek,
+              good_meal_streak: newStreak,
               updated_at: now,
             })
             .eq('id', clientId);

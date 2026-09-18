@@ -106,6 +106,14 @@ export async function PUT(
     const body = await request.json();
     const { notes, current_phase, current_week, subscription_status } = body;
 
+    // Fetch current client phase to detect phase changes
+    const { data: existingClient } = await supabase
+      .from('clients')
+      .select('current_phase')
+      .eq('id', id)
+      .single();
+    const existingPhase = existingClient?.current_phase;
+
     // Build update object
     const updateObj: Record<string, any> = {};
 
@@ -115,7 +123,9 @@ export async function PUT(
     if (current_phase !== undefined) {
       updateObj.current_phase = current_phase;
       updateObj.phase_start_date = new Date().toISOString();
-      // If changing to Phase 5, generate a new 3-day plan
+      // Always reset week to 1 on phase change (Allen law 2026-09-18)
+      updateObj.current_week = 1;
+      // If changing to Phase 5, generate a new 14-day plan
       if (Number(current_phase) === 5) {
         console.log('[PUT] Phase 5 detected - generating plan...');
         try {
@@ -130,7 +140,9 @@ export async function PUT(
         }
       }
     }
-    if (current_week !== undefined) {
+    // Only allow explicit week update if phase is NOT changing
+    // (trainer UI should not override week on phase change)
+    if (current_week !== undefined && current_phase === undefined) {
       updateObj.current_week = current_week;
     }
     if (subscription_status !== undefined) {

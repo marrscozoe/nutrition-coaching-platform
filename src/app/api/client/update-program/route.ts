@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db_run, db_get, db_all } from '@/lib/db';
+import { generatePhase5Plan } from '@/lib/ai-coach';
 
 const VALID_PROGRAMS = ['get_shredded', 'muscle_gain', 'event_ready', 'general_health'];
 
@@ -56,8 +57,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Build dynamic update query
-    const updates: string[] = ['program_type = ?', 'current_phase = ?'];
-    const values: any[] = [program_type, newPhase];
+    // Allen law 2026-09-18: program change → reset phase to program start, phase_start_date to now, current_week to 1
+    const updates: string[] = [
+      'program_type = ?',
+      'current_phase = ?',
+      'phase_start_date = ?',
+      'current_week = 1',
+    ];
+    const values: any[] = [program_type, newPhase, now];
 
     // If event_ready program, require event_date (but not empty string)
     if (program_type === 'event_ready') {
@@ -72,6 +79,16 @@ export async function POST(request: NextRequest) {
     } else {
       // Clear event_date when switching to a non-event_ready program
       updates.push('event_date = NULL');
+    }
+
+    // Allen law 2026-09-18: entering Phase 5 → init phase5_plan + phase5_start_date
+    // Clear any stale Phase 5 data when switching programs
+    if (newPhase === 5) {
+      const phase5Plan = generatePhase5Plan();
+      updates.push('phase5_plan = ?', 'phase5_start_date = ?');
+      values.push(JSON.stringify(phase5Plan), now.split('T')[0]);
+    } else {
+      updates.push('phase5_plan = NULL', 'phase5_start_date = NULL');
     }
 
     updates.push('updated_at = ?');
