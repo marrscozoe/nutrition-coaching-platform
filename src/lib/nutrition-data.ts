@@ -123,7 +123,7 @@ const ALLERGY_BAN_PATTERNS: Record<string, { list: string; patterns: string[] }[
     { list: 'STARCHY_CARBOHYDRATES', patterns: ['bread', 'pasta', 'cracker', 'breaded', 'wheat', 'barley', 'rye', 'oats', 'oatmeal', 'couscous', 'bulgur', 'seitan', 'tortilla', 'pita', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'noodle'] },
   ],
   eggs: [
-    { list: 'LEAN_PROTEINS', patterns: ['egg', 'mayo', 'aioli', 'quiche', 'meringue', 'custard', 'hollandaise', 'egg white'] },
+    { list: 'LEAN_PROTEINS', patterns: ['egg', 'eggs', 'mayo', 'aioli', 'quiche', 'meringue', 'custard', 'hollandaise', 'egg white', 'egg whites', 'whole egg', 'whole eggs'] },
   ],
   soy: [
     { list: 'STARCHY_CARBOHYDRATES', patterns: ['soybean', 'tofu', 'tempeh', 'edamame', 'soy milk', 'soy sauce', 'soybean', 'soya'] },
