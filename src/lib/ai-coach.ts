@@ -1452,6 +1452,33 @@ function checkItemPortionCorrection(
     return null; // Rule 3: Portion stated and correct - no correction
   }
   
+  // Allen law (2026-09-18): protein + fibrous veg: over = OK, under = correction needed
+  // Fat and starch: keep current behavior (any wrong = correction)
+  if (category === 'protein' || category === 'vegetable') {
+    // Parse numeric values to determine over vs under
+    const statedMatch = statedPortion.match(/^([\d.\/]+)\s*(\S+)?$/);
+    const requiredMatch = requiredPortion.match(/^([\d.\/]+)\s*(\S+)?$/);
+    if (statedMatch && requiredMatch) {
+      const statedVal = parsePortionValue(statedMatch[1]);
+      const requiredVal = parsePortionValue(requiredMatch[1]);
+      // Get normalized units for direct comparison
+      const statedUnit = statedMatch[2] ? normalizePortionUnit(statedMatch[2]) : '';
+      const requiredUnit = requiredMatch[2] ? normalizePortionUnit(requiredMatch[2]) : '';
+      if (statedUnit === requiredUnit && statedUnit !== '' && !isNaN(statedVal) && !isNaN(requiredVal)) {
+        if (statedVal > requiredVal) {
+          // Over the required portion — OK, no correction for protein/veg
+          console.log('[DEBUG checkItemPortionCorrection] protein/veg over limit, returning null (over = OK)');
+          return null;
+        }
+        // Under or wrong unit — correction needed
+        const correction = `You need ${requiredPortion} ${categoryLabel}`;
+        console.log('[DEBUG checkItemPortionCorrection] protein/veg under, returning correction:', correction);
+        return correction;
+      }
+    }
+    // Could not parse/compare — fall through to default correction
+  }
+
   // Rule 2: Portion stated and WRONG - return correction
   // Format the correction message with the required portion
   const correction = `You need ${requiredPortion} ${categoryLabel}`;
