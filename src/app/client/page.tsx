@@ -162,9 +162,7 @@ export default function ClientDashboard() {
     setProteinRemaining(targets.proteinOz);
     setVegRemaining(targets.vegCups);
     setFatRemaining(targets.fatTbsp);
-    if (targets.starchCups > 0) {
-      setStarchRemaining(targets.starchCups);
-    }
+    setStarchRemaining(targets.starchCups);
     setWaterRemaining(targets.waterOz);
   }
 
@@ -222,9 +220,7 @@ export default function ClientDashboard() {
     setProteinRemaining(Math.max(0, proteinTargetVal - totalProteinOz));
     setVegRemaining(Math.max(0, vegTargetVal - totalVegCups));
     setFatRemaining(Math.max(0, fatTargetVal - totalFatTbsp));
-    if (starchTargetVal > 0) {
-      setStarchRemaining(Math.max(0, starchTargetVal - totalStarchCups));
-    }
+    setStarchRemaining(Math.max(0, starchTargetVal - totalStarchCups));
     setWaterRemaining(Math.max(0, waterTargetVal - totalWaterOz));
     console.log('[Home] set remaining: protein=', Math.max(0, proteinTargetVal - totalProteinOz),
       'veg=', Math.max(0, vegTargetVal - totalVegCups),
@@ -347,7 +343,7 @@ export default function ClientDashboard() {
     if (client) {
       calculateDailyTargets(client);
     }
-  }, [client?.id, client?.current_phase, client?.goal_weight, client?.program_type, client?.gender]);
+  }, [client?.id, client?.current_phase, client?.goal_weight, client?.program_type, client?.gender, client?.phase5_plan, client?.phase5_start_date]);
 
   // Recalculate remaining whenever recentMeals changes (after fetch resolves)
   // or when any target value changes (after calculateDailyTargets sets them).

@@ -1765,10 +1765,15 @@ export function getDailyTargets(client: {
   } else if (phase === 5) {
     if (client.phase5_plan && client.phase5_start_date) {
       let phase5Plan: Phase5Day[] | null = null;
-      try {
-        phase5Plan = JSON.parse(client.phase5_plan);
-      } catch {
-        phase5Plan = null;
+      // Accept string (JSON) or already-parsed array/object
+      if (typeof client.phase5_plan === 'string') {
+        try {
+          phase5Plan = JSON.parse(client.phase5_plan);
+        } catch {
+          phase5Plan = null;
+        }
+      } else if (Array.isArray(client.phase5_plan)) {
+        phase5Plan = client.phase5_plan as Phase5Day[];
       }
       if (phase5Plan) {
         const rule = getPhase5CurrentRule(phase5Plan, client.phase5_start_date);
