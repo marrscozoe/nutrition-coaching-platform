@@ -173,8 +173,8 @@ export default function ClientDetailPage() {
       });
 
       if (res.ok) {
-        // Redirect to clients list after successful deletion
-        router.push('/trainer/clients');
+        // Hard navigation — forces fresh page load so no ghost client appears in the list
+        window.location.assign('/trainer/clients');
       } else {
         const data = await res.json().catch(() => ({}));
         setDeleteError(data.error || 'Failed to delete client');
