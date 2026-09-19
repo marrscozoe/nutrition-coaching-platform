@@ -1690,3 +1690,116 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
   result.starchCups = Math.round(result.starchCups * 10) / 10;
   return result;
 }
+
+// ============================================
+// DAILY TARGETS CALCULATOR
+// ============================================
+
+function parsePortionToNumber(portion: string): number {
+  if (!portion) return 0;
+  const rangeMatch = portion.match(/(\d+)-(\d+)/);
+  if (rangeMatch) return parseInt(rangeMatch[2]);
+  const singleMatch = portion.match(/(\d+)/);
+  if (singleMatch) return parseInt(singleMatch[1]);
+  return 0;
+}
+
+function getPhase2MealCount(): number {
+  const chicagoTime = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+  const day = new Date(chicagoTime).getDay();
+  return (day === 3 || day === 6 || day === 0) ? 2 : 0;
+}
+
+export interface DailyTargets {
+  proteinOz: number;
+  vegCups: number;
+  fatTbsp: number;
+  starchCups: number;
+  waterOz: number;
+  dayGuidance: string;
+}
+
+export function getDailyTargets(client: {
+  gender: string;
+  current_phase: number;
+  goal_weight: number;
+  program_type: string;
+  phase5_plan?: string;
+  phase5_start_date?: string;
+}): DailyTargets {
+  const gender = client.gender as 'male' | 'female';
+  const phase = client.current_phase;
+  const portions = getPortions(gender, phase);
+  const starchPerMeal = parsePortionToNumber(portions.starch);
+  const vegPerMeal = parsePortionToNumber(portions.fibrousVegetables);
+  const fatPerMeal = parsePortionToNumber(portions.fat);
+
+  // Protein: goal_weight/9 (or /6 for muscle_gain); fallback to portion×3 if goal_weight is 0/missing
+  const divisor = client.program_type === 'muscle_gain' ? 6 : 9;
+  let proteinOz: number;
+  if (client.goal_weight && client.goal_weight > 0) {
+    proteinOz = Math.round((client.goal_weight / divisor) * 10) / 10;
+  } else {
+    const portionProteinOz = gender === 'male' ? 6 : 4;
+    proteinOz = portionProteinOz * 3;
+  }
+
+  const vegCups = vegPerMeal * 3;
+  const fatTbsp = fatPerMeal * 3;
+
+  let starchMealCount = 0;
+  let dayGuidance = '';
+
+  if (phase === 1) {
+    starchMealCount = 0;
+    dayGuidance = 'Today: No starches.';
+  } else if (phase === 2) {
+    const mealCount = getPhase2MealCount();
+    starchMealCount = mealCount;
+    dayGuidance = mealCount > 0
+      ? 'Today: Starches with breakfast and lunch — not with dinner.'
+      : 'Today: No starches.';
+  } else if (phase === 4) {
+    starchMealCount = 3;
+    dayGuidance = 'Today: Starches with every meal.';
+  } else if (phase === 5) {
+    if (client.phase5_plan && client.phase5_start_date) {
+      let phase5Plan: Phase5Day[] | null = null;
+      try {
+        phase5Plan = JSON.parse(client.phase5_plan);
+      } catch {
+        phase5Plan = null;
+      }
+      if (phase5Plan) {
+        const rule = getPhase5CurrentRule(phase5Plan, client.phase5_start_date);
+        if (rule?.type === 'phase1') {
+          starchMealCount = 0;
+          dayGuidance = 'Today: No starches.';
+        } else if (rule?.type === 'phase2') {
+          starchMealCount = 2;
+          dayGuidance = 'Today: Starches with breakfast and lunch — not with dinner.';
+        } else if (rule?.type === 'phase4') {
+          starchMealCount = 3;
+          dayGuidance = 'Today: Starches with every meal.';
+        } else {
+          starchMealCount = 0;
+          dayGuidance = 'Today: No starches.';
+        }
+      } else {
+        starchMealCount = 0;
+        dayGuidance = 'Today: No starches (plan missing).';
+      }
+    } else {
+      starchMealCount = 0;
+      dayGuidance = 'Today: No starches (plan missing).';
+    }
+  } else if (phase === 6) {
+    starchMealCount = 3;
+    dayGuidance = 'Today: Starches with every meal.';
+  }
+
+  const starchCups = starchPerMeal * starchMealCount;
+  const waterOz = gender === 'male' ? 128 : 80;
+
+  return { proteinOz, vegCups, fatTbsp, starchCups, waterOz, dayGuidance };
+}

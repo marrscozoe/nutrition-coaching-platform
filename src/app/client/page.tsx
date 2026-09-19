@@ -6,7 +6,7 @@ import Link from 'next/link';
 import AddToHomeScreenBanner from '@/components/AddToHomeScreenBanner';
 import PullToRefresh from '@/components/PullToRefresh';
 import { logout, getCurrentUser } from '@/lib/auth';
-import { getPhaseGuidance, getPortions, getWaterReminder, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies, mealContainsPlainWater, parseFoodDescriptionToPortions, cleanDisplayNumber, extractWaterOzFromDescription } from '@/lib/nutrition-data';
+import { getPhaseGuidance, getPortions, getWaterReminder, getDailyTargets, LEAN_PROTEINS, FIBROUS_VEGETABLES, HEALTHY_FATS, STARCHY_CARBOHYDRATES, filterFoodsForAllergies, mealContainsPlainWater, parseFoodDescriptionToPortions, cleanDisplayNumber, extractWaterOzFromDescription } from '@/lib/nutrition-data';
 
 interface ClientData {
   id: string;
@@ -153,40 +153,19 @@ export default function ClientDashboard() {
   // Calculate daily targets from client data
   function calculateDailyTargets(clientData: ClientData) {
     if (!clientData) return;
-
-    const portions = getPortions(clientData.gender as 'male' | 'female', clientData.current_phase);
-    const vegPerMeal = parsePortionToNumber(portions.fibrousVegetables);
-    const fatPerMeal = parsePortionToNumber(portions.fat);
-    const starchPerMeal = parsePortionToNumber(portions.starch);
-
-    // Protein: goal_weight / 6 for muscle_gain, / 9 for all others
-    const divisor = clientData.program_type === 'muscle_gain' ? 6 : 9;
-    const proteinOz = Math.round((clientData.goal_weight / divisor) * 10) / 10;
-
-    const vegTargetVal = vegPerMeal * 3;
-    const fatTargetVal = fatPerMeal * 3;
-    const starchTargetVal = clientData.current_phase === 1 ? 0 : starchPerMeal * 3;
-
-    setProteinTarget(proteinOz);
-    setVegTarget(vegTargetVal);
-    setFatTarget(fatTargetVal);
-    setStarchTarget(starchTargetVal);
-    // Initialize remaining to targets (no meals deducted yet).
-    // When recalculateRemainingFromMeals runs with fetched meals it will deduct accordingly.
-    setProteinRemaining(proteinOz);
-    setVegRemaining(vegTargetVal);
-    setFatRemaining(fatTargetVal);
-    if (starchTargetVal > 0) {
-      setStarchRemaining(starchTargetVal);
+    const targets = getDailyTargets(clientData);
+    setProteinTarget(targets.proteinOz);
+    setVegTarget(targets.vegCups);
+    setFatTarget(targets.fatTbsp);
+    setStarchTarget(targets.starchCups);
+    setWaterTarget(targets.waterOz);
+    setProteinRemaining(targets.proteinOz);
+    setVegRemaining(targets.vegCups);
+    setFatRemaining(targets.fatTbsp);
+    if (targets.starchCups > 0) {
+      setStarchRemaining(targets.starchCups);
     }
-
-    // Water: extract oz from getWaterReminder (male=128, female=80)
-    const waterReminder = getWaterReminder(clientData.gender as 'male' | 'female');
-    const waterOzMatch = waterReminder.match(/(\d+) oz daily/);
-    const waterTargetVal = waterOzMatch ? parseInt(waterOzMatch[1]) : (clientData.gender === 'male' ? 128 : 80);
-    setWaterTarget(waterTargetVal);
-    setWaterRemaining(waterTargetVal);
-
+    setWaterRemaining(targets.waterOz);
   }
 
   // Recalculate remaining from today's meals
@@ -450,6 +429,19 @@ export default function ClientDashboard() {
           <p className="text-white text-xs mt-1">Keep pushing — you've got this!</p>
         </div>
       )}
+
+      {/* Day Guidance Banner */}
+      {(() => {
+        const targets = getDailyTargets(client as any);
+        if (targets.dayGuidance) {
+          return (
+            <div className="mx-4 mt-4 p-3 rounded-xl bg-brand-orange/20 border border-brand-orange/40">
+              <p className="text-sm text-brand-orange font-medium">{targets.dayGuidance}</p>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {/* Daily Targets Countdown */}
       {client && (
