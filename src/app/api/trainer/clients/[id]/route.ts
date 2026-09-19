@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/db';
 import { generatePhase5Plan } from '@/lib/ai-coach';
+import { chicagoDateString } from '@/lib/nutrition-data';
 
 // GET - Fetch a single client's details
 export async function GET(
@@ -131,7 +132,7 @@ export async function PUT(
         try {
           const phase5Plan = generatePhase5Plan();
           const planJson = JSON.stringify(phase5Plan);
-          const startDate = new Date().toISOString().split('T')[0];
+          const startDate = chicagoDateString();
           updateObj.phase5_plan = planJson;
           updateObj.phase5_start_date = startDate;
           console.log('[PUT] Phase 5 fields added to update');

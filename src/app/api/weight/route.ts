@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db_all, db_run, getAdminClient, insertCoachMessage, hasRecentCoachMessage } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { generatePhase5Plan } from '@/lib/ai-coach';
+import { chicagoDateString } from '@/lib/nutrition-data';
 
 // Allen law 2026-09-18: compute current week from phase + days elapsed
 function computeCurrentWeekWeight(phase: number, daysInPhase: number): number {
@@ -186,7 +187,7 @@ export async function POST(request: NextRequest) {
               const phase5Plan = generatePhase5PlanWeight();
               await db_run(
                 `UPDATE clients SET current_phase = ?, phase_start_date = ?, current_week = ?, phase5_plan = ?, phase5_start_date = ?, good_meal_streak = 0, updated_at = ? WHERE id = ?`,
-                newPhase, now, advanceWeek, JSON.stringify(phase5Plan), now.split('T')[0], now, clientId
+                newPhase, now, advanceWeek, JSON.stringify(phase5Plan), chicagoDateString(), now, clientId
               );
             } else if (newPhase === 4) {
               // Transitioning to Phase 4 (maintenance): reset streak

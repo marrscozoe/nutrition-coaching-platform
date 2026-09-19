@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db_all, db_get, db_run, getAdminClient, MealLog, insertCoachMessage, hasRecentCoachMessage } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { generatePhase5Plan, getTomorrowPhase, getTomorrowStarchMessage } from '@/lib/ai-coach';
+import { chicagoDateString } from '@/lib/nutrition-data';
 
 // Allen law 2026-09-18: compute current week from phase + days elapsed
 // Phase 1/5 (14-day): Week 1 = days 0-6, Week 2 = days 7-13
@@ -282,7 +283,7 @@ export async function POST(request: NextRequest) {
               .from('clients')
               .update({
                 phase5_plan: JSON.stringify(newPhase5Plan),
-                phase5_start_date: now.split('T')[0], // YYYY-MM-DD
+                phase5_start_date: chicagoDateString(), // YYYY-MM-DD
                 good_meal_streak: newStreak,
                 updated_at: now,
               })
@@ -324,7 +325,7 @@ export async function POST(request: NextRequest) {
           if (newPhase === 5) {
             const newPhase5Plan = generatePhase5Plan();
             advanceUpdate.phase5_plan = JSON.stringify(newPhase5Plan);
-            advanceUpdate.phase5_start_date = now.split('T')[0];
+            advanceUpdate.phase5_start_date = chicagoDateString();
           }
           await supabase
             .from('clients')

@@ -1,5 +1,13 @@
 import type { AdjustedTotals } from './grocery-types';
 
+// Always use America/Chicago for user-facing calendar dates
+function toChicagoDateString(date: Date): string {
+  return date.toLocaleString('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' }).split(', ')[0];
+}
+export function chicagoDateString(d: Date = new Date()): string {
+  return toChicagoDateString(d);
+}
+
 // ============================================
 // CUSTOM ALLERGY BANS — client-typed ban items
 // ============================================
@@ -623,14 +631,16 @@ export interface Phase5Day {
 export function getPhase5DayNumber(phase5StartDate: string): number {
   if (!phase5StartDate) return 1;
   const [y, m, d] = phase5StartDate.split('-').map(Number);
-  // Plan date is a calendar date in the user's timezone (America/Chicago).
-  // Parse it as local time (same calendar date, midnight).
-  // Then compute days elapsed against current local time.
-  const start = new Date(y, m - 1, d, 0, 0, 0);
-  const now = new Date();
+  // Always use America/Chicago for the day clock.
+  const startChicago = toChicagoDateString(new Date(y, m - 1, d, 12, 0, 0));
+  const nowChicago = toChicagoDateString(new Date());
+  const [y2, m2, d2] = nowChicago.split('/').map(Number);
+  const [sy, sm, sd] = startChicago.split('/').map(Number);
+  const start = new Date(sy, sm - 1, sd, 12, 0, 0);
+  const now = new Date(y2, m2 - 1, d2, 12, 0, 0);
   const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   const result = Math.min(14, Math.max(1, diffDays + 1));
-  console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate, '| startLocal:', start.toISOString(), '| nowLocal:', now.toISOString(), '| diffDays:', diffDays, '| currentDay:', result);
+  console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate, '| startChicago:', startChicago, '| nowChicago:', nowChicago, '| diffDays:', diffDays, '| currentDay:', result);
   return result;
 }
 

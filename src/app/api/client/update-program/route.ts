@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db_run, db_get, db_all } from '@/lib/db';
 import { generatePhase5Plan } from '@/lib/ai-coach';
+import { chicagoDateString } from '@/lib/nutrition-data';
 
 const VALID_PROGRAMS = ['get_shredded', 'muscle_gain', 'event_ready', 'general_health'];
 
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (newPhase === 5) {
       const phase5Plan = generatePhase5Plan();
       updates.push('phase5_plan = ?', 'phase5_start_date = ?');
-      values.push(JSON.stringify(phase5Plan), now.split('T')[0]);
+      values.push(JSON.stringify(phase5Plan), chicagoDateString());
     } else {
       updates.push('phase5_plan = NULL', 'phase5_start_date = NULL');
     }
