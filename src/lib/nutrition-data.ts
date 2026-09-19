@@ -630,14 +630,19 @@ export interface Phase5Day {
 
 export function getPhase5DayNumber(phase5StartDate: string): number {
   if (!phase5StartDate) return 1;
-  const [y, m, d] = phase5StartDate.split('-').map(Number);
   // Always use America/Chicago for the day clock.
+  const [y, m, d] = phase5StartDate.split('-').map(Number);
+  // start date: noon UTC → toLocaleString gives correct Chicago calendar date
   const startChicago = toChicagoDateString(new Date(y, m - 1, d, 12, 0, 0));
+  // current date: now UTC → toLocaleString gives correct Chicago calendar date
   const nowChicago = toChicagoDateString(new Date());
-  const [y2, m2, d2] = nowChicago.split('/').map(Number);
-  const [sy, sm, sd] = startChicago.split('/').map(Number);
-  const start = new Date(sy, sm - 1, sd, 12, 0, 0);
-  const now = new Date(y2, m2 - 1, d2, 12, 0, 0);
+  // startChicago and nowChicago are both 'MM/DD/YYYY'
+  // Parse back: [0]=month, [1]=day, [2]=year
+  const [startM, startD, startY] = startChicago.split('/').map(Number);
+  const [nowM, nowD, nowY] = nowChicago.split('/').map(Number);
+  // Build dates at noon to avoid any midnight-boundary ambiguity
+  const start = new Date(startY, startM - 1, startD, 12, 0, 0);
+  const now = new Date(nowY, nowM - 1, nowD, 12, 0, 0);
   const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   const result = Math.min(14, Math.max(1, diffDays + 1));
   console.log('[PHASE5-DEBUG] phase5StartDate:', phase5StartDate, '| startChicago:', startChicago, '| nowChicago:', nowChicago, '| diffDays:', diffDays, '| currentDay:', result);
