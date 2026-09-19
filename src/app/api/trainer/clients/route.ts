@@ -31,11 +31,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fail loud — log when client count looks wrong (e.g., 6 vs expected 8)
-    console.log(`[GET /api/trainer/clients] Trainer ${trainerId}: returning ${clients?.length ?? 0} clients`);
+    console.log(`[GET /api/trainer/clients] Trainer ${trainerId}: raw ${clients?.length ?? 0} clients`);
 
-    // Get last meal date for each client
+    // Self-heal: drop ghost rows (deleted in DB but still returned by a stale read)
     let enrichedClients = (clients || []) as any[];
+    if (enrichedClients.length > 0) {
+      const ids = enrichedClients.map((c: any) => c.id);
+      const { data: verifyRows } = await supabase
+        .from('clients')
+        .select('id')
+        .in('id', ids);
+      const alive = new Set((verifyRows || []).map((r: any) => r.id));
+      const before = enrichedClients.length;
+      enrichedClients = enrichedClients.filter((c: any) => alive.has(c.id));
+      if (enrichedClients.length !== before) {
+        console.warn(`[GET /api/trainer/clients] Dropped ${before - enrichedClients.length} ghost client(s)`);
+      }
+    }
+    console.log(`[GET /api/trainer/clients] Trainer ${trainerId}: returning ${enrichedClients.length} clients`);
 
     if (enrichedClients.length > 0) {
       const clientIds = enrichedClients.map(c => c.id);

@@ -29,7 +29,7 @@ export const CUSTOM_BAN_MATCHERS: Record<string, string[]> = {
   ],
   'fried food': [
     'fried', 'crispy', 'deep-fried', 'pan-fried', 'air-fried', 'tempura',
-    'fried chicken', 'french fries', 'fries', 'onion rings', 'fried fish',
+    'fried chicken', 'french fries', 'fries', 'potato salad', 'onion rings', 'fried fish',
     'fish and chips', 'corn dog', 'funnel cake', 'beignets', 'sufganiyot', 'poutine',
   ],
   shellfish: [
@@ -331,7 +331,6 @@ export const STARCHY_CARBOHYDRATES = [
   'Pineapple',
   'Pinto beans',
   'Plantain',
-  'Potato salad',
   'Purple',
   'Raspberries',
   'Red potatoes',
@@ -879,7 +878,7 @@ const PHASE_DISALLOWED: Record<number, { starch: boolean; dairy: boolean; sugar:
 const STARCH_KEYWORDS = ['bread', 'rice', 'pasta', 'potato', 'kidney beans', 'pinto beans', 'black beans', 'garbanzo', 'chickpeas', 'cannellini', 'navy beans', 'lima beans', 'butter beans', 'black eyed peas', 'corn', 'oatmeal', 'cereal', 'banana', 'apple', 'orange', 'mango', 'pineapple', 'grape', 'peach', 'plum', 'cherry'];
 const DAIRY_KEYWORDS = ['milk', 'cheese', 'ice cream'];
 const SUGAR_KEYWORDS = ['candy', 'soda', 'sugar', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry'];
-const PROCESSED_KEYWORDS = ['chips', 'fries', 'fried', 'nuggets', 'tenders', 'tortilla', 'tortillas', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'french toast', 'sandwich', 'sandwiches', 'bun', 'buns', 'roll', 'rolls', 'wrap', 'wraps', 'bagels', 'toast', 'sub', 'subs', 'hoagie', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
+const PROCESSED_KEYWORDS = ['chips', 'fries', 'potato salad', 'fried', 'nuggets', 'tenders', 'tortilla', 'tortillas', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'french toast', 'sandwich', 'sandwiches', 'bun', 'buns', 'roll', 'rolls', 'wrap', 'wraps', 'bagels', 'toast', 'sub', 'subs', 'hoagie', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
 export const ALCOHOL_KEYWORDS = ['beer', 'wine', 'vodka', 'whiskey', 'tequila', 'rum', 'cocktail', 'alcohol', 'champagne', 'hard seltzer', 'cider', 'ale', 'stout', 'sake', 'liquor', 'brandy'];
 
 // Helper: check if a food appears on any approved list
