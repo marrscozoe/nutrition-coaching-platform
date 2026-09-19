@@ -1775,15 +1775,18 @@ export function getDailyTargets(client: {
   } else if (phase === 5) {
     if (client.phase5_plan && client.phase5_start_date) {
       let phase5Plan: Phase5Day[] | null = null;
-      // Accept string (JSON) or already-parsed array/object
+      // Accept string (JSON), already-parsed array, or {type:'phase5', days:[...]} object
       if (typeof client.phase5_plan === 'string') {
         try {
-          phase5Plan = JSON.parse(client.phase5_plan);
+          const parsed = JSON.parse(client.phase5_plan);
+          phase5Plan = Array.isArray(parsed) ? parsed : (parsed?.days || null);
         } catch {
           phase5Plan = null;
         }
       } else if (Array.isArray(client.phase5_plan)) {
         phase5Plan = client.phase5_plan as Phase5Day[];
+      } else if (client.phase5_plan && typeof client.phase5_plan === 'object' && 'days' in client.phase5_plan) {
+        phase5Plan = (client.phase5_plan as { days: Phase5Day[] }).days;
       }
       if (phase5Plan) {
         const rule = getPhase5CurrentRule(phase5Plan, client.phase5_start_date);
