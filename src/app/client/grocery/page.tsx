@@ -12,7 +12,9 @@ import {
   HEALTHY_FATS,
   filterFoodsForAllergies,
   get12MealTotals,
+  getDailyTargets,
   toStandardUnit,
+  type Phase5Day,
 } from '@/lib/nutrition-data';
 import { getCurrentUser } from '@/lib/auth';
 import type { AdjustedTotals, GroceryItem } from '@/lib/grocery-types';
@@ -22,8 +24,12 @@ interface ClientData {
   name: string;
   gender: string;
   current_phase: number;
+  goal_weight: number;
+  program_type: string;
   allergies?: string[];
   custom_allergy_bans?: string[];
+  phase5_plan?: string;
+  phase5_start_date?: string;
 }
 
 function debounce<T extends (...args: any[]) => any>(fn: T, ms: number): T {
@@ -32,10 +38,6 @@ function debounce<T extends (...args: any[]) => any>(fn: T, ms: number): T {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), ms);
   }) as any;
-}
-
-function isStarchAllowedForPhase(phase: number): boolean {
-  return ![1, 5].includes(phase);
 }
 
 /** Scale AdjustedTotals from 12 meals to a target meal count */
@@ -144,6 +146,29 @@ const CATEGORY_LABELS: Record<string, { label: string; emoji: string }> = {
 
 type TabKey = 'protein' | 'veggies' | 'starch' | 'fats' | 'eggs' | 'other';
 
+/** Returns a user-facing starch warning string for the current day, or null if no restriction */
+function getStarchWarning(client: ClientData | null, targets: { starchCups: number; dayGuidance: string } | null): string | null {
+  if (!client || !targets) return null;
+  // Phase 1: no starch
+  if (client.current_phase === 1) {
+    return 'No starches on your plan today — you can still add for shopping.';
+  }
+  // Phase 5: dayGuidance from getDailyTargets tells the story
+  if (client.current_phase === 5) {
+    const guidance = targets.dayGuidance;
+    if (guidance.includes('No starches')) {
+      return 'No starches today on your plan — you can still add for shopping.';
+    }
+    if (guidance.includes('breakfast and lunch')) {
+      return 'Starches only with breakfast and lunch today — not with dinner.';
+    }
+    // starch every meal: no warning needed
+    return null;
+  }
+  // Other phases (2, 3, 4, 6): no starch restriction warning
+  return null;
+}
+
 export default function GroceryPage() {
   const router = useRouter();
   const [client, setClient] = useState<ClientData | null>(null);
@@ -153,7 +178,8 @@ export default function GroceryPage() {
     protein_lb: 3, veggies_cups: 24, starch_cups: 0, fats_oz: 12, eggs_carton: 1
   });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabKey>('protein');
+  // Accordion: which category is open (null = all closed by default)
+  const [openCategory, setOpenCategory] = useState<TabKey | null>('protein');
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedFood, setSelectedFood] = useState('');
   const [addAmount, setAddAmount] = useState(0);
@@ -165,11 +191,13 @@ export default function GroceryPage() {
   const [customItemAmount, setCustomItemAmount] = useState(0);
   const [customItemUnit, setCustomItemUnit] = useState<'oz' | 'cups' | 'lb'>('oz');
 
+  // Daily targets (used for starch dayGuidance)
+  const [dailyTargets, setDailyTargets] = useState<{ starchCups: number; dayGuidance: string } | null>(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser || currentUser.userType !== 'client') { router.push('/'); return; }
-    const user: ClientData = currentUser.user;
+    const user: ClientData = currentUser.user as ClientData;
     setClient(user);
     const defaults = get12MealTotals(
       user.gender === 'female' ? 'female' : 'male',
@@ -177,6 +205,21 @@ export default function GroceryPage() {
     );
     setAdjustedTotals(defaults);
     fetchGroceryList(user.id);
+
+    // Compute daily targets for starch dayGuidance (same logic as Home)
+    let phase5Plan: Phase5Day[] | undefined;
+    if (user.phase5_plan) {
+      try { phase5Plan = JSON.parse(user.phase5_plan); } catch { phase5Plan = undefined; }
+    }
+    const targets = getDailyTargets({
+      gender: user.gender as 'male' | 'female',
+      current_phase: user.current_phase,
+      goal_weight: user.goal_weight ?? 0,
+      program_type: user.program_type ?? 'standard',
+      phase5_plan: user.phase5_plan,
+      phase5_start_date: user.phase5_start_date,
+    });
+    setDailyTargets({ starchCups: targets.starchCups, dayGuidance: targets.dayGuidance });
   }, [router]);
 
   async function fetchGroceryList(clientId: string) {
@@ -204,7 +247,6 @@ export default function GroceryPage() {
     const remaining = { ...adjustedTotals };
     for (const item of items) {
       if (!item.shop_amount || !item.unit) continue;
-      // Skip 'other' custom items — they don't count against totals
       if (item.category === 'other') continue;
       const std = toStandardUnit(item.shop_amount, item.unit, item.category);
       switch (item.category) {
@@ -283,6 +325,20 @@ export default function GroceryPage() {
     setItems([]);
   }
 
+  /** Uncheck all items — persists via PATCH, keeps items on the list */
+  async function handleUncheckAll() {
+    if (!client || items.length === 0) return;
+    const unchecked = items.map(item => ({ ...item, checked: false }));
+    setItems(unchecked);
+    await Promise.all(items.map(item =>
+      fetch(`/api/grocery/items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-client-id': client.id },
+        body: JSON.stringify({ checked: false }),
+      })
+    ));
+  }
+
   async function handleAddCustomItem() {
     if (!client || !customItemName.trim()) return;
     const res = await fetch('/api/grocery/items', {
@@ -334,30 +390,35 @@ export default function GroceryPage() {
       case 'starch': return 'cups';
       case 'fats': return 'oz';
       case 'eggs': return 'carton';
-      case 'other': return 'oz'; // custom items default to oz
+      case 'other': return 'oz';
     }
   }
 
   function openAddModal(food: string) {
     setSelectedFood(food);
-    // Eggs default to 1 carton so Add button isn't disabled
     setAddAmount(activeTab === 'eggs' ? 1 : 0);
     setAddUnit(defaultUnitForCategory(activeTab));
     setAddModalOpen(true);
   }
 
+  // activeTab is the tab for the currently open accordion category
+  const activeTab: TabKey = openCategory ?? 'protein';
+
   const allergies = client?.allergies || [];
   const customBans = client?.custom_allergy_bans || [];
+
+  // Always populate all categories from nutrition-data (allergy-filtered only — never empty for phase)
   const foodLists: Record<TabKey, string[]> = {
     protein: filterFoodsForAllergies(LEAN_PROTEINS, allergies, customBans),
     veggies: filterFoodsForAllergies(FIBROUS_VEGETABLES, allergies, customBans),
-    starch: client && isStarchAllowedForPhase(client.current_phase)
-      ? filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies, customBans)
-      : [],
+    starch: filterFoodsForAllergies(STARCHY_CARBOHYDRATES, allergies, customBans),
     fats: filterFoodsForAllergies(HEALTHY_FATS, allergies, customBans),
     eggs: ['Eggs (12)', 'Eggs (18)', 'Eggs (24)'],
-    other: [], // custom items: no predefined list
+    other: [],
   };
+
+  const starchWarning = getStarchWarning(client, dailyTargets);
+  const starchCups = dailyTargets?.starchCups ?? 0;
 
   if (loading) {
     return (
@@ -366,8 +427,6 @@ export default function GroceryPage() {
       </div>
     );
   }
-
-  const starchAllowed = client ? isStarchAllowedForPhase(client.current_phase) : false;
 
   return (
     <>
@@ -380,8 +439,6 @@ export default function GroceryPage() {
           </header>
 
           <AddToHomeScreenBanner />
-
-
 
           {/* TOP: Editable Totals with Countdown */}
           <div className="mx-4 mt-4 p-4 rounded-xl bg-blue-50 border-2 border-blue-200 overflow-hidden">
@@ -405,7 +462,7 @@ export default function GroceryPage() {
                     }}
                     onBlur={() => {
                       if (mealCountVal === 0) {
-                        setMealCountVal(mealCount); // reset to original
+                        setMealCountVal(mealCount);
                         setMealCountEditing(false);
                       } else if (mealCountVal !== mealCount) {
                         handleMealCountChange(mealCountVal);
@@ -458,19 +515,18 @@ export default function GroceryPage() {
               total={adjustedTotals.veggies_cups} remaining={remaining.veggies_cups}
               onChange={v => handleTotalChange('veggies_cups', v)}
             />
-            {starchAllowed && adjustedTotals.starch_cups > 0 && (
+            {starchCups > 0 ? (
               <TotalRow
                 emoji="🍠" label="Starch" unit="cups"
                 total={adjustedTotals.starch_cups} remaining={remaining.starch_cups}
                 onChange={v => handleTotalChange('starch_cups', v)}
               />
-            )}
-            {(!starchAllowed || adjustedTotals.starch_cups === 0) && (
+            ) : (
               <div className="flex items-center gap-2 mb-3 opacity-60">
                 <span className="text-base">🍠</span>
                 <span className="text-sm font-semibold text-gray-600 flex-1">Starch</span>
                 <span className="text-xs text-gray-500 font-medium italic">
-                  {!starchAllowed ? 'Not available in your phase' : '0 cups'}
+                  {client?.current_phase === 1 ? 'Not in your phase' : '0 cups'}
                 </span>
               </div>
             )}
@@ -483,88 +539,108 @@ export default function GroceryPage() {
               cartons={adjustedTotals.eggs_carton} remaining={remaining.eggs_carton}
               onChange={v => handleTotalChange('eggs_carton', v)}
             />
-
-
           </div>
 
-          {/* MIDDLE: Add Foods */}
+          {/* MIDDLE: Add Foods — Accordion by category */}
           <div className="mx-4 mt-4">
             <h3 className="text-base font-bold text-brand-cream mb-2">Add Foods</h3>
-            {/* Tab bar */}
-            <div className="flex gap-1 overflow-x-auto pb-2 -mx-1 px-1">
-              {(Object.keys(CATEGORY_LABELS) as TabKey[]).map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                    activeTab === tab
-                      ? 'bg-brand-orange text-white'
-                      : 'bg-brand-charcoal/80 text-brand-cream/60 border border-brand-cream/10'
-                  }`}
-                >
-                  {CATEGORY_LABELS[tab].emoji} {CATEGORY_LABELS[tab].label}
-                </button>
-              ))}
-            </div>
-            {/* Food list */}
-            <div className="mt-2 space-y-1">
-              {foodLists[activeTab].length === 0 ? (
-                activeTab === 'other' ? (
-                  <div className="space-y-2">
-                    <p className="text-sm text-brand-cream/50 italic">Add any item not on the list above.</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={customItemName}
-                        onChange={e => setCustomItemName(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && customItemName.trim()) handleAddCustomItem(); }}
-                        placeholder="Item name (required)"
-                        className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm focus:border-brand-orange/60 focus:outline-none"
-                      />
-                    </div>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="number"
-                        value={customItemAmount || ''}
-                        onChange={e => setCustomItemAmount(parseFloat(e.target.value) || 0)}
-                        placeholder="Qty (opt)"
-                        className="w-20 px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm focus:border-brand-orange/60 focus:outline-none"
-                        min="0" step="0.5"
-                      />
-                      <select
-                        value={customItemUnit}
-                        onChange={e => setCustomItemUnit(e.target.value as any)}
-                        className="px-2 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm"
-                      >
-                        <option value="oz">oz</option>
-                        <option value="lb">lb</option>
-                        <option value="cups">cups</option>
-                      </select>
-                      <button
-                        onClick={handleAddCustomItem}
-                        disabled={!customItemName.trim()}
-                        className="px-4 py-2 rounded-lg bg-brand-orange text-white text-sm font-semibold disabled:opacity-40 hover:bg-brand-orange/90 transition-colors"
-                      >Add</button>
-                    </div>
+
+            {/* Accordion category list */}
+            <div className="space-y-2">
+              {(Object.keys(CATEGORY_LABELS) as TabKey[]).map(tab => {
+                const isOpen = openCategory === tab;
+                const warning = tab === 'starch' ? starchWarning : null;
+                return (
+                  <div key={tab} className="rounded-xl bg-brand-charcoal/80 border border-brand-cream/10 overflow-hidden">
+                    {/* Accordion header (tappable) */}
+                    <button
+                      onClick={() => setOpenCategory(isOpen ? null : tab)}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-brand-cream/5 transition-colors"
+                    >
+                      <span className="text-lg">{CATEGORY_LABELS[tab].emoji}</span>
+                      <span className="flex-1 text-sm font-semibold text-brand-cream">
+                        {CATEGORY_LABELS[tab].label}
+                      </span>
+                      {/* Starch warning dot */}
+                      {warning && (
+                        <span className="text-xs text-yellow-400 font-medium">⚠️</span>
+                      )}
+                      {/* Open/close chevron */}
+                      <span className={`text-brand-cream/40 text-lg transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+                        ▾
+                      </span>
+                    </button>
+
+                    {/* Accordion body */}
+                    {isOpen && (
+                      <div className="px-4 pb-4">
+                        {/* Starch restriction banner */}
+                        {warning && (
+                          <div className="mb-3 px-3 py-2 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 text-xs font-medium">
+                            ⚠️ {warning}
+                          </div>
+                        )}
+
+                        {tab === 'other' ? (
+                          <div className="space-y-2">
+                            <p className="text-sm text-brand-cream/50 italic">Add any item not on the list above.</p>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={customItemName}
+                                onChange={e => setCustomItemName(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && customItemName.trim()) handleAddCustomItem(); }}
+                                placeholder="Item name (required)"
+                                className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm focus:border-brand-orange/60 focus:outline-none"
+                              />
+                            </div>
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="number"
+                                value={customItemAmount || ''}
+                                onChange={e => setCustomItemAmount(parseFloat(e.target.value) || 0)}
+                                placeholder="Qty (opt)"
+                                className="w-20 px-3 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm focus:border-brand-orange/60 focus:outline-none"
+                                min="0" step="0.5"
+                              />
+                              <select
+                                value={customItemUnit}
+                                onChange={e => setCustomItemUnit(e.target.value as any)}
+                                className="px-2 py-2 rounded-lg bg-brand-cream/10 border border-brand-cream/20 text-brand-cream text-sm"
+                              >
+                                <option value="oz">oz</option>
+                                <option value="lb">lb</option>
+                                <option value="cups">cups</option>
+                              </select>
+                              <button
+                                onClick={handleAddCustomItem}
+                                disabled={!customItemName.trim()}
+                                className="px-4 py-2 rounded-lg bg-brand-orange text-white text-sm font-semibold disabled:opacity-40 hover:bg-brand-orange/90 transition-colors"
+                              >Add</button>
+                            </div>
+                          </div>
+                        ) : foodLists[tab].length === 0 ? (
+                          <p className="text-sm text-brand-cream/40 italic py-2">
+                            No foods available (check allergies).
+                          </p>
+                        ) : (
+                          <div className="space-y-1">
+                            {foodLists[tab].map(food => (
+                              <button
+                                key={food}
+                                onClick={() => openAddModal(food)}
+                                className="w-full text-left px-3 py-2.5 rounded-lg bg-brand-cream/5 border border-brand-cream/10 hover:border-brand-orange/50 text-brand-cream text-sm transition-colors"
+                              >
+                                + {food}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-sm text-brand-cream/40 italic py-4 text-center">
-                    {activeTab === 'starch' && !starchAllowed
-                      ? 'Starch is not available in your phase.'
-                      : 'No foods available.'}
-                  </p>
-                )
-              ) : (
-                foodLists[activeTab].map(food => (
-                  <button
-                    key={food}
-                    onClick={() => openAddModal(food)}
-                    className="w-full text-left px-3 py-2.5 rounded-lg bg-brand-charcoal/80 border border-brand-cream/10 hover:border-brand-orange/50 text-brand-cream text-sm transition-colors"
-                  >
-                    + {food}
-                  </button>
-                ))
-              )}
+                );
+              })}
             </div>
           </div>
 
@@ -572,7 +648,7 @@ export default function GroceryPage() {
           <div className="mx-4 mt-6 mb-4">
             {/* Prominent section header */}
             <div className="rounded-xl bg-brand-orange/10 border-2 border-brand-orange/30 p-4 mb-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <h3 className="text-lg font-bold text-brand-cream">
                   🛒 Your Shopping List
                   {items.length > 0 && (
@@ -582,12 +658,20 @@ export default function GroceryPage() {
                   )}
                 </h3>
                 {items.length > 0 && (
-                  <button
-                    onClick={handleClearAll}
-                    className="text-xs text-red-400/80 hover:text-red-400 font-medium px-2 py-1 rounded border border-red-400/20 hover:bg-red-400/10 transition-colors"
-                  >
-                    Clear All
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleUncheckAll}
+                      className="text-xs text-brand-orange/80 hover:text-brand-orange font-medium px-2 py-1 rounded border border-brand-orange/30 hover:bg-brand-orange/10 transition-colors"
+                    >
+                      Uncheck All
+                    </button>
+                    <button
+                      onClick={handleClearAll}
+                      className="text-xs text-red-400/80 hover:text-red-400 font-medium px-2 py-1 rounded border border-red-400/20 hover:bg-red-400/10 transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -600,9 +684,6 @@ export default function GroceryPage() {
             ) : (
               <div className="space-y-3">
                 {(Object.keys(CATEGORY_LABELS) as TabKey[]).map(cat => {
-                  // 'other' (custom) items: show all regardless of amount
-                  // standard categories: only show items with amount > 0 (count toward totals)
-                  // eggs: show all (always visible so user can keep adding/checking off)
                   const catItems = items.filter(i => {
                     if (i.category !== cat) return false;
                     if (cat === 'other') return true;
@@ -687,7 +768,6 @@ export default function GroceryPage() {
           </Link>
         </div>
       </nav>
-
 
       {/* Add Modal */}
       {addModalOpen && (
