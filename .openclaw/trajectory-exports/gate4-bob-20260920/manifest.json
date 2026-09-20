@@ -1,0 +1,58 @@
+{
+  "traceSchema": "openclaw-trajectory",
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-20T05:14:09.823Z",
+  "traceId": "presley-midnight-gate4-bob-20260920",
+  "sessionId": "presley-midnight-gate4-bob-20260920",
+  "sessionKey": "agent:main:explicit:presley-midnight-gate4-bob-20260920",
+  "workspaceDir": "$WORKSPACE_DIR",
+  "leafId": "e27c5b89-03a7-43d5-af2c-0cb92d5bd1f6",
+  "eventCount": 50,
+  "runtimeEventCount": 14,
+  "transcriptEventCount": 36,
+  "sourceFiles": {
+    "session": "agent:…0920"
+  },
+  "supplementalFiles": [
+    "metadata.json",
+    "artifacts.json",
+    "prompts.json"
+  ],
+  "contents": [
+    {
+      "path": "metadata.json",
+      "mediaType": "application/json",
+      "bytes": 8981
+    },
+    {
+      "path": "artifacts.json",
+      "mediaType": "application/json",
+      "bytes": 3788
+    },
+    {
+      "path": "prompts.json",
+      "mediaType": "application/json",
+      "bytes": 4062
+    },
+    {
+      "path": "events.jsonl",
+      "mediaType": "application/x-ndjson",
+      "bytes": 156484
+    },
+    {
+      "path": "session-branch.json",
+      "mediaType": "application/json",
+      "bytes": 15198
+    },
+    {
+      "path": "system-prompt.txt",
+      "mediaType": "text/plain; charset=utf-8",
+      "bytes": 37
+    },
+    {
+      "path": "tools.json",
+      "mediaType": "application/json",
+      "bytes": 2434
+    }
+  ]
+}

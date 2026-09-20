@@ -1,0 +1,78 @@
+[
+  {
+    "name": "agents_list",
+    "description": "List configured agent ids with name/model/runtime metadata, allowed as `sessions_spawn(runtime:\"subagent\")` targets.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "apply_patch",
+    "description": "Patch one/many files. Input requires *** Begin Patch and *** End Patch.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "input"
+      ],
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Patch content using the *** Begin Patch/End Patch format."
+        }
+      }
+    }
+  },
+  {
+    "name": "ask_user",
+    "description": "Ask the human user 1-3 structured questions and wait for their answer; `multiSelect` allows picking several options and `timeoutSeconds` bounds the wait. Use only when blocked on a decision genuinely theirs that cannot be resolved from the request, code, or sensible defaults; never ask whether to proceed or confirm a plan. Ask exactly one question per call unless several answers must be submitted together; one single-select question uses native controls on supported messaging channels. Put every selectable choice in `options`, never only in the question text. Put the recommended option first and suffix its label with ` (Recommended)`. Use `multiSelect` only when the user may choose several options at once; otherwise omit it. Do not include an Other option; free text is added automatically. If the result is no_answer, continue with best judgment.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "questions"
+      ],
+      "properties": {
+        "questions": "[Truncated]",
+        "timeoutSeconds": "[Truncated]"
+      },
+      "additionalProperties": false
+    }
+  },
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]",
+  "[Truncated]"
+]

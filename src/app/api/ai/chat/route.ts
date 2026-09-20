@@ -404,6 +404,60 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Allen law (2026-09-20 Gate 4): If message contains text that could be a meal description,
+    // route through meal analysis pipeline so unrecognized items are passed to AI for correction.
+    // This prevents 'xyzabc123' and similar unrecognized text from falling through to
+    // generic encouragement instead of being analyzed as a meal with unrecognized facts.
+    const messageHasTextContent = normalizedMessage.trim().length > 0 && /[a-zA-Z]{2,}/.test(normalizedMessage);
+    const isClearlyNonMealQuery = (
+      lower.includes('portion size') || lower.includes('portion sizes') ||
+      lower === 'tips?' || lower === 'tips' ||
+      lower.includes('what should my next meal') || lower.includes('what do i eat') ||
+      lower.includes('im hungry') || lower.includes("i'm hungry") ||
+      lower.includes('next meal') || lower.includes('what can i eat') ||
+      lower.includes('what should i eat') || lower.includes('example meal') ||
+      lower.includes('meal suggestion') || lower.includes('what to eat') ||
+      lower.includes('motivat') || lower.includes('i got this') ||
+      lower.includes('make my grocery list') || lower.includes('generate grocery list') ||
+      lower.includes('what is') || lower.includes('what are') ||
+      lower.includes('define') || lower.includes('list of') ||
+      lower.includes("what's a") || lower.includes('whats a') ||
+      lower.includes('motivat') || lower.includes('hello') || lower.includes('hey') ||
+      lower.includes('hi ') || lower.includes('how are') || lower.includes('whats up') ||
+      lower.includes("what's up") || lower.includes('weight') || lower.includes('lost') ||
+      lower.includes('gained') || lower.includes('progress') || lower.includes('down') ||
+      lower.includes('scale') || lower.includes('phase')
+    );
+
+    if (messageHasTextContent && !isClearlyNonMealQuery) {
+      // Try meal analysis first - this ensures unrecognized items are passed to AI with facts
+      const mealContext: CoachContext = {
+        ...context,
+        mealType: undefined, // Unknown meal type from chat
+        mealDate: undefined,
+      };
+      const mealDataStructured = extractMealData(normalizedMessage, mealContext);
+      const analysis = await analyzeMealPortion(normalizedMessage, mealContext, undefined);
+
+      // If we found any recognized OR unrecognized items, use meal analysis pipeline
+      if (mealDataStructured.recognizedItems.length > 0 || mealDataStructured.unrecognizedItems.length > 0) {
+        const evalPrompt = getMealEvaluationPrompt(mealDataStructured, analysis, mealContext);
+        const systemMessage: AIMessage = { role: 'system', content: evalPrompt };
+        const mealResult = await chatWithChatAI([systemMessage], `My meal: ${normalizedMessage}`, preferredProvider);
+
+        if (!mealResult.error && mealResult.text) {
+          await persistAcceptedAllergies(supabase, normalizedMessage, client.allergies || [], client.custom_allergy_bans || [], clientId);
+          return NextResponse.json({
+            response: mealResult.text,
+            type: 'meal_analysis',
+            provider: mealResult.provider,
+            _debug: { unrecognizedItems: mealDataStructured.unrecognizedItems },
+          });
+        }
+        // AI failed for meal - fall through to coach prompt (not fallback)
+      }
+    }
+
     const coachPrompt = getCoachPrompt(context, message);
     // Add discovery tip when client mentions digestive issues and has opted into allergy discovery
     let discoveryTip = '';

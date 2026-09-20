@@ -1,0 +1,13 @@
+{
+  "traceSchema": "openclaw-trajectory",
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-20T05:17:36.840Z",
+  "traceId": "presley-midnight-gate4-bob-v2-20260920",
+  "sessionId": "presley-midnight-gate4-bob-v2-20260920",
+  "sessionKey": "agent:main:explicit:presley-midnight-gate4-bob-v2-20260920",
+  "system": "[Oversized diagnostic JSON redacted]",
+  "submittedPrompts": [
+    "Presley retry (midnight). Last Bob spawn FAILED: worktree=true against workspace/main → \"agent workspace is not a git checkout\".\n\nREQUIRED spawn pattern (skill spawn-repo-coder):\n- sessions_spawn with cwd=\"<redacted>\"\n- agentId=\"builder\" (Bob)\n- worktree=false / DO NOT set worktree or worktreeBaseRef\n- Fresh taskName + label (e.g. bob-gate4-unrecog-v3 / \"Bob Gate4 unrecog v3\")\n- SERIAL: one Bob only. No Tim.\n\nACTIVE JOB stays in jobs/active:\n~/.openclaw/workspace/jobs/active/20260919-2100-nutrition-chat-unrecognized-gate4.md\n\nP0 Gate 4: xyzabc123 must NOT get \"Please share what you ate!\". Program must pass unrecognized:[...] to AI. Base SHA 497707d0.\n\nBob: fix → push main → vercel --prod Ready → proof ~/.openclaw/workspace/jobs/proof/2026-09-20-gate4-unrecognized.md → reply BOB_DONE SHA=… PROD=yes. Leave job in active for Tim later. Then ping Presley webhook.\n\nAfter spawn succeeds, sessions_yield until Bob finishes. If spawn fails again, report the exact error — do not silently end."
+  ],
+  "latestSubmittedPrompt": "Presley retry (midnight). Last Bob spawn FAILED: worktree=true against workspace/main → \"agent workspace is not a git checkout\".\n\nREQUIRED spawn pattern (skill spawn-repo-coder):\n- sessions_spawn with cwd=\"<redacted>\"\n- agentId=\"builder\" (Bob)\n- worktree=false / DO NOT set worktree or worktreeBaseRef\n- Fresh taskName + label (e.g. bob-gate4-unrecog-v3 / \"Bob Gate4 unrecog v3\")\n- SERIAL: one Bob only. No Tim.\n\nACTIVE JOB stays in jobs/active:\n~/.openclaw/workspace/jobs/active/20260919-2100-nutrition-chat-unrecognized-gate4.md\n\nP0 Gate 4: xyzabc123 must NOT get \"Please share what you ate!\". Program must pass unrecognized:[...] to AI. Base SHA 497707d0.\n\nBob: fix → push main → vercel --prod Ready → proof ~/.openclaw/workspace/jobs/proof/2026-09-20-gate4-unrecognized.md → reply BOB_DONE SHA=… PROD=yes. Leave job in active for Tim later. Then ping Presley webhook.\n\nAfter spawn succeeds, sessions_yield until Bob finishes. If spawn fails again, report the exact error — do not silently end."
+}
