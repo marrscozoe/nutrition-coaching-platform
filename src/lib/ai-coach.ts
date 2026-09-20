@@ -1566,7 +1566,7 @@ export async function analyzeMealPortion(
       };
     }
     // Snacks: partial is fine, just check for violations
-    // Run basic food matching to detect any disallowed items
+    // Run basic food matching to detect any disallowed items AND unrecognized items
     let hasProtein = false;
     let hasVeg = false;
     let hasStarch = false;
@@ -1574,6 +1574,26 @@ export async function analyzeMealPortion(
     let hasSupplement = false;
     const unrecognizedItems: string[] = [];
     const disallowedItems: string[] = [];
+
+    // Build unrecognized items for snacks: split into food items and check each against lists
+    const snackFoodItems = splitIntoFoodItems(foodDescription);
+    for (const item of snackFoodItems) {
+      const itemLower = item.toLowerCase();
+      let itemRecognized = false;
+      // Eggs: BOTH protein and fat
+      if (itemLower.includes('egg') && !itemLower.includes('eggplant')) {
+        itemRecognized = true;
+      }
+      if (!itemRecognized && itemMatchesFoodList(itemLower, LEAN_PROTEINS)) itemRecognized = true;
+      // Plain water guard for veg
+      const isPlainWaterItem = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(itemLower.trim()) ||
+        /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(itemLower.trim());
+      if (!isPlainWaterItem && !itemRecognized && itemMatchesFoodList(itemLower, FIBROUS_VEGETABLES)) itemRecognized = true;
+      if (!itemRecognized && itemMatchesFoodList(itemLower, STARCHY_CARBOHYDRATES)) itemRecognized = true;
+      if (!isPlainWaterItem && !itemRecognized && itemMatchesFoodList(itemLower, HEALTHY_FATS)) itemRecognized = true;
+      if (!itemRecognized && itemMatchesFoodList(itemLower, SUPPLEMENTS)) itemRecognized = true;
+      if (!itemRecognized) unrecognizedItems.push(item);
+    }
 
     // SPECIAL CASE: Eggs are BOTH protein AND fat
     if (foodLower.includes('egg') && !foodLower.includes('eggplant')) {
@@ -2385,6 +2405,15 @@ export function getMealEvaluationPrompt(
       if (nonSugarUnrecognized.length > 0) {
         p += `\nUNRECOGNIZED (use your judgment): ${nonSugarUnrecognized.join(', ')}\n`;
       }
+    }
+
+    // CRITICAL FIX: When meal has unrecognized items but ZERO recognized items,
+    // do NOT fire MISSING category tips. The AI would say "Please share what you ate!"
+    // because all categories appear missing. Instead, force the AI to ask about the
+    // specific unrecognized items — those are the meal, not an empty meal.
+    const hasNoRecognizedItems = proteinItems.length === 0 && vegItems.length === 0 && starchItems.length === 0 && fatItems.length === 0;
+    if (hasNoRecognizedItems && analysis.unrecognizedItems.length > 0) {
+      p += `\nIMPORTANT: This meal contains only unrecognized items. Do NOT say "Please share what you ate!" or ask for the meal description. The meal IS "${analysis.unrecognizedItems.join(', ')}". Acknowledge this specific item(s) and ask for clarification about what it is in Allen's voice (e.g. "I don't have 'xyzabc123' in my list — what's that?"). Do NOT give portion tips for missing categories until the food is clarified.\n`;
     }
   }
 
