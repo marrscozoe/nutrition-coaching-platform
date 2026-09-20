@@ -277,6 +277,7 @@ export function getFilteredFoodLists(allergies: string[], customBans?: string[])
 export const LEAN_PROTEINS = [
   'Bacon (nitrate-free, twice per week)',
   'Beef', 'Bison',
+  'Burger', 'Cheeseburger', 'Hamburger', 'Cheeseburgers', 'Hamburgers', // burger variants - protein source
   'Chicken breast',
   'Cod', 'Crab',
   'Egg beaters', 'Egg whites', 'Eggs (2-3 for men, 1-2 for women)',
@@ -877,7 +878,7 @@ const PHASE_DISALLOWED: Record<number, { starch: boolean; dairy: boolean; sugar:
 // Keywords to detect disallowed foods
 const STARCH_KEYWORDS = ['bread', 'rice', 'pasta', 'potato', 'kidney beans', 'pinto beans', 'black beans', 'garbanzo', 'chickpeas', 'cannellini', 'navy beans', 'lima beans', 'butter beans', 'black eyed peas', 'corn', 'oatmeal', 'cereal', 'banana', 'apple', 'orange', 'mango', 'pineapple', 'grape', 'peach', 'plum', 'cherry'];
 const DAIRY_KEYWORDS = ['milk', 'cheese', 'ice cream'];
-const SUGAR_KEYWORDS = ['candy', 'soda', 'sugar', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry'];
+const SUGAR_KEYWORDS = ['candy', 'soda', 'sugar', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'dr pepper', 'coke', 'pepsi', 'sprite', 'mountain dew'];
 const PROCESSED_KEYWORDS = ['chips', 'fries', 'potato salad', 'fried', 'nuggets', 'tenders', 'tortilla', 'tortillas', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'french toast', 'sandwich', 'sandwiches', 'bun', 'buns', 'roll', 'rolls', 'wrap', 'wraps', 'bagels', 'toast', 'sub', 'subs', 'hoagie', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
 export const ALCOHOL_KEYWORDS = ['beer', 'wine', 'vodka', 'whiskey', 'tequila', 'rum', 'cocktail', 'alcohol', 'champagne', 'hard seltzer', 'cider', 'ale', 'stout', 'sake', 'liquor', 'brandy'];
 
@@ -1355,6 +1356,10 @@ export function extractAmount(item: string, foodPos: number = -1): { amount: num
 }
 
 function parseAmountStr(amountStr: string, unit: string): { amount: number; unit: string } {
+  // Handle "I" as "1" (parser edge case: "I beef rib" → 1 beef rib)
+  if (amountStr.toUpperCase() === 'I') {
+    return { amount: 1, unit };
+  }
   if (amountStr.includes('/')) {
     const parts = amountStr.split('/');
     if (parts.length === 2) {

@@ -1164,7 +1164,7 @@ export function extractMealData(
 
   // Sugar detection — Phase 1/2/5 all disallow sugar
   // Scan the full food description for sugar-related keywords
-  const sugarKeywords = ['sugar', 'candy', 'soda', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'ice cream', 'cereal', 'sweet'];
+  const sugarKeywords = ['sugar', 'candy', 'soda', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'ice cream', 'cereal', 'sweet', 'dr pepper', 'coke', 'pepsi', 'sprite', 'mountain dew'];
   const hasSugar = phase !== 4 && phase !== 6 && sugarKeywords.some(k => foodLower.includes(k));
   if (hasSugar) {
     disallowedItems.push('Sugar (disallowed in this phase)');
@@ -1957,6 +1957,29 @@ export async function analyzeMealPortion(
       }
     }
   }
+
+  // Phase 5 strict day: also flag unrecognized processed starches (fries, bun, etc.)
+  // even when hasStarch is false (they aren't recognized as starch by the food lists)
+  if (phase === 5) {
+    const dayNum = context.phase5StartDate ? getPhase5DayNumber(context.phase5StartDate) : 1;
+    const currentDayRule = (Array.isArray(context.phase5Plan) && context.phase5Plan.length > 0)
+      ? context.phase5Plan.find(d => d.day === dayNum)
+      : null;
+    const rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
+
+    if (rulePhase === 1) {
+      const processedStarchKeywords = ['fries', 'french fries', 'bun', 'buns', 'roll', 'rolls', 'tortilla', 'bread', 'pasta', 'cracker', 'crackers'];
+      const foundProcessedStarches = unrecognizedItems.filter(item => {
+        const lower = item.toLowerCase();
+        return processedStarchKeywords.some(kw => lower.includes(kw));
+      });
+      if (foundProcessedStarches.length > 0) {
+        disallowedItems.push(...foundProcessedStarches);
+        corrections.push(`⚠️ Phase 5 Day ${dayNum} (strict phase) — NO processed starch! Remove: ${foundProcessedStarches.join(', ')}.`);
+      }
+    }
+  }
+
   // Phase 6: starch allowed every meal (tortillas now allowed)
   if (phase === 6) {
     // No restrictions on tortillas in Phase 6
@@ -1966,7 +1989,7 @@ export async function analyzeMealPortion(
   // SUGAR CHECK — Phase 1/2/5 all disallow sugar
   // =============================================
   if (phase === 1 || phase === 2 || phase === 5) {
-    const sugarKeywords = ['sugar', 'candy', 'soda', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'ice cream', 'cereal', 'sweet'];
+    const sugarKeywords = ['sugar', 'candy', 'soda', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'ice cream', 'cereal', 'sweet', 'dr pepper', 'coke', 'pepsi', 'sprite', 'mountain dew'];
     const foundSugar = sugarKeywords.filter(k => foodLower.includes(k));
     if (foundSugar.length > 0) {
       disallowedItems.push(...foundSugar);
@@ -2348,7 +2371,7 @@ export function getMealEvaluationPrompt(
     const otherUnrecognized = analysis.unrecognizedItems.filter(item => !processedStarches.includes(item));
     if (otherUnrecognized.length > 0) {
       // Flag sugar items explicitly for Phase 1/2/5 — sugar is always disallowed in these phases
-      const sugarKeywords = ['sugar', 'candy', 'soda', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'ice cream', 'sweet'];
+      const sugarKeywords = ['sugar', 'candy', 'soda', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'ice cream', 'sweet', 'dr pepper', 'coke', 'pepsi', 'sprite', 'mountain dew'];
       const sugarItems = otherUnrecognized.filter(item =>
         sugarKeywords.some(k => item.toLowerCase().includes(k))
       );
