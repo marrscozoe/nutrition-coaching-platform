@@ -179,7 +179,7 @@ export default function GroceryPage() {
   });
   const [loading, setLoading] = useState(true);
   // Accordion: which category is open (null = all closed by default)
-  const [openCategory, setOpenCategory] = useState<TabKey | null>('protein');
+  const [openCategory, setOpenCategory] = useState<TabKey | null>(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedFood, setSelectedFood] = useState('');
   const [addAmount, setAddAmount] = useState(0);
