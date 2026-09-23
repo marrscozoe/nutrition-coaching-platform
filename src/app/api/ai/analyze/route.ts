@@ -376,8 +376,10 @@ export async function POST(request: NextRequest) {
       aiError: aiResult.error,
     });
   } catch (error) {
-    console.error('AI analyze error:', error);
-    return NextResponse.json({ error: 'Analysis failed' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : '';
+    console.error('AI analyze error:', msg, stack);
+    return NextResponse.json({ error: 'Analysis failed', debug: msg }, { status: 500 });
   }
 }
 

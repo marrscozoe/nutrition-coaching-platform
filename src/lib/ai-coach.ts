@@ -24,6 +24,7 @@ import {
   getAllowedStarches,
   getFilteredFoodLists,
   ALCOHOL_KEYWORDS,
+  PHASE_DISALLOWED,
 } from './nutrition-data';
 
 // Re-export Phase5Day and phase 5 helpers for backward compatibility
@@ -656,8 +657,8 @@ COACHING RULES:
 
 CLIENT CONTEXT:
 - Name: ${context.clientName || 'Client'}
-- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 4 = maintenance, Phase 6 = muscle gain (higher carbs & fat)${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 14-day rotating plan (3-day blocks)${context.currentPhase === 5 && context.phase5Plan ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})${context.currentPhase === 5 && context.phase5RuleType ? `
-- TODAY'S STARCH RULE: Phase 5 day ${getPhase5DayNumber(context.phase5StartDate || '')} is a "${context.phase5Plan?.find(d => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || context.phase5RuleType}" day — ${context.phase5RuleType === 'phase1' ? 'NO STARCH today (protein + veggies + fat only)' : context.phase5RuleType === 'phase2' ? 'STARCH at breakfast & lunch only (no starch at dinner)' : 'STARCH at every meal'}` : ''}
+- Phase: ${context.currentPhase} (Phase 1 = no starch, Phase 2 = add starch Wed/Sat/Sun, Phase 4 = maintenance, Phase 6 = muscle gain (higher carbs & fat)${context.programType !== 'event_ready' && context.programType ? `, Phase 5 = aggressive fat loss with 14-day rotating plan (3-day blocks)${context.currentPhase === 5 && Array.isArray(context.phase5Plan) ? `, current plan: Day ${getPhase5DayNumber(context.phase5StartDate || '')}: ${context.phase5Plan?.find((d: any) => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || 'Unknown'}` : ''}` : ''})${context.currentPhase === 5 && context.phase5RuleType ? `
+- TODAY'S STARCH RULE: Phase 5 day ${getPhase5DayNumber(context.phase5StartDate || '')} is a "${Array.isArray(context.phase5Plan) ? context.phase5Plan.find((d: any) => d.day === getPhase5DayNumber(context.phase5StartDate || ''))?.label || context.phase5RuleType : context.phase5RuleType}" day — ${context.phase5RuleType === 'phase1' ? 'NO STARCH today (protein + veggies + fat only)' : context.phase5RuleType === 'phase2' ? 'STARCH at breakfast & lunch only (no starch at dinner)' : 'STARCH at every meal'}` : ''}
 - Gender: ${context.gender} (${context.gender === 'male' ? 'MALE — use MALE portions only' : 'FEMALE — use FEMALE portions only'})
 - Goal: ${context.goalWeight}lbs, Started: ${context.startingWeight}lbs, Current: ${context.currentWeight}lbs
 ${isEventClient ? `- Event in ${weeksUntilEvent} weeks` : ''}
@@ -768,6 +769,19 @@ export function getPhaseAdvice(clientPhase: number): string {
 // MEAL EVALUATION: extractMealData()
 // ============================================
 
+/**
+ * Check if a keyword matches in a string using word-boundary matching.
+ * Prevents "buns" from matching "bunless burger" or "bun" from matching "burger".
+ */
+function containsKeyword(text: string, keyword: string): boolean {
+  try {
+    const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?:^|[^a-z])${esc}(?:$|[^a-z])`, 'i').test(text.toLowerCase());
+  } catch {
+    return text.toLowerCase().includes(keyword.toLowerCase());
+  }
+}
+
 export interface RecognizedItem {
   item: string;
   category: 'protein' | 'vegetable' | 'starch' | 'fat' | 'supplement';
@@ -788,6 +802,7 @@ export interface MealData {
   phaseContext: PhaseContext;
   missingCategories: string[];
   disallowedItems: string[];
+  waterLogged: number; // oz of water logged (0 if not mentioned)
   phaseRules: {
     starchAllowed: boolean;
     starchDays?: number[]; // Phase 2: [0, 3, 6] = Sun, Wed, Sat
@@ -797,17 +812,33 @@ export interface MealData {
 
 /**
  * Split meal description into individual food items.
- * Handles commas, "and", and various separators.
+ * Uses three-level splitting to handle all formats:
+ * 1. Newlines separate meal lines
+ * 2. Commas separate items on the same line
+ * 3. Periods separate compound sentences
  */
 function splitIntoFoodItems(foodDescription: string): string[] {
-  // Split on sentence/phrase boundaries, NOT internal punctuation.
-  // We use periods (meal items) and semicolons as delimiters.
-  // This prevents dates like "Mon, Sep 14" from being split mid-phrase.
-  // Commas and "and" are NOT used as delimiters — they appear inside food items.
-  const items = foodDescription
-    .split(/[.;]+/)
-    .map(item => item.trim())
-    .filter(item => item.length > 0);
+  // Strip photo emoji and timestamps that can interfere with splitting
+  // e.g. "📸 LUNCH — Wed, Sep 23" → ""
+  const cleaned = foodDescription.replace(/📸[^\n]*/gi, '').trim();
+  if (!cleaned) return [];
+
+  // Step 1: split on newlines
+  const lines = cleaned.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
+
+  const items: string[] = [];
+  for (const line of lines) {
+    // Step 2: split on commas (between different foods on same line)
+    const commaParts = line.split(/,/);
+    for (const commaPart of commaParts) {
+      // Step 3: split on periods (between distinct food sentences)
+      const periodParts = commaPart.split(/\./);
+      for (const periodPart of periodParts) {
+        const trimmed = periodPart.trim();
+        if (trimmed.length > 0) items.push(trimmed);
+      }
+    }
+  }
   return items;
 }
 
@@ -849,6 +880,18 @@ function itemMatchesFoodList(itemLower: string, foodList: string[]): boolean {
 
   for (const foodEntry of foodList) {
     const entryClean = stripPortion(foodEntry);
+    // Guard: single-word entries (like "buns") must use word-boundary matching
+    // to prevent "buns" from matching "bunless burger" or "buns out"
+    const isSingleWordEntry = !entryClean.includes(' ') && entryClean.length > 2;
+    if (isSingleWordEntry) {
+      // Use word-boundary regex: match as a distinct word, not as substring of another word
+      const esc = entryClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (!new RegExp(`(?:^|[^a-z])${esc}(?:$|[^a-z])`, 'i').test(itemLower)) {
+        continue; // doesn't match as a whole word — skip
+      }
+      return true;
+    }
+    // Multi-word entries: use existing word-boundary matching (last-word rule)
     // Direct match after stripping portion text
     if (itemClean.includes(entryClean)) return true;
     // Also try the item against the entry (e.g. "mixed nuts" vs "Mixed nuts (3 small...)")
@@ -913,6 +956,17 @@ export function extractMealData(
   let hasStarch = false;
   let hasFat = false;
   let hasSupplement = false;
+  let waterLogged = 0; // oz of plain water beverage (e.g. "32 oz water")
+  if (foodLower.includes('water')) {
+    const allMatches = Array.from(foodDescription.matchAll(/(\d+)\s*(?:oz|ounces?|oz\.)/gi));
+    if (allMatches.length > 0) {
+      const waterIndex = foodLower.indexOf('water');
+      // Find the first "X oz" that appears near the word "water"
+      const waterMatch = allMatches.find(m => m.index !== undefined && m.index >= waterIndex - 5)
+                     || allMatches[allMatches.length - 1];
+      if (waterMatch) waterLogged = parseInt(waterMatch[1], 10);
+    }
+  }
 
   // SPECIAL CASE: Eggs are BOTH protein AND fat — check at food level first
   // The LEAN_PROTEINS entry is "Eggs (2-3 for men, 1-2 for women)" which doesn't match plain "egg"
@@ -979,11 +1033,13 @@ export function extractMealData(
   }
 
   // Mark items as unrecognized only if they weren't recognized as any category
-  // (After the loop, unrecognizedItems only contains items that matched no category)
+  // Plain water beverages are NOT unrecognized — they are tracked separately via waterLogged
   for (const item of foodItems) {
     const itemLower = item.toLowerCase();
     const isRecognized = recognizedItems.some(r => r.item === item);
-    if (!isRecognized) {
+    const isPlainWater = /^\d+\s*(?:oz|ounce|ounces)?\s*water$/i.test(itemLower.trim()) ||
+                         /^water\s+\d+\s*(?:oz|ounce|ounces)?$/i.test(itemLower.trim());
+    if (!isRecognized && !isPlainWater) {
       unrecognizedItems.push(item);
     }
   }
@@ -1085,6 +1141,7 @@ export function extractMealData(
 
   // Also check for unrecognized items by looking for any unmatched
   // food-related words in the description
+
   // Water check (separate from food categories)
   const waterKeywords = ['water', 'h2o', 'sparkling water', 'mineral water', 'soda water'];
   const hasWater = waterKeywords.some(w => foodLower.includes(w));
@@ -1098,6 +1155,26 @@ export function extractMealData(
   // Determine disallowed items based on phase rules
   const disallowedItems: string[] = [];
   let starchAllowed = false;
+
+  // POST-PROCESSING: detect processed starch components within recognized items.
+  // E.g. "Turkey sandwich" → protein recognized, but bread/bun is processed starch.
+  // E.g. "2 cups spaghetti" → starch recognized, but spaghetti is processed starch.
+  // If starch is allowed by phase: count it as starch (hasStarch=true) AND flag as disallowed.
+  // If starch is not allowed: only flag as disallowed (already handled by phase rules above).
+  // This applies to ALL phases — processed starch is always flagged for AI advice.
+  const processedStarchKeywords = ['tortilla', 'bread', 'spaghetti', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
+  for (const recognized of recognizedItems) {
+    if (recognized.category === 'protein' || recognized.category === 'vegetable' || recognized.category === 'starch') {
+      const recognizedLower = recognized.item.toLowerCase();
+      const matchedKeywords = processedStarchKeywords.filter(kw => containsKeyword(recognizedLower, kw));
+      if (matchedKeywords.length > 0) {
+        // Always flag as disallowed so AI advises replacement
+        if (!disallowedItems.includes(recognized.item)) {
+          disallowedItems.push(recognized.item);
+        }
+      }
+    }
+  }
 
   // Phase 1: no starch allowed
   if (phase === 1) {
@@ -1170,12 +1247,20 @@ export function extractMealData(
     disallowedItems.push('Sugar (disallowed in this phase)');
   }
 
+  // Alcohol detection — alcohol is disallowed in all phases except 4 and 6
+  // Check both recognized and unrecognized items against ALCOHOL_KEYWORDS
+  const hasAlcohol = phase !== 4 && phase !== 6 && ALCOHOL_KEYWORDS.some(k => containsKeyword(foodLower, k));
+  if (hasAlcohol) {
+    disallowedItems.push('Alcohol (not allowed in this phase)');
+  }
+
   return {
     recognizedItems,
     unrecognizedItems,
     phaseContext,
     missingCategories,
     disallowedItems,
+    waterLogged,
     phaseRules,
   };
 }
@@ -1616,7 +1701,44 @@ export async function analyzeMealPortion(
       if (foodLower.includes(supp.toLowerCase())) { hasSupplement = true; break; }
     }
 
+    // Check for disallowed items (phase rules + alcohol)
+    // Beer/alcohol is disallowed in Phases 1-5; starch disallowed in Phase 1/2 snacks
+    const phaseDisallowed = PHASE_DISALLOWED[phase] || { starch: false, alcohol: false };
+    const alcoholKeywords = ['beer', 'wine', 'vodka', 'whiskey', 'tequila', 'rum', 'cocktail', 'alcohol', 'champagne', 'hard seltzer', 'cider', 'ale', 'stout', 'sake', 'liquor', 'brandy'];
+    for (const item of snackFoodItems) {
+      const itemLower = item.toLowerCase();
+      // Check for alcohol
+      if (phase !== 6 && phase !== 4 && alcoholKeywords.some(k => itemLower.includes(k))) {
+        disallowedItems.push(`${item} (alcohol not allowed)`);
+      }
+      // Check for processed starch keywords (Phase 1/2: no starch in snacks)
+      if (phaseDisallowed.starch && phase === 1) {
+        const processedStarchKeywords = ['sandwich', 'tortilla', 'bread', 'pasta', 'bun', 'buns', 'roll', 'rolls', 'wrap', 'wraps', 'pizza', 'taco', 'burrito', 'enchilada', 'quesadilla', 'pita', 'naan', 'bagel', 'croissant'];
+        if (processedStarchKeywords.some(kw => {
+          const idx = itemLower.indexOf(kw);
+          if (idx < 0) return false;
+          const before = idx === 0 ? ' ' : itemLower[idx - 1];
+          const after = idx + kw.length >= itemLower.length ? ' ' : itemLower[idx + kw.length];
+          return (before === ' ' || before === ',' || before === '(') && (after === ' ' || after === ',' || after === ')');
+        })) {
+          disallowedItems.push(`${item} (processed starch not allowed in this phase)`);
+        }
+      }
+    }
+
     const waterReminder = getWaterReminder(context.gender);
+
+    // Build corrections list
+    const corrections: string[] = [];
+    for (const dis of disallowedItems) {
+      corrections.push(`⚠️ ${dis}`);
+    }
+    if (unrecognizedItems.length > 0) {
+      for (const unrecognized of unrecognizedItems) {
+        corrections.push(`What is "${unrecognized}"?`);
+      }
+    }
+
     return {
       hasProtein,
       hasVeg,
@@ -1627,8 +1749,8 @@ export async function analyzeMealPortion(
       unrecognizedItems,
       missingCategories: [],
       disallowedItems,
-      portionAdvice: `Looks good! ${waterReminder}`,
-      corrections: [waterReminder],
+      portionAdvice: corrections.length > 0 ? corrections.join(' ') : `Looks good! ${waterReminder}`,
+      corrections,
     };
   }
 
@@ -1641,6 +1763,8 @@ export async function analyzeMealPortion(
   let hasFat = false;
   let hasSupplement = false;
   const unrecognizedItems: string[] = [];
+  // Track if any recognized item contains processed starch (for Phase 4 advice)
+  let processedStarchDetected = false;
 
   // Check corrections cache for full food description first
   const fullCorrection = getCorrection(foodDescription.toLowerCase().trim());
@@ -1717,6 +1841,30 @@ export async function analyzeMealPortion(
         }
       }
     }
+
+    // POST-PROCESSING for Phase 4: detect processed starch within recognized items.
+    // Even if an item was recognized as protein (e.g. "2 cups spaghetti 6oz ground beef"),
+    // if it contains processed starch keywords, flag it so the Phase 4 branch correctly
+    // warns to replace with approved starch instead of just "add starch".
+    if (phase === 4) {
+      const processedStarchKeywords = ['tortilla', 'bread', 'spaghetti', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
+      for (const item of mealFoodItems) {
+        const itemLower = item.toLowerCase();
+        for (const kw of processedStarchKeywords) {
+          const idx = itemLower.indexOf(kw);
+          if (idx < 0) continue;
+          const before = idx === 0 ? ' ' : itemLower[idx - 1];
+          const after = idx + kw.length >= itemLower.length ? ' ' : itemLower[idx + kw.length];
+          if ((before === ' ' || before === ',' || before === '(') &&
+              (after === ' ' || after === ',' || after === ')' || after === '.')) {
+            processedStarchDetected = true;
+            break;
+          }
+        }
+        if (processedStarchDetected) break;
+      }
+    }
+
     console.log('[DEBUG analyzeMealPortion] AFTER MATCHING: hasFat:', hasFat, '| hasProtein:', hasProtein, '| hasVeg:', hasVeg, '| hasStarch:', hasStarch);
 
     // Full-string fallback for ALL categories: catches compound items where split didn't separate them cleanly.
@@ -1988,10 +2136,10 @@ export async function analyzeMealPortion(
     const rulePhase = typeToNumericPhase(currentDayRule?.type) || 1;
 
     if (rulePhase === 1) {
-      const processedStarchKeywords = ['fries', 'french fries', 'bun', 'buns', 'roll', 'rolls', 'tortilla', 'bread', 'pasta', 'cracker', 'crackers'];
+      const processedStarchKeywords = ['fries', 'french fries', 'bun', 'buns', 'tortilla', 'bread', 'spaghetti', 'pasta', 'cracker', 'crackers'];
       const foundProcessedStarches = unrecognizedItems.filter(item => {
         const lower = item.toLowerCase();
-        return processedStarchKeywords.some(kw => lower.includes(kw));
+        return processedStarchKeywords.some(kw => containsKeyword(lower, kw));
       });
       if (foundProcessedStarches.length > 0) {
         disallowedItems.push(...foundProcessedStarches);
@@ -2228,21 +2376,23 @@ export async function analyzeMealPortion(
       console.log('[DEBUG Phase4 FAT] hasFat is TRUE - NOT adding fat correction');
     }
     if (!hasStarch) {
-      // Starch is REQUIRED in Phase 4 - every meal needs starch
-      // BUT: if unrecognized items contain processed starches (tortillas, bread, etc.),
-      // DON'T add 'starch' to missingCategories - the person had starch, just not on approved list
-      const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'pepperoni', 'salami', 'bacon', 'ham', 'hot dog', 'sausage', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
+      // Starch is REQUIRED in Phase 4 - every meal needs approved starch
+      // Processed starches (bread, spaghetti, tortillas, etc.) are in recognizedItems
+      // but are not approved starch. Check BOTH recognized AND unrecognized items.
+      const processedStarchKeywords = ['tortilla', 'bread', 'spaghetti', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
       const hasProcessedStarchInUnrecognized = unrecognizedItems.some(item => {
         const lower = item.toLowerCase();
-        return processedStarchKeywords.some(kw => lower.includes(kw));
+        return processedStarchKeywords.some(kw => containsKeyword(lower, kw));
       });
-      
-      if (!hasProcessedStarchInUnrecognized) {
-        // Truly missing starch - no processed starches in unrecognized items
+      const hasProcessedStarchInRecognized = processedStarchDetected;
+
+      if (!hasProcessedStarchInUnrecognized && !hasProcessedStarchInRecognized) {
+        // Truly missing starch — no processed starches anywhere
         missingCategories.push('starch');
         corrections.push(`💡 Phase 4 requires starch every meal — add ${context.gender === 'male' ? '2 cups' : '1 cup'} rice, potato, or sweet potato.`);
       } else {
-        // Processed starch detected — tell client to replace with approved starches
+        // Processed starch detected in recognized or unrecognized items — flag it and require approved replacement
+        missingCategories.push('starch');
         corrections.push(`💡 Replace the processed starch with an approved starch: rice, beans, potatoes, or sweet potato.`);
       }
     }
@@ -2300,8 +2450,14 @@ export async function analyzeMealPortion(
 // ============================================
 
 /**
- * Generate a SHORT coaching prompt for meal feedback — NO chain-of-thought.
- * The prompt describes what was eaten and phase rules, then gets out of the way.
+ * RULES CODE → AI VOICE architecture for meal evaluation.
+ *
+ * Rules code decides WHAT to coach (categories, portions, phase rules).
+ * AI delivers coaching messages in Allen's voice — no interpretation, no improvisation.
+ *
+ * This replaces the old approach where AI had to parse complex instructions
+ * and decide what to say — which caused garbled output, wrong phase advice,
+ * and water being treated as an unknown food.
  */
 export function getMealEvaluationPrompt(
   mealData: MealData,
@@ -2318,245 +2474,153 @@ export function getMealEvaluationPrompt(
   const m = gender === 'male';
   const portions = getPortions(gender, phase);
 
-  // Build allergy-filtered food lists for the evaluation protocol
-  const allergies = [...(context.allergies || []), ...(context.custom_allergy_bans || [])];
-  const filteredLists = allergies.length > 0 ? getFilteredFoodLists(allergies) : null;
+  // ============================================================
+  // STEP 1: RULES CODE BUILDS THE COACHING DECISION
+  // ============================================================
 
-  // For Phase 1: also filter out dairy items from fat list since Phase 1 disallows dairy
-  let fatExamplesForPhase = (filteredLists?.healthyFats || HEALTHY_FATS);
-  if (phase === 1) {
-    const dairyFatItems = ['heavy cream', 'kerrygold', 'safflower oil', 'coconut oil', 'mct oil'];
-    fatExamplesForPhase = fatExamplesForPhase.filter(f => !dairyFatItems.some(d => f.toLowerCase().includes(d)));
-  }
-  const evalFatExamples = fatExamplesForPhase.join(', ');
+  // Build coaching message parts (rules code decides these)
+  const coachingParts: string[] = [];
 
-  // Phase rules (one line each)
-  const phaseRules: Record<number, string> = {
-    1: 'NO starch, NO sugar — protein, veggies, fat only',
-    2: 'Starch only Wed/Sat/Sun breakfast & lunch — NO sugar',
-    4: 'Starch every meal — maintenance',
-    5: `Phase 5 — rotating 3-day blocks — NO sugar`,
-    6: 'Starch every meal — Phase 6',
-  };
-
-  // Build the prompt - report ALL 5 categories as YES/NO, let AI format in Allen's voice
-  let p = `ALLEN'S AI COACH — ${(context.mealType || 'meal').toUpperCase()} FEEDBACK\n`;
-  p += `Client: ${context.clientName || 'Client'} | Phase ${phase} | ${gender}\n`;
-  p += `Rule: ${phaseRules[phase] || ''}\n\n`;
-
-  // Report ALL 5 categories as YES/NO - don't filter, just report what was detected
-  p += `CATEGORIES DETECTED:\n`;
-  p += `Protein: ${analysis.hasProtein ? 'YES' : 'NO'}\n`;
-  p += `Veggies: ${analysis.hasVeg ? 'YES' : 'NO'}\n`;
-  p += `Starch: ${analysis.hasStarch ? 'YES' : 'NO'}\n`;
-  p += `Fat: ${analysis.hasFat ? 'YES' : 'NO'}\n`;
-  p += `Water: ${analysis.hasWater ? 'YES' : 'NO'}\n\n`;
-
-  // What they ate (list recognized items by category)
-  const proteinItems = mealData.recognizedItems.filter(i => i.category === 'protein').map(i => i.item);
-  const vegItems = mealData.recognizedItems.filter(i => i.category === 'vegetable').map(i => i.item);
-  const starchItems = mealData.recognizedItems.filter(i => i.category === 'starch').map(i => i.item);
-  const fatItems = mealData.recognizedItems.filter(i => i.category === 'fat').map(i => i.item);
-
-  p += `RECOGNIZED FOODS:\n`;
-  if (proteinItems.length) p += `Protein: ${proteinItems.join(', ')}\n`;
-  if (vegItems.length) p += `Veggies: ${vegItems.join(', ')}\n`;
-  if (starchItems.length) p += `Starch: ${starchItems.join(', ')}\n`;
-  if (fatItems.length) p += `Fat: ${fatItems.join(', ')}\n`;
-
-  // Unrecognized items - flag but don't automatically make meal off phase
-  // IMPORTANT: If the unrecognized item is a processed starch (tortillas, bread, pasta, etc.),
-  // flag it explicitly so the AI doesn't give generic "add starch" advice
-  // EXCEPTION: In Phase 6, tortillas are explicitly allowed, so don't flag them
-  if (analysis.unrecognizedItems.length > 0) {
-    const processedStarchKeywords = ['tortilla', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'pepperoni', 'salami', 'bacon', 'ham', 'hot dog', 'sausage', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
-    const processedStarches = analysis.unrecognizedItems.filter(item => {
-      const lower = item.toLowerCase();
-      return processedStarchKeywords.some(kw => lower.includes(kw));
-    });
-    
-    // In Phase 6, tortillas are allowed - don't flag them as processed starch
-    const processedStarchesToFlag = phase === 6 
-      ? processedStarches.filter(item => !item.toLowerCase().includes('tortilla'))
-      : processedStarches;
-    
-    if (processedStarchesToFlag.length > 0) {
-      p += `\n⚠️ PROCESSED STARCH - NOT ON APPROVED LIST:\n`;
-      const itemList = processedStarchesToFlag.join(', ');
-      const isAre = processedStarchesToFlag.length > 1 ? 'are' : 'is';
-      p += `- ${itemList} ${isAre} a PROCESSED STARCH (not on the approved list). Replace with an approved starch: rice, beans, potatoes, or sweet potato.\n`;
-    }
-    
-    // Show other unrecognized items (not processed starches) for AI judgment
-    const otherUnrecognized = analysis.unrecognizedItems.filter(item => !processedStarches.includes(item));
-    if (otherUnrecognized.length > 0) {
-      // Flag sugar items explicitly for Phase 1/2/5 — sugar is always disallowed in these phases
-      const sugarKeywords = ['sugar', 'candy', 'soda', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'ice cream', 'sweet', 'dr pepper', 'coke', 'pepsi', 'sprite', 'mountain dew'];
-      const sugarItems = otherUnrecognized.filter(item =>
-        sugarKeywords.some(k => item.toLowerCase().includes(k))
-      );
-      const nonSugarUnrecognized = otherUnrecognized.filter(item =>
-        !sugarItems.includes(item)
-      );
-      if (sugarItems.length > 0 && (phase === 1 || phase === 2 || phase === 5)) {
-        p += `\n⚠️ SUGAR DETECTED — NOT ALLOWED in Phase ${phase}!\n`;
-        p += `- Remove: ${sugarItems.join(', ')}\n`;
-      }
-      if (nonSugarUnrecognized.length > 0) {
-        p += `\nUNRECOGNIZED (use your judgment): ${nonSugarUnrecognized.join(', ')}\n`;
-
-        // IMPORTANT: When there are unrecognized items (that are not sugar or processed starches),
-        // ALWAYS force the AI to ask about them — regardless of whether recognized items exist.
-        // This ensures unrecognized items like "xyzabc123" are surfaced even when "grilled chicken"
-        // is recognized as protein (Gate 4.2 fix).
-        const hasNoRecognizedItems = proteinItems.length === 0 && vegItems.length === 0 && starchItems.length === 0 && fatItems.length === 0;
-        if (hasNoRecognizedItems) {
-          // All items are unrecognized — do NOT fire MISSING category tips. The meal is the unrecognized items.
-          p += `\nIMPORTANT: This meal contains only unrecognized items. Do NOT say "Please share what you ate!" or ask for the meal description. The meal IS "${nonSugarUnrecognized.join(', ')}". Acknowledge this specific item(s) and ask for clarification about what it is in Allen's voice (e.g. "I don't have 'xyzabc123' in my list — what's that?"). Do NOT give portion tips for missing categories until the food is clarified.\n`;
-        } else {
-          // Some items recognized, some not — acknowledge unrecognized items AND give portion tips.
-          p += `\nIMPORTANT: Acknowledge that "${nonSugarUnrecognized.join(', ')}" is not in your food list and ask what it is in Allen's voice (e.g. "I don't have 'xyzabc123' in my list — what's that?"). Then continue with your normal portion tips for any missing categories.\n`;
-        }
-      }
-    }
-  }
-
-  // REMOVE section - disallowed items (Phase 1 with starch present, etc.)
-  if (analysis.disallowedItems.length > 0) {
-    p += `\n⚠️ REMOVE: ${analysis.disallowedItems.join(', ')}\n`;
-  }
-
-  // CORRECTIONS section - portion corrections (e.g., "You need 2 tablespoons healthy fats" for wrong fat amount)
-  // These come from checkItemPortionCorrection when the stated portion doesn't match required portion
-  if (analysis.corrections && analysis.corrections.length > 0) {
-    p += `\n💡 PORTION CORRECTIONS (include these EXACTLY in your response):\n`;
-    for (const correction of analysis.corrections) {
-      p += `- "${correction.replace(/^💡\s*/, '')}"\n`;
-    }
-  }
-
-  // MISSING section - required categories not present (Phase 4 missing starch, etc.)
-  // IMPORTANT: Use EXACT format "You need X" so AI cannot misinterpret portions
-  // NOTE: fat is handled in YOUR JOB / exactResponseParts (which includes "olive oil or avocado")
-  // to avoid duplication — do NOT add fat here.
-  if (!isSnack && analysis.missingCategories.length > 0) {
-    p += `\nMISSING — Quote these EXACTLY in your response (do NOT change the food or amount):\n`;
-    if (analysis.missingCategories.includes('protein')) p += `- "You need ${m ? '6oz' : '4oz'} lean protein"\n`;
-    if (analysis.missingCategories.includes('vegetable')) p += `- "You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables"\n`;
-    if (analysis.missingCategories.includes('starch')) p += `- "You need ${portions.starch} sweet potato" OR "You need ${portions.starch} red potato" OR "You need ${portions.starch} beans" OR "You need ${portions.starch} fruit"\n`;
-    if (analysis.missingCategories.includes('water')) p += `- "You need ${m ? '32oz' : '20oz'} water"\n`;
-  }
-
-  // Coaching rules - keep it simple, AI formats in Allen's voice
-  // CRITICAL: Make corrections MANDATORY, not optional
-  p += `\nYOUR JOB - FOLLOW THIS EXACTLY:\n`;
-  if (isSnack) {
-    p += `- If allowed: "Good snack! 💪"\n`;
-    p += `- If problems: explain what's wrong, 1 sentence max\n`;
-  } else {
-    // -----------------------------------------------------------------------
-    // FIX: Deduplicate tips ONCE, before building coveredCategories.
-    // corrections[] already contains category tips (veg/fat/protein/starch) from
-    // analyzeMealPortion's MISSING check. Then the MISSING section below ALSO
-    // pushes the same tips again if !coveredCategories.has('category').
-    // The previous code built coveredCategories from an intermediate deduped list,
-    // then added MISSING items (which were already covered) back to exactResponseParts.
-    // Result: tips appeared in CORRECTIONS section + YOU MUST SAY THESE THINGS twice.
-    //
-    // Fix: deduplicate all corrections first, build coveredCategories from that
-    // clean set, then only add MISSING items for categories NOT yet covered.
-    // -----------------------------------------------------------------------
-
-    // Helper: normalize a tip string for deduplication comparison.
-    const normTip = (s: string): string =>
-      s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
-
-    // Deduplicate analysis.corrections upfront — removes duplicate tips from the source.
-    const seenTipNorm = new Set<string>();
-    const dedupedAnalysisCorrections: string[] = [];
-    for (const corr of (analysis.corrections || [])) {
-      const stripped = corr.replace(/^💡\s*/, '');
-      const n = normTip(stripped);
-      if (!seenTipNorm.has(n)) {
-        seenTipNorm.add(n);
-        dedupedAnalysisCorrections.push(stripped);
-      }
-    }
-
-    // Build coveredCategories from the already-deduped corrections list.
-    const coveredCategories = new Set<string>();
-    for (const part of dedupedAnalysisCorrections) {
-      const n = normTip(part);
-      if (n.includes('protein')) coveredCategories.add('protein');
-      if (n.includes('vegetable') || n.includes('fibrous veg')) coveredCategories.add('vegetable');
-      if (n.includes('fat') || n.includes('olive oil') || n.includes('avocado')) coveredCategories.add('fat');
-      if (n.includes('starch') || n.includes('sweet potato') || n.includes('red potato') || n.includes('rice')) coveredCategories.add('starch');
-    }
-
-    // Check if fibrous veg was genuinely recognized in the meal.
-    // Use coveredCategories (set from deduped corrections) as the authoritative check,
-    // supplemented by mealData recognizedItems (handles compound-item edge cases).
-    const hasRecognizedVeg = coveredCategories.has('vegetable') ||
-      mealData.recognizedItems.some(i => i.category === 'vegetable');
-
-    // Build exactResponseParts: deduped corrections + REMOVE + MISSING (if not covered).
-    const exactResponseParts: string[] = [...dedupedAnalysisCorrections];
-
-    for (const item of analysis.disallowedItems) {
-      exactResponseParts.push(`⚠️ Remove: ${item}`);
-    }
-
-    if (analysis.missingCategories.includes('protein') && !coveredCategories.has('protein')) {
-      exactResponseParts.push(`You need ${m ? '6oz' : '4oz'} lean protein`);
-    }
-    // Only emit "need fibrous vegetables" tip if NO fibrous veg was recognized.
-    if (analysis.missingCategories.includes('vegetable') && !hasRecognizedVeg) {
-      exactResponseParts.push(`You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables`);
-    }
-    if (analysis.missingCategories.includes('starch') && !coveredCategories.has('starch')) {
-      exactResponseParts.push(`You need ${portions.starch} sweet potato`);
-    }
-    if (analysis.missingCategories.includes('fat') && !coveredCategories.has('fat')) {
-      exactResponseParts.push(`You need ${m ? '2 tbsp' : '1 tbsp'} olive oil or ${portions.avocado} avocado`);
-    }
-    // Water: always include if missing (no prior correction can cover it).
-    if (analysis.missingCategories.includes('water')) {
-      exactResponseParts.push(`You need ${m ? '32oz' : '20oz'} water`);
-    }
-
-    // Final dedupe pass — one tip per normalized text in the final list.
-    const seenNorm2 = new Set<string>();
-    const uniqueResponseParts: string[] = [];
-    for (const part of exactResponseParts) {
-      const n = normTip(part);
-      if (!seenNorm2.has(n)) {
-        seenNorm2.add(n);
-        uniqueResponseParts.push(part);
-      }
-    }
-
-    if (uniqueResponseParts.length > 0) {
-      // AI MUST use exactly these messages, nothing else
-      p += `- YOU MUST SAY THESE THINGS (use Allen's voice, short and punchy):\n`;
-      for (const part of uniqueResponseParts) {
-        p += `  • ${part}\n`;
-      }
-      p += `- DO NOT add any other advice or foods not listed above\n`;
-      p += `- DO NOT suggest adding foods that are not in MISSING or CORRECTIONS\n`;
+  // REMOVE items (phase violations, disallowed foods)
+  for (const item of analysis.disallowedItems) {
+    if (item.startsWith('⚠️')) {
+      coachingParts.push(item);
     } else {
-      p += `- "Nice! Keep it up! 💪"\n`;
+      coachingParts.push(`⚠️ Remove: ${item}`);
     }
-    p += `- AVOCADO IS A HEALTHY FAT — encourage it!\n`;
-    p += `- NEVER mention a food unless it appears in CORRECTIONS, REMOVE, or MISSING above\n`;
   }
 
-  // Gate allergy discovery tips — never suggest adding foods as allergies unless client has opted in
+  // PORTION CORRECTIONS (rules code already computed these)
+  for (const corr of analysis.corrections || []) {
+    const text = corr.replace(/^💡\s*/, '');
+    if (!coachingParts.some(p => p.toLowerCase().includes(text.toLowerCase().slice(0, 20)))) {
+      coachingParts.push(text);
+    }
+  }
+
+  // MISSING CATEGORIES (rules code — not AI judgment)
+  // Fat is only missing if no fat was recognized
+  const hasRecognizedFat = mealData.recognizedItems.some(i => i.category === 'fat');
+  const hasRecognizedVeg = mealData.recognizedItems.some(i => i.category === 'vegetable');
+  const hasRecognizedProtein = mealData.recognizedItems.some(i => i.category === 'protein');
+  const hasRecognizedStarch = mealData.recognizedItems.some(i => i.category === 'starch');
+
+  if (!isSnack) {
+    if (analysis.missingCategories.includes('protein') && !hasRecognizedProtein) {
+      coachingParts.push(`You need ${m ? '6oz' : '4oz'} lean protein`);
+    }
+    if (analysis.missingCategories.includes('vegetable') && !hasRecognizedVeg) {
+      coachingParts.push(`You need ${m ? '2 cups' : '1-2 cups'} fibrous vegetables`);
+    }
+    if (analysis.missingCategories.includes('starch') && !hasRecognizedStarch) {
+      // Starch allowed depends on phase
+      if (phase === 1) {
+        // Phase 1: no starch allowed — this is a phase violation if starch present
+        coachingParts.push(`⚠️ Phase 1 — NO starch! Skip the starch.`);
+      } else if (phase === 2) {
+        // Phase 2: only Wed/Sat/Sun breakfast+lunch
+        const todayRule = context.phase5RuleType; // reused for phase 2 day check
+        coachingParts.push(`You need ${portions.starch} sweet potato or beans`);
+      } else if (phase === 4) {
+        coachingParts.push(`You need ${portions.starch} sweet potato`);
+      } else if (phase === 5) {
+        // Phase 5: use the phase5RuleType from context
+        const ruleType = context.phase5RuleType;
+        if (ruleType === 'phase1') {
+          // Phase 1 day in Phase 5 rotation — no starch
+          coachingParts.push(`⚠️ Phase 1 day — NO starch today.`);
+        } else if (ruleType === 'phase2') {
+          coachingParts.push(`You need ${portions.starch} sweet potato or beans`);
+        } else if (ruleType === 'phase4') {
+          coachingParts.push(`You need ${portions.starch} sweet potato`);
+        }
+      } else if (phase === 6) {
+        coachingParts.push(`You need ${portions.starch} sweet potato`);
+      }
+    }
+    if (analysis.missingCategories.includes('fat') && !hasRecognizedFat) {
+      coachingParts.push(`You need ${m ? '2 tbsp' : '1 tbsp'} olive oil or ${portions.avocado} avocado`);
+    }
+    // Water: if logged (via mealData.waterLogged), it's covered. If not, tell them.
+    if (analysis.missingCategories.includes('water') && mealData.waterLogged === 0) {
+      coachingParts.push(`You need ${m ? '32oz' : '20oz'} water`);
+    }
+  }
+
+  // WATER LOGGED — positive feedback
+  let waterTrackedMessage = '';
+  if (mealData.waterLogged > 0) {
+    const waterRequired = m ? 32 : 20;
+    if (mealData.waterLogged >= waterRequired) {
+      waterTrackedMessage = `💧 ${mealData.waterLogged}oz — on track!`;
+    } else {
+      waterTrackedMessage = `💧 ${mealData.waterLogged}oz logged. Need ${waterRequired - mealData.waterLogged}oz more.`;
+    }
+  }
+
+  // UNRECOGNIZED ITEMS — rules code tells AI what to ask
+  // "Unknown food" goes to AI to ask about. Portion advice stays rules-based.
+  const unrecognizedNonSugar = analysis.unrecognizedItems.filter(item => {
+    const lower = item.toLowerCase();
+    const sugarKeywords = ['sugar', 'candy', 'soda', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'ice cream', 'sweet', 'dr pepper', 'coke', 'pepsi', 'sprite', 'mountain dew'];
+    return !sugarKeywords.some(k => lower.includes(k));
+  });
+  // Processed starches are handled by the phase rules above
+  const processedStarchKeywords = ['tortilla', 'bread', 'spaghetti', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'pizza', 'burrito', 'quesadilla', 'enchilada', 'taco', 'wrap', 'sandwich', 'sub', 'hoagie', 'pasta dish', 'fried rice', 'bun', 'buns', 'roll', 'rolls', 'wraps', 'bagels', 'toast', 'subs', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
+  const processedStarchUnrecognized = unrecognizedNonSugar.filter(item =>
+    processedStarchKeywords.some(kw => containsKeyword(item.toLowerCase(), kw))
+  );
+  const otherUnrecognized = unrecognizedNonSugar.filter(item =>
+    !processedStarchKeywords.some(kw => containsKeyword(item.toLowerCase(), kw))
+  );
+
+  // ============================================================
+  // STEP 2: BUILD THE PROMPT — rules give AI exact text to say
+  // ============================================================
+
+  let p = `You are ALLEN'S AI NUTRITION COACH.\n`;
+  p += `Voice: Allen texts his clients — short, direct, punchy. One to three sentences.\n`;
+  p += `Example: "Good! Keep it up 💪" or "Bad — swap that" or "You need 2 cups fibrous vegetables"\n\n`;
+
+  // WATER section — always explicitly stated (never a food, always tracked)
+  p += `WATER: ${mealData.waterLogged > 0 ? `${mealData.waterLogged}oz logged` : 'not logged'}\n`;
+  if (waterTrackedMessage) p += `COACH: "${waterTrackedMessage}"\n\n`;
+  else p += `\n`;
+
+  // RECOGNIZED CATEGORIES (brief, for AI context)
+  p += `EATEN:\n`;
+  p += `Protein: ${hasRecognizedProtein ? 'YES' : 'NO'}\n`;
+  p += `Veggies: ${hasRecognizedVeg ? 'YES' : 'NO'}\n`;
+  p += `Starch: ${hasRecognizedStarch ? 'YES' : 'NO'}\n`;
+  p += `Fat: ${hasRecognizedFat ? 'YES' : 'NO'}\n\n`;
+
+  // COACHING DECISIONS (rules code — AI reads these verbatim)
+  if (coachingParts.length > 0) {
+    p += `SAY THESE (use Allen's voice, exact text):\n`;
+    for (const part of coachingParts) {
+      p += `- "${part}"\n`;
+    }
+    p += `\n`;
+  } else {
+    p += `SAY: "Nice! Keep it up! 💪"\n\n`;
+  }
+
+  // UNRECOGNIZED FOOD (AI asks about it — voice only, no portion advice)
+  if (otherUnrecognized.length > 0) {
+    p += `ASK ABOUT: ${otherUnrecognized.join(', ')}\n`;
+    p += `Voice rule: ask in Allen's casual voice, one question. Example: "I don't have 'xyz' — what's that?"\n`;
+    p += `Do NOT give portion advice about unrecognized items. Do NOT say "please share what you ate".\n\n`;
+  }
+
+  // AVOCADO reminder (positive, not a correction)
+  p += `REMEMBER: Avocado is a healthy fat — mention it positively if fat is low or missing.\n`;
+
+  // Allergy gate
   if (!context.allergy_discovery_enabled) {
-    p += `\n⚠️ IMPORTANT: Allergy discovery is DISABLED for this client. NEVER suggest adding foods as allergies. NEVER say "want me to add X as a hard allergy" or similar. Hard bans (actual allergies) still apply — never suggest those foods.\n`;
+    p += `\n⚠️ Allergy discovery is OFF for this client. Never suggest adding foods as allergies.\n`;
   }
 
-  p += `\nRespond now:`;
-
+  p += `\nYour reply (Allen coaching voice, short):`;
   return p;
 }
 
@@ -2585,7 +2649,11 @@ Recognized items: ${recognizedList || 'none'}
 Unrecognized items: ${unrecognizedList || 'none'}
 Disallowed items: ${disallowedList || 'none'}${discoveryGate}
 
-If all items are allowed (no disallowed, no unrecognized that are problems): say "Good snack! 💪"
-If there are problems (disallowed or unrecognized items that violate phase): explain what's wrong
+SNACK RULES:
+- MISSING CATEGORIES ARE OK — snacks don't need protein/veg/fat/starch. Do NOT warn about missing categories.
+- ALCOHOL IS NEVER ALLOWED in Phases 1, 2, 3, 5. If "Disallowed items" includes alcohol → warn: "Alcohol is not allowed in Phase [N]! Swap it out."
+- If disallowed items contain sugar, processed foods, or starch on a no-starch day → warn what's wrong.
+- If no disallowed items (only recognized or unrecognized food) → say "Good snack! 💪" or ask about unrecognized items.
+
 Keep response SHORT - 1-2 sentences max. Allen's coaching voice.`;
 }

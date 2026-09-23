@@ -217,6 +217,43 @@ export default function ClientDashboard() {
       totalWaterOz += extractWaterOzFromDescription(meal.food_description || '', waterPerMeal);
     }
 
+    // Phase 5 starch detection: for compound meals like "Turkey sandwich",
+    // the starch (bread) is counted by parseFoodDescriptionToPortions only if it's
+    // on the approved list. But the processed starch keyword (sandwich, tortilla, etc.)
+    // means the person DID eat starch — just not an approved kind.
+    // Detect this and count it toward starch so Home tab doesn't show "missing starch"
+    // when the person actually ate bread/pasta/etc.
+    // Only apply for Phase 5 days where starch is allowed (Phase 2 or Phase 4 days).
+    if (currentPhase === 5 && client.phase5_start_date && client.phase5_plan) {
+      const startDate = new Date(client.phase5_start_date);
+      const today = new Date();
+      const daysSinceStart = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const currentDayNum = (daysSinceStart % 14) + 1;
+      const phase5Plan = typeof client.phase5_plan === 'string' ? JSON.parse(client.phase5_plan) : client.phase5_plan;
+      const todayRule = phase5Plan?.days?.find((d: { day: number; type: string }) => d.day === currentDayNum);
+      const starchAllowedToday = todayRule?.type === 'phase2' || todayRule?.type === 'phase4';
+
+      if (starchAllowedToday) {
+        const processedStarchKeywords = ['sandwich', 'tortilla', 'bread', 'pasta', 'bun', 'buns', 'roll', 'rolls', 'wrap', 'wraps', 'pizza', 'taco', 'burrito', 'enchilada', 'quesadilla', 'pita', 'naan', 'bagel', 'croissant'];
+        for (const meal of todaysMeals) {
+          const lower = (meal.food_description || '').toLowerCase();
+          const hasProcessedStarch = processedStarchKeywords.some((kw: string) => {
+            const idx = lower.indexOf(kw);
+            if (idx < 0) return false;
+            const before = idx === 0 ? ' ' : lower[idx - 1];
+            const after = idx + kw.length >= lower.length ? ' ' : lower[idx + kw.length];
+            return (before === ' ' || before === ',' || before === '(') &&
+                   (after === ' ' || after === ',' || after === ')');
+          });
+          if (hasProcessedStarch) {
+            // Count 1 starch cup (approximate portion for a sandwich/tortilla/etc.)
+            totalStarchCups += 1;
+            break; // only count once per meal
+          }
+        }
+      }
+    }
+
     setProteinRemaining(Math.max(0, proteinTargetVal - totalProteinOz));
     setVegRemaining(Math.max(0, vegTargetVal - totalVegCups));
     setFatRemaining(Math.max(0, fatTargetVal - totalFatTbsp));

@@ -173,10 +173,14 @@ export async function POST(request: NextRequest) {
 
     // Handle meal analysis request - HYBRID FLOW (code + AI)
     if (mealData) {
-      const foodDescription = mealData.foodDescription || mealData.description || '';
+      let foodDescription = mealData.foodDescription || mealData.description || '';
       // DEBUG: Log mealData.mealType
       console.log('[DEBUG chat route] mealData.mealType:', JSON.stringify(mealData.mealType), 'typeof:', typeof mealData.mealType);
-      
+
+      // Strip the date/meal header line before parsing — parser should never see it as food
+      // Header format: "MEAL — Day, Mon" or "MEAL — Day, Mon DD" on its own line at start
+      foodDescription = foodDescription.replace(/^(BREAKFAST|LUNCH|DINNER|SNACK)\s*[-—]\s*[A-Z][a-z]{2},?\s*[A-Z][a-z]{2}\s+\d{1,2}\s*\n?/i, '').trim();
+
       const mealContext: CoachContext = {
         ...context,
         mealType: mealData.mealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,

@@ -140,7 +140,7 @@ const ALLERGY_BAN_PATTERNS: Record<string, { list: string; patterns: string[] }[
     { list: 'LEAN_PROTEINS', patterns: ['shrimp', 'crab', 'lobster', 'crawfish', 'scallop', 'clam', 'mussel', 'oyster', 'crawfish', 'crayfish', 'shellfish'] },
   ],
   nuts: [
-    { list: 'HEALTHY_FATS', patterns: ['almond', 'walnut', 'pecan', 'cashew', 'macadamia', 'hazelnut', 'brazil nut', 'pine nut', 'pistachio', 'nuttzo', 'nut butter', 'mixed', 'nut'] },
+    { list: 'HEALTHY_FATS', patterns: ['almond', 'walnut', 'pecan', 'cashew', 'macadamia', 'hazelnut', 'brazil nut', 'pine nut', 'pistachio', 'nuttzo', 'nut butter', 'mixed nuts', 'nut'] },
   ],
   peanuts: [
     { list: 'HEALTHY_FATS', patterns: ['peanut'] },
@@ -277,7 +277,7 @@ export function getFilteredFoodLists(allergies: string[], customBans?: string[])
 export const LEAN_PROTEINS = [
   'Bacon (nitrate-free, twice per week)',
   'Beef', 'Bison',
-  'Burger', 'Cheeseburger', 'Hamburger', 'Cheeseburgers', 'Hamburgers', // burger variants - protein source
+  'Bunless burger',
   'Chicken breast',
   'Cod', 'Crab',
   'Egg beaters', 'Egg whites', 'Eggs (2-3 for men, 1-2 for women)',
@@ -330,6 +330,7 @@ export const STARCHY_CARBOHYDRATES = [
   'Parsnips',
   'Peas',
   'Pineapple',
+  'Pizza',
   'Pinto beans',
   'Plantain',
   'Purple',
@@ -364,6 +365,7 @@ export const FIBROUS_VEGETABLES = [
   'Tomatoes', 'Turnips',
   'Water chestnuts',
   'Zucchini', 'Jalapeño peppers', 'Serrano peppers', 'Anaheim peppers',
+  'Salad greens', 'Mixed greens', 'Mixed salad',
 ];
 // Fresh or frozen, NO CANS
 
@@ -375,6 +377,7 @@ export const HEALTHY_FATS = [
   'Kerrygold gold butter',
   'MCT oil (in coffee)',
   'Mixed nuts (3 small handfuls male, 2 small handfuls female)',
+  'Oil (olive, coconut, safflower)',
   'Olive oil',
   'Safflower oil',
   'Walnuts (3 small handfuls male, 2 small handfuls female)',
@@ -867,7 +870,7 @@ export const PROGRAM_PHASES: Record<string, number[]> = {
 // But water reminder should always be included
 
 // Disallowed food categories per phase (same rules as meals)
-const PHASE_DISALLOWED: Record<number, { starch: boolean; dairy: boolean; sugar: boolean; processed: boolean; alcohol: boolean }> = {
+export const PHASE_DISALLOWED: Record<number, { starch: boolean; dairy: boolean; sugar: boolean; processed: boolean; alcohol: boolean }> = {
   1: { starch: true, dairy: true, sugar: true, processed: true, alcohol: true },
   2: { starch: true, dairy: true, sugar: true, processed: true, alcohol: true },
   4: { starch: false, dairy: false, sugar: false, processed: true, alcohol: true },
@@ -879,7 +882,7 @@ const PHASE_DISALLOWED: Record<number, { starch: boolean; dairy: boolean; sugar:
 const STARCH_KEYWORDS = ['bread', 'rice', 'pasta', 'potato', 'kidney beans', 'pinto beans', 'black beans', 'garbanzo', 'chickpeas', 'cannellini', 'navy beans', 'lima beans', 'butter beans', 'black eyed peas', 'corn', 'oatmeal', 'cereal', 'banana', 'apple', 'orange', 'mango', 'pineapple', 'grape', 'peach', 'plum', 'cherry'];
 const DAIRY_KEYWORDS = ['milk', 'cheese', 'ice cream'];
 const SUGAR_KEYWORDS = ['candy', 'soda', 'sugar', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'dr pepper', 'coke', 'pepsi', 'sprite', 'mountain dew'];
-const PROCESSED_KEYWORDS = ['chips', 'fries', 'potato salad', 'fried', 'nuggets', 'tenders', 'tortilla', 'tortillas', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'french toast', 'sandwich', 'sandwiches', 'bun', 'buns', 'roll', 'rolls', 'wrap', 'wraps', 'bagels', 'toast', 'sub', 'subs', 'hoagie', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
+export const PROCESSED_KEYWORDS = ['chips', 'fries', 'potato salad', 'fried', 'nuggets', 'tenders', 'tortilla', 'tortillas', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'french toast', 'sandwich', 'sandwiches', 'bun', 'buns', 'roll', 'rolls', 'wrap', 'wraps', 'bagels', 'toast', 'sub', 'subs', 'hoagie', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
 export const ALCOHOL_KEYWORDS = ['beer', 'wine', 'vodka', 'whiskey', 'tequila', 'rum', 'cocktail', 'alcohol', 'champagne', 'hard seltzer', 'cider', 'ale', 'stout', 'sake', 'liquor', 'brandy'];
 
 // Helper: check if a food appears on any approved list
@@ -1636,21 +1639,49 @@ export function parseFoodDescriptionToPortions(foodDescription: string): {
   // further split each chunk on " with " and " and " to isolate each food item.
   // Also split on amount-unit boundaries so "20oz water 12oz coffee" splits
   // into ["20oz water", "12oz coffee"] before classification.
+  //
+  // IMPORTANT: the unit-split can OVER-FRAGMENT items like
+  // "2 cups spaghetti" → ["2 cups", "spaghetti"] and "6oz ground beef" → ["6oz", "ground beef"].
+  // The MERGE PASS below re-combines amount-only fragments with their following food word,
+  // EXCEPT for cooking fats ("2 tbsp oil") which need to stay as single items for classification.
   const rawItems = foodDescription.split(/[,;\n]+|\.\s*/);
-  const items: string[] = [];
+  const rawFragments: string[] = [];
+  const fatFoods = new Set(['oil', 'olive oil', 'coconut oil', 'avocado oil', 'safflower oil',
+    'mct oil', 'butter', 'ghee', 'lard', 'margarine', 'shortening',
+    'kerrygold', 'heavy cream', 'cream']);
   for (const raw of rawItems) {
-    // Split on " with " or " and " to separate compound descriptions.
-    // E.g. "12oz coffee with 1 tbsp heavy cream and 1 tbsp sugar"
-    //   → ["12oz coffee", "1 tbsp heavy cream", "1 tbsp sugar"]
     const andSplit = raw.split(/\s+(?:with|and)\s+/i);
     for (const chunk of andSplit) {
-      // Also split on amount-unit boundaries when no other delimiter exists.
-      // This splits "20oz water 12oz coffee" → ["20oz water", "12oz coffee"]
-      const unitSplit = chunk.split(/\s+(?=\d{1,4}(?:\.\d+)?(?:\s*\/\s*\d+)?\s*(?:oz|ounce|tbsp|tablespoons?|cups?|handfuls?|egg|eggs)\b)/gi);
+      // Only split on space-before-number if there IS a space (no-space forms like "6oz" stay intact)
+      // This prevents "2 cups spaghetti 6oz beef" from being split mid-sentence
+      const unitSplit = chunk.split(/(?<=\s)(?=\d{1,4}(?:\.\d+)?(?:\s*\/\s*\d+)?\s*(?:oz|ounce|tbsp|tablespoons?|cups?|handfuls?|egg|eggs)\b)/gi);
       for (const p of unitSplit) {
         const trimmed = p.trim();
-        if (trimmed) items.push(trimmed);
+        if (trimmed) rawFragments.push(trimmed);
       }
+    }
+  }
+  // Merge pass: combine consecutive "amount-unit fragment" + "food word" pairs,
+  // EXCEPT when the second fragment is a cooking fat (keep "2 tbsp oil" intact).
+  const amountUnitEnd = /^.+\b(?:oz|ounce|ounces|tbsp|tablespoons?|tsp|teaspoons?|cups?|handfuls?|egg|eggs)$/i;
+  const items: string[] = [];
+  for (let i = 0; i < rawFragments.length; i++) {
+    const curr = rawFragments[i];
+    const next = rawFragments[i + 1];
+    if (next && amountUnitEnd.test(curr) && !next.match(/^\d/) && !amountUnitEnd.test(next)) {
+      // curr is amount-unit fragment, next is food word
+      const merged = `${curr} ${next}`;
+      // Special case: if the merged item ends in a cooking fat, KEEP it intact as one item
+      // so "2 tbsp oil" stays as one chunk (classification needs this)
+      const lastWord = merged.split(/\s+/).pop()?.toLowerCase() || '';
+      if (fatFoods.has(lastWord)) {
+        items.push(merged);
+      } else {
+        items.push(merged);
+      }
+      i++; // skip next
+    } else {
+      items.push(curr);
     }
   }
 
