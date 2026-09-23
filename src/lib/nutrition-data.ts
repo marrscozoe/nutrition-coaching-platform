@@ -882,7 +882,7 @@ export const PHASE_DISALLOWED: Record<number, { starch: boolean; dairy: boolean;
 const STARCH_KEYWORDS = ['bread', 'rice', 'pasta', 'potato', 'kidney beans', 'pinto beans', 'black beans', 'garbanzo', 'chickpeas', 'cannellini', 'navy beans', 'lima beans', 'butter beans', 'black eyed peas', 'corn', 'oatmeal', 'cereal', 'banana', 'apple', 'orange', 'mango', 'pineapple', 'grape', 'peach', 'plum', 'cherry'];
 const DAIRY_KEYWORDS = ['milk', 'cheese', 'ice cream'];
 const SUGAR_KEYWORDS = ['candy', 'soda', 'sugar', 'honey', 'syrup', 'chocolate', 'cookie', 'cake', 'pie', 'donut', 'pastry', 'dr pepper', 'coke', 'pepsi', 'sprite', 'mountain dew'];
-export const PROCESSED_KEYWORDS = ['chips', 'fries', 'potato salad', 'fried', 'nuggets', 'tenders', 'tortilla', 'tortillas', 'bread', 'pasta', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'french toast', 'sandwich', 'sandwiches', 'bun', 'buns', 'roll', 'rolls', 'wrap', 'wraps', 'bagels', 'toast', 'sub', 'subs', 'hoagie', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
+export const PROCESSED_KEYWORDS = ['chips', 'fries', 'potato salad', 'fried', 'nuggets', 'tenders', 'tortilla', 'tortillas', 'bread', 'pasta', 'spaghetti', 'noodle', 'cereal', 'crackers', 'bagel', 'croissant', 'muffin', 'pancake', 'waffle', 'french toast', 'sandwich', 'sandwiches', 'bun', 'buns', 'roll', 'rolls', 'wrap', 'wraps', 'bagels', 'toast', 'sub', 'subs', 'hoagie', 'hoagies', 'hero', 'baguette', 'flatbread', 'naan', 'pita'];
 export const ALCOHOL_KEYWORDS = ['beer', 'wine', 'vodka', 'whiskey', 'tequila', 'rum', 'cocktail', 'alcohol', 'champagne', 'hard seltzer', 'cider', 'ale', 'stout', 'sake', 'liquor', 'brandy'];
 
 // Helper: check if a food appears on any approved list
@@ -1572,6 +1572,23 @@ export function classifyFoodItem(item: string): 'protein' | 'veg' | 'fat' | 'sta
   // Check healthy fats
   for (const food of HEALTHY_FATS) {
     if (itemContainsFood(food, false)) { console.log(`[DEBUG fat] item="${item}", food="${food}"`); return 'fat'; }
+  }
+
+  // Processed-starch fallback: catch common starches not on the approved list
+  // (spaghetti, pasta, etc.) so Home tab still deducts starch even though
+  // these are disallowed items for chat advice.
+  const lowerUnmodified = item.toLowerCase();
+  for (const kw of PROCESSED_KEYWORDS) {
+    // Use same word-boundary logic as itemContainsFood to avoid "bread" matching "breaded"
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, 'i');
+    if (pattern.test(lowerUnmodified)) {
+      // Only treat as starch if it looks like the main food (not a modifier like "breaded")
+      const foodWords = ['spaghetti', 'pasta', 'bread', 'bun', 'buns', 'roll', 'rolls', 'tortilla', 'bagel', 'cereal', 'crackers', 'muffin', 'pancake', 'waffle', 'pizza', 'sandwich', 'wrap', 'toast', 'sub', 'subs', 'hoagie', 'flatbread', 'naan', 'pita', 'baguette'];
+      if (foodWords.some(fw => new RegExp(`(?:^|[^a-z0-9])${fw}(?:$|[^a-z0-9])`, 'i').test(lowerUnmodified))) {
+        return 'starch';
+      }
+    }
   }
 
   return null;
