@@ -1,14 +1,24 @@
-const withPWA = require('next-pwa')({
+const withPWA = require('@ducanh2912/next-pwa').default;
+
+const nextConfig = {
+  reactStrictMode: true,
+  turbopack: {},
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push('sql.js');
+    }
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+    };
+    return config;
+  },
+};
+
+module.exports = withPWA(nextConfig, {
   dest: 'public',
   register: true,
-  // REMOVED skipWaiting/clientsClaim:
-  // Old code had skipWaiting:true which caused the SW to silently
-  // take over and reload the page as soon as it installed — stealing
-  // the UpdateBanner away from the user before they could tap it.
-  // With skipWaiting:false (default) the new SW waits until ALL tabs
-  // are closed or until the user explicitly calls registration.update().
-  // skipWaiting: false,
-  // clientsClaim: false,
   disable: process.env.NODE_ENV === 'development',
   runtimeCaching: [
     {
@@ -60,7 +70,7 @@ const withPWA = require('next-pwa')({
       handler: 'NetworkFirst',
       options: {
         cacheName: 'static-js-assets',
-        networkTimeoutSeconds: 5, // Fast timeout - fall back to cache quickly
+        networkTimeoutSeconds: 5,
         expiration: {
           maxEntries: 32,
           maxAgeSeconds: 60 * 60, // 1 hour max
@@ -79,9 +89,7 @@ const withPWA = require('next-pwa')({
       },
     },
     {
-      // NetworkOnly for ALL API routes — trainer client list must always be fresh.
-      // Server-side Cache-Control headers on /api/trainer/* handle no-store, but
-      // the SW must never serve a stale trainer list from its own cache.
+      // NetworkOnly for ALL API routes — trainer client list must always be fresh
       urlPattern: /^https:\/\/api\./i,
       handler: 'NetworkOnly',
     },
@@ -98,23 +106,3 @@ const withPWA = require('next-pwa')({
     },
   ],
 });
-
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  reactStrictMode: true,
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      // Exclude sql.js WASM file from server bundle - it will be served from public/
-      config.externals = config.externals || [];
-      config.externals.push('sql.js');
-    }
-    // Enable async WebAssembly for sql.js
-    config.experiments = {
-      ...config.experiments,
-      asyncWebAssembly: true,
-    };
-    return config;
-  },
-};
-
-module.exports = withPWA(nextConfig);
